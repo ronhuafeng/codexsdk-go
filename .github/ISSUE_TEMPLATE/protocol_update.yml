@@ -1,0 +1,29 @@
+name: Protocol update
+description: Track an upstream Codex app-server protocol baseline update.
+title: "protocol: update baseline to <commit>"
+labels: ["protocol", "maintenance"]
+body:
+  - type: input
+    id: upstream_commit
+    attributes:
+      label: Upstream Codex commit
+      placeholder: 3da89d4831251b704ac40d1357d26ad518abaf1d
+    validations:
+      required: true
+  - type: textarea
+    id: drift_summary
+    attributes:
+      label: Drift summary
+      description: Summarize added, changed, removed, and experimental protocol surface.
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Checklist
+      value: |
+        - [ ] Generated schema with `scripts/codexsdk_track_upstream.sh`.
+        - [ ] Reviewed manifest and coverage matrix changes.
+        - [ ] Updated generated protocolv2 Go files.
+        - [ ] Updated provenance metadata and NOTICE if needed.
+        - [ ] Ran tests and generated-code reproducibility checks.

@@ -1,0 +1,34 @@
+{
+  "baseline_schema_bundle_sha256": "0d7eaa1308961f7e714cfbc08f71d210e0c178981940ccac3f295b1d52b6c096",
+  "codex_version": "codex-cli 0.130.0",
+  "comparison_command": "codex app-server generate-json-schema --experimental --out <tmpdir>",
+  "comparison_mode": "canonical-json",
+  "file_diff": {
+    "added": [],
+    "changed": [],
+    "removed": []
+  },
+  "matrix_update_skeleton": "matrix_update_skeleton.json",
+  "method_diff": {
+    "ClientNotification.json": {
+      "added": [],
+      "removed": []
+    },
+    "ClientRequest.json": {
+      "added": [],
+      "removed": []
+    },
+    "ServerNotification.json": {
+      "added": [],
+      "removed": []
+    },
+    "ServerRequest.json": {
+      "added": [],
+      "removed": []
+    }
+  },
+  "note": "This report compares canonical JSON, so object member ordering differences in generated schema bundles do not count as protocol drift.",
+  "schema_version": 1,
+  "source_commit": "3da89d4831251b704ac40d1357d26ad518abaf1d",
+  "status": "clean"
+}
