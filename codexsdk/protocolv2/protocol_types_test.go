@@ -67,7 +67,7 @@ func sampleGeneratedThread() Thread {
 		SessionID:     "session-1",
 		Source:        NewSessionSourceAppServer(),
 		Status:        NewThreadStatusIdle(),
-		ThreadSource:  Value(ThreadSourceUser),
+		ThreadSource:  Value(ThreadSource("user")),
 		Turns: []Turn{{
 			ID:     "turn-1",
 			Items:  []ThreadItem{NewThreadItemAgentMessage(ThreadItemAgentMessage{ID: "item-1", Text: "done"})},
@@ -586,16 +586,10 @@ func TestGeneratedReviewStartParamsProtocolMarshalAndUnmarshal(t *testing.T) {
 func TestGeneratedThreadLifecycleResponsesProtocolMarshalAndUnmarshal(t *testing.T) {
 	thread := sampleGeneratedThread()
 	instructionSources := []string{"AGENTS.md"}
-	modifications := []ActivePermissionProfileModification{
-		NewActivePermissionProfileModificationAdditionalWritableRoot(ActivePermissionProfileModificationAdditionalWritableRoot{
-			Path: "/workspace/tmp",
-		}),
-	}
 	response := ThreadStartResponse{
 		ActivePermissionProfile: Value(ActivePermissionProfile{
-			Extends:       Null[string](),
-			ID:            "profile-1",
-			Modifications: &modifications,
+			Extends: Null[string](),
+			ID:      "profile-1",
 		}),
 		ApprovalPolicy:     NewAskForApprovalNever(),
 		ApprovalsReviewer:  ApprovalsReviewerUser,
@@ -603,8 +597,7 @@ func TestGeneratedThreadLifecycleResponsesProtocolMarshalAndUnmarshal(t *testing
 		InstructionSources: &instructionSources,
 		Model:              "gpt-5",
 		ModelProvider:      "openai",
-		PermissionProfile:  Null[PermissionProfile](),
-		ReasoningEffort:    Value(ReasoningEffortHigh),
+		ReasoningEffort:    Value(ReasoningEffort("high")),
 		Sandbox:            NewSandboxPolicyReadOnly(SandboxPolicyReadOnly{NetworkAccess: boolPtr(true)}),
 		ServiceTier:        Null[string](),
 		Thread:             thread,
@@ -615,11 +608,10 @@ func TestGeneratedThreadLifecycleResponsesProtocolMarshalAndUnmarshal(t *testing
 	}
 	text := string(raw)
 	for _, want := range []string{
-		`"activePermissionProfile":{"extends":null,"id":"profile-1","modifications":[{"path":"/workspace/tmp","type":"additionalWritableRoot"}]}`,
+		`"activePermissionProfile":{"extends":null,"id":"profile-1"}`,
 		`"approvalPolicy":"never"`,
 		`"approvalsReviewer":"user"`,
 		`"instructionSources":["AGENTS.md"]`,
-		`"permissionProfile":null`,
 		`"reasoningEffort":"high"`,
 		`"sandbox":{"networkAccess":true,"type":"readOnly"}`,
 		`"serviceTier":null`,
@@ -637,8 +629,8 @@ func TestGeneratedThreadLifecycleResponsesProtocolMarshalAndUnmarshal(t *testing
 	if decoded.Thread.ID != "thread-1" || decoded.ActivePermissionProfile == nil || decoded.ActivePermissionProfile.Value == nil {
 		t.Fatalf("decoded ThreadStartResponse = %#v", decoded)
 	}
-	if decoded.PermissionProfile == nil || decoded.PermissionProfile.Value != nil || decoded.ServiceTier == nil || decoded.ServiceTier.Value != nil {
-		t.Fatalf("decoded null fields = permissionProfile:%#v serviceTier:%#v", decoded.PermissionProfile, decoded.ServiceTier)
+	if decoded.ServiceTier == nil || decoded.ServiceTier.Value != nil {
+		t.Fatalf("decoded serviceTier = %#v, want explicit null", decoded.ServiceTier)
 	}
 	if decoded.Thread.GitInfo == nil || decoded.Thread.GitInfo.Value == nil || decoded.Thread.GitInfo.Value.SHA == nil {
 		t.Fatalf("decoded thread gitInfo = %#v", decoded.Thread.GitInfo)
@@ -1194,7 +1186,7 @@ func TestGeneratedStableNotificationPayloadsProtocolMarshalAndUnmarshal(t *testi
 		{name: "reasoning summary part added", value: ReasoningSummaryPartAddedNotification{ItemID: "item-1", SummaryIndex: 1, ThreadID: "thread-1", TurnID: "turn-1"}, target: &ReasoningSummaryPartAddedNotification{}, want: `{"itemId":"item-1","summaryIndex":1,"threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "reasoning summary text delta", value: ReasoningSummaryTextDeltaNotification{Delta: "why", ItemID: "item-1", SummaryIndex: 1, ThreadID: "thread-1", TurnID: "turn-1"}, target: &ReasoningSummaryTextDeltaNotification{}, want: `{"delta":"why","itemId":"item-1","summaryIndex":1,"threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "reasoning text delta", value: ReasoningTextDeltaNotification{ContentIndex: 0, Delta: "think", ItemID: "item-1", ThreadID: "thread-1", TurnID: "turn-1"}, target: &ReasoningTextDeltaNotification{}, want: `{"contentIndex":0,"delta":"think","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`},
-		{name: "remote control status changed", value: RemoteControlStatusChangedNotification{EnvironmentID: Value("env-1"), Status: RemoteControlConnectionStatusConnected}, target: &RemoteControlStatusChangedNotification{}, want: `{"environmentId":"env-1","status":"connected"}`},
+		{name: "remote control status changed", value: RemoteControlStatusChangedNotification{EnvironmentID: Value("env-1"), InstallationID: "install-1", ServerName: "remote", Status: RemoteControlConnectionStatusConnected}, target: &RemoteControlStatusChangedNotification{}, want: `{"environmentId":"env-1","installationId":"install-1","serverName":"remote","status":"connected"}`},
 		{name: "skills changed", value: SkillsChangedNotification{}, target: &SkillsChangedNotification{}, want: `{}`},
 		{name: "terminal interaction", value: TerminalInteractionNotification{ItemID: "item-1", ProcessID: "proc-1", Stdin: "ls\n", ThreadID: "thread-1", TurnID: "turn-1"}, target: &TerminalInteractionNotification{}, want: `{"itemId":"item-1","processId":"proc-1","stdin":"ls\n","threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "thread token usage updated", value: ThreadTokenUsageUpdatedNotification{
@@ -1263,7 +1255,7 @@ func TestGeneratedStableNotificationPayloadsRejectMalformedProtocol(t *testing.T
 	}
 
 	var remote RemoteControlStatusChangedNotification
-	err = json.Unmarshal([]byte(`{"status":"bogus"}`), &remote)
+	err = json.Unmarshal([]byte(`{"installationId":"install-1","serverName":"remote","status":"bogus"}`), &remote)
 	if err == nil {
 		t.Fatal("expected invalid remote control status to fail")
 	}
@@ -2009,7 +2001,7 @@ func TestGeneratedAccountFamilyRejectsMalformedProtocol(t *testing.T) {
 func TestGeneratedFeedbackUploadMarshalAndUnmarshal(t *testing.T) {
 	minimalRaw, err := json.Marshal(FeedbackUploadParams{
 		Classification: "bug",
-		IncludeLogs:    true,
+		IncludeLogs:    boolPtr(true),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -2021,7 +2013,7 @@ func TestGeneratedFeedbackUploadMarshalAndUnmarshal(t *testing.T) {
 	fullRaw, err := json.Marshal(FeedbackUploadParams{
 		Classification: "bug",
 		ExtraLogFiles:  Value([]string{"logs/extra.txt"}),
-		IncludeLogs:    false,
+		IncludeLogs:    boolPtr(false),
 		Reason:         Null[string](),
 		Tags:           Value(map[string]string{"area": "sdk"}),
 		ThreadID:       Value("thread-1"),
@@ -2112,11 +2104,6 @@ func TestGeneratedFeedbackUploadRejectsMalformedProtocol(t *testing.T) {
 			name: "null classification",
 			raw:  `{"classification":null,"includeLogs":true}`,
 			want: "decode FeedbackUploadParams.classification: null is not allowed",
-		},
-		{
-			name: "missing includeLogs",
-			raw:  `{"classification":"bug"}`,
-			want: "decode FeedbackUploadParams.includeLogs: missing required field",
 		},
 		{
 			name: "null includeLogs",
@@ -2211,7 +2198,7 @@ func TestGeneratedCollaborationModeProtocolMarshalAndUnmarshal(t *testing.T) {
 			Mode:            Value(ModeKindPlan),
 			Model:           Null[string](),
 			Name:            "Plan",
-			ReasoningEffort: Value(ReasoningEffortMedium),
+			ReasoningEffort: Value(ReasoningEffort("medium")),
 		}, {
 			Name: "Default",
 		}},
@@ -2239,7 +2226,7 @@ func TestGeneratedCollaborationModeProtocolMarshalAndUnmarshal(t *testing.T) {
 	if decoded.Data[0].Model == nil || decoded.Data[0].Model.Value != nil {
 		t.Fatalf("decoded collaboration mode model = %#v, want explicit null", decoded.Data[0].Model)
 	}
-	if decoded.Data[0].ReasoningEffort == nil || decoded.Data[0].ReasoningEffort.Value == nil || *decoded.Data[0].ReasoningEffort.Value != ReasoningEffortMedium {
+	if decoded.Data[0].ReasoningEffort == nil || decoded.Data[0].ReasoningEffort.Value == nil || *decoded.Data[0].ReasoningEffort.Value != ReasoningEffort("medium") {
 		t.Fatalf("decoded collaboration mode reasoning effort = %#v", decoded.Data[0].ReasoningEffort)
 	}
 	if decoded.Data[1].Mode != nil || decoded.Data[1].Model != nil || decoded.Data[1].ReasoningEffort != nil {
@@ -2320,14 +2307,6 @@ func TestGeneratedCollaborationModeRejectsMalformedProtocol(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "decode CollaborationModeMask.mode:") {
 		t.Fatalf("unexpected unknown collaboration mode enum error: %v", err)
-	}
-
-	err = json.Unmarshal([]byte(`{"data":[{"name":"Plan","reasoning_effort":"giant"}]}`), &response)
-	if err == nil {
-		t.Fatal("expected unknown collaboration reasoning effort enum to fail")
-	}
-	if !strings.Contains(err.Error(), "decode CollaborationModeMask.reasoning_effort:") {
-		t.Fatalf("unexpected unknown collaboration reasoning effort error: %v", err)
 	}
 
 	err = json.Unmarshal([]byte(`{"data":[{"name":"Plan","extra":true}]}`), &response)
@@ -3018,7 +2997,7 @@ func TestGeneratedModelListResponseMarshalAndUnmarshal(t *testing.T) {
 		Data: []Model{{
 			AdditionalSpeedTiers:   &speedTiers,
 			AvailabilityNux:        Value(ModelAvailabilityNux{Message: "try it"}),
-			DefaultReasoningEffort: ReasoningEffortMedium,
+			DefaultReasoningEffort: ReasoningEffort("medium"),
 			Description:            "desc",
 			DisplayName:            "GPT",
 			Hidden:                 false,
@@ -3029,7 +3008,7 @@ func TestGeneratedModelListResponseMarshalAndUnmarshal(t *testing.T) {
 			ServiceTiers:           &serviceTiers,
 			SupportedReasoningEfforts: []ReasoningEffortOption{{
 				Description:     "Medium",
-				ReasoningEffort: ReasoningEffortMedium,
+				ReasoningEffort: ReasoningEffort("medium"),
 			}},
 			SupportsPersonality: &supportsPersonality,
 			Upgrade:             Null[string](),
@@ -3056,7 +3035,7 @@ func TestGeneratedModelListResponseMarshalAndUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(decoded.Data) != 1 || decoded.Data[0].Model != "gpt-test" || decoded.Data[0].DefaultReasoningEffort != ReasoningEffortMedium {
+	if len(decoded.Data) != 1 || decoded.Data[0].Model != "gpt-test" || decoded.Data[0].DefaultReasoningEffort != ReasoningEffort("medium") {
 		t.Fatalf("decoded model list response = %#v", decoded)
 	}
 	if decoded.Data[0].UpgradeInfo == nil || decoded.Data[0].UpgradeInfo.Value != nil {
@@ -3143,7 +3122,7 @@ func TestGeneratedModelFamilyRejectsMalformedProtocol(t *testing.T) {
 	}
 
 	_, err = json.Marshal(Model{
-		DefaultReasoningEffort: ReasoningEffortMedium,
+		DefaultReasoningEffort: ReasoningEffort("medium"),
 		Description:            "desc",
 		DisplayName:            "GPT",
 		Hidden:                 false,
@@ -3412,18 +3391,6 @@ func TestGeneratedCommandExecParamsPreserveNullableFields(t *testing.T) {
 		"DROP": Null[string](),
 		"KEEP": Value("1"),
 	}
-	permissionProfile := NewPermissionProfileManaged(PermissionProfileManaged{
-		FileSystem: NewPermissionProfileFileSystemPermissionsRestricted(PermissionProfileFileSystemPermissionsRestricted{
-			Entries: []FileSystemSandboxEntry{{
-				Access: FileSystemAccessModeRead,
-				Path: NewFileSystemPathPath(FileSystemPathPath{
-					Path: "/workspace",
-				}),
-			}},
-			GlobScanMaxDepth: Value(uint64(2)),
-		}),
-		Network: PermissionProfileNetworkPermissions{Enabled: true},
-	})
 	writableRoots := []string{"/workspace/out"}
 	sandboxPolicy := NewSandboxPolicyWorkspaceWrite(SandboxPolicyWorkspaceWrite{
 		ExcludeSlashTmp:     boolPtr(true),
@@ -3438,7 +3405,7 @@ func TestGeneratedCommandExecParamsPreserveNullableFields(t *testing.T) {
 		DisableTimeout:     boolPtr(false),
 		Env:                Value(env),
 		OutputBytesCap:     Value(uint64(4096)),
-		PermissionProfile:  Value(permissionProfile),
+		PermissionProfile:  Value("profile-1"),
 		ProcessID:          Value("proc-1"),
 		SandboxPolicy:      Value(sandboxPolicy),
 		Size:               Value(CommandExecTerminalSize{Cols: 100, Rows: 30}),
@@ -3450,7 +3417,7 @@ func TestGeneratedCommandExecParamsPreserveNullableFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"command":["bash","-lc","echo ok"],"cwd":"/workspace","disableOutputCap":true,"disableTimeout":false,"env":{"DROP":null,"KEEP":"1"},"outputBytesCap":4096,"permissionProfile":{"fileSystem":{"entries":[{"access":"read","path":{"path":"/workspace","type":"path"}}],"globScanMaxDepth":2,"type":"restricted"},"network":{"enabled":true},"type":"managed"},"processId":"proc-1","sandboxPolicy":{"excludeSlashTmp":true,"excludeTmpdirEnvVar":false,"networkAccess":true,"type":"workspaceWrite","writableRoots":["/workspace/out"]},"size":{"cols":100,"rows":30},"streamStdin":true,"streamStdoutStderr":false,"timeoutMs":1000,"tty":true}`
+	want := `{"command":["bash","-lc","echo ok"],"cwd":"/workspace","disableOutputCap":true,"disableTimeout":false,"env":{"DROP":null,"KEEP":"1"},"outputBytesCap":4096,"permissionProfile":"profile-1","processId":"proc-1","sandboxPolicy":{"excludeSlashTmp":true,"excludeTmpdirEnvVar":false,"networkAccess":true,"type":"workspaceWrite","writableRoots":["/workspace/out"]},"size":{"cols":100,"rows":30},"streamStdin":true,"streamStdoutStderr":false,"timeoutMs":1000,"tty":true}`
 	if got := string(fullRaw); got != want {
 		t.Fatalf("full CommandExecParams JSON = %s, want %s", got, want)
 	}
@@ -3487,64 +3454,6 @@ func TestGeneratedCommandExecParamsPreserveNullableFields(t *testing.T) {
 	}
 	if decoded.TimeoutMS == nil || decoded.TimeoutMS.Value == nil || *decoded.TimeoutMS.Value != 0 {
 		t.Fatalf("decoded timeoutMs = %#v", decoded.TimeoutMS)
-	}
-}
-
-func TestGeneratedCommandExecPermissionProfileUnionMarshalAndAccessors(t *testing.T) {
-	restricted := NewPermissionProfileFileSystemPermissionsRestricted(PermissionProfileFileSystemPermissionsRestricted{
-		Entries: []FileSystemSandboxEntry{{
-			Access: FileSystemAccessModeWrite,
-			Path: NewFileSystemPathSpecial(FileSystemPathSpecial{
-				Value: NewFileSystemSpecialPathTmpdir(),
-			}),
-		}},
-		GlobScanMaxDepth: Null[uint64](),
-	})
-	profile := NewPermissionProfileManaged(PermissionProfileManaged{
-		FileSystem: restricted,
-		Network:    PermissionProfileNetworkPermissions{Enabled: true},
-	})
-	if profile.Kind() != PermissionProfileKindManaged || !profile.IsValid() {
-		t.Fatalf("PermissionProfile managed kind/valid = %s/%t", profile.Kind(), profile.IsValid())
-	}
-	managed, ok := profile.AsManaged()
-	if !ok || managed.Network.Enabled != true {
-		t.Fatalf("PermissionProfile AsManaged = %#v ok=%t", managed, ok)
-	}
-	raw, err := json.Marshal(profile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := `{"fileSystem":{"entries":[{"access":"write","path":{"type":"special","value":{"kind":"tmpdir"}}}],"globScanMaxDepth":null,"type":"restricted"},"network":{"enabled":true},"type":"managed"}`
-	if got := string(raw); got != want {
-		t.Fatalf("PermissionProfile JSON = %s, want %s", got, want)
-	}
-
-	disabledRaw, err := json.Marshal(NewPermissionProfileDisabled())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := string(disabledRaw), `{"type":"disabled"}`; got != want {
-		t.Fatalf("PermissionProfile disabled JSON = %s, want %s", got, want)
-	}
-
-	externalRaw, err := json.Marshal(NewPermissionProfileExternal(PermissionProfileExternal{
-		Network: PermissionProfileNetworkPermissions{Enabled: false},
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := string(externalRaw), `{"network":{"enabled":false},"type":"external"}`; got != want {
-		t.Fatalf("PermissionProfile external JSON = %s, want %s", got, want)
-	}
-
-	var decoded PermissionProfile
-	if err := json.Unmarshal([]byte(want), &decoded); err != nil {
-		t.Fatal(err)
-	}
-	decodedManaged, ok := decoded.AsManaged()
-	if !ok || decodedManaged.FileSystem.Kind() != PermissionProfileFileSystemPermissionsKindRestricted {
-		t.Fatalf("decoded PermissionProfile = %#v ok=%t", decodedManaged, ok)
 	}
 }
 
@@ -3778,17 +3687,7 @@ func TestGeneratedCommandExecRejectsMalformedProtocol(t *testing.T) {
 		{
 			name: "invalid permission profile variant",
 			raw:  `{"command":["sh"],"permissionProfile":{"type":"weird"}}`,
-			want: `decode PermissionProfile.type: unknown variant "weird"`,
-		},
-		{
-			name: "missing managed file system",
-			raw:  `{"command":["sh"],"permissionProfile":{"network":{"enabled":true},"type":"managed"}}`,
-			want: "decode PermissionProfile.fileSystem: missing required field",
-		},
-		{
-			name: "restricted glob minimum",
-			raw:  `{"command":["sh"],"permissionProfile":{"fileSystem":{"entries":[],"globScanMaxDepth":0,"type":"restricted"},"network":{"enabled":true},"type":"managed"}}`,
-			want: "decode PermissionProfileFileSystemPermissions.globScanMaxDepth: value must be >= 1",
+			want: "decode CommandExecParams.permissionProfile",
 		},
 		{
 			name: "invalid sandbox policy variant",
@@ -3831,33 +3730,6 @@ func TestGeneratedCommandExecRejectsMalformedProtocol(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "encode CommandExecParams.command: must contain at least 1 item") {
 		t.Fatalf("unexpected empty command exec command error: %v", err)
-	}
-
-	_, err = json.Marshal(PermissionProfile{})
-	if err == nil {
-		t.Fatal("expected zero-value PermissionProfile marshal to fail")
-	}
-	if !strings.Contains(err.Error(), "invalid PermissionProfile union value: no variant is set") {
-		t.Fatalf("unexpected zero-value PermissionProfile error: %v", err)
-	}
-
-	_, err = json.Marshal(NewPermissionProfileFileSystemPermissionsRestricted(PermissionProfileFileSystemPermissionsRestricted{}))
-	if err == nil {
-		t.Fatal("expected restricted PermissionProfileFileSystemPermissions nil entries marshal to fail")
-	}
-	if !strings.Contains(err.Error(), "encode PermissionProfileFileSystemPermissions.restricted.entries: nil is not allowed") {
-		t.Fatalf("unexpected restricted nil entries error: %v", err)
-	}
-
-	_, err = json.Marshal(NewPermissionProfileFileSystemPermissionsRestricted(PermissionProfileFileSystemPermissionsRestricted{
-		Entries:          []FileSystemSandboxEntry{},
-		GlobScanMaxDepth: Value(uint64(0)),
-	}))
-	if err == nil {
-		t.Fatal("expected restricted PermissionProfileFileSystemPermissions invalid globScanMaxDepth marshal to fail")
-	}
-	if !strings.Contains(err.Error(), "encode PermissionProfileFileSystemPermissions.restricted.globScanMaxDepth: value must be >= 1") {
-		t.Fatalf("unexpected restricted globScanMaxDepth error: %v", err)
 	}
 
 	_, err = json.Marshal(SandboxPolicy{})
@@ -4440,12 +4312,9 @@ func TestGeneratedConfigReadResponseProtocolMarshalAndUnmarshal(t *testing.T) {
 	if decoded.Config.Analytics.Value.DynamicProperties["sample"].Kind() != JSONKindString {
 		t.Fatalf("decoded AnalyticsConfig dynamic properties = %#v", decoded.Config.Analytics.Value.DynamicProperties)
 	}
-	if decoded.Config.Profiles == nil || len(*decoded.Config.Profiles) != 1 {
-		t.Fatalf("decoded Config.profiles = %#v", decoded.Config.Profiles)
-	}
-	workProfile := (*decoded.Config.Profiles)["work"]
-	if workProfile.DynamicProperties["customProfile"].Kind() != JSONKindNumber {
-		t.Fatalf("decoded ProfileV2 dynamic properties = %#v", workProfile.DynamicProperties)
+	profiles, ok := decoded.Config.DynamicProperties["profiles"]
+	if !ok || profiles.Kind() != JSONKindObject {
+		t.Fatalf("decoded Config profiles dynamic property = %#v, present=%t", profiles, ok)
 	}
 	if decoded.Layers == nil || decoded.Layers.Value == nil || len(*decoded.Layers.Value) != 1 {
 		t.Fatalf("decoded ConfigReadResponse.layers = %#v", decoded.Layers)
@@ -4498,18 +4367,6 @@ func TestGeneratedConfigReadResponseRejectsMalformedProtocol(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `encode Config.DynamicProperties["model"]: conflicts with declared field`) {
 		t.Fatalf("unexpected config dynamic property conflict error: %v", err)
-	}
-
-	_, err = json.Marshal(ProfileV2{
-		DynamicProperties: map[string]JSONValue{
-			"custom": {},
-		},
-	})
-	if err == nil {
-		t.Fatal("expected invalid profile dynamic JSONValue to fail")
-	}
-	if !strings.Contains(err.Error(), `encode ProfileV2.DynamicProperties["custom"]: invalid JSONValue`) {
-		t.Fatalf("unexpected invalid profile dynamic property error: %v", err)
 	}
 
 	var layer ConfigLayer
@@ -4625,7 +4482,7 @@ func TestGeneratedConfigRequirementsProtocolMarshalAndUnmarshal(t *testing.T) {
 	}
 
 	var decoded ConfigRequirementsReadResponse
-	if err := json.Unmarshal([]byte(`{"requirements":{"allowedApprovalPolicies":["on-request"],"allowedApprovalsReviewers":["user"],"allowedSandboxModes":["workspace-write"],"allowedWebSearchModes":null,"enforceResidency":"us","featureRequirements":{"alpha":true},"hooks":{"PermissionRequest":[{"hooks":[{"type":"prompt"}],"matcher":null}],"PostCompact":[],"PostToolUse":[],"PreCompact":[],"PreToolUse":[],"SessionStart":[],"Stop":[],"UserPromptSubmit":[],"managedDir":"/managed","windowsManagedDir":null},"network":{"allowLocalBinding":true,"allowUnixSockets":["/tmp/socket"],"domains":{"api.openai.com":"allow","blocked.example":"deny"},"httpPort":8080,"unixSockets":{"agent":"none"}}}}`), &decoded); err != nil {
+	if err := json.Unmarshal([]byte(`{"requirements":{"allowedApprovalPolicies":["on-request"],"allowedApprovalsReviewers":["user"],"allowedSandboxModes":["workspace-write"],"allowedWebSearchModes":null,"enforceResidency":"us","featureRequirements":{"alpha":true},"hooks":{"PermissionRequest":[{"hooks":[{"type":"prompt"}],"matcher":null}],"PostCompact":[],"PostToolUse":[],"PreCompact":[],"PreToolUse":[],"SessionStart":[],"Stop":[],"SubagentStart":[],"SubagentStop":[],"UserPromptSubmit":[],"managedDir":"/managed","windowsManagedDir":null},"network":{"allowLocalBinding":true,"allowUnixSockets":["/tmp/socket"],"domains":{"api.openai.com":"allow","blocked.example":"deny"},"httpPort":8080,"unixSockets":{"agent":"deny"}}}}`), &decoded); err != nil {
 		t.Fatal(err)
 	}
 	if decoded.Requirements == nil || decoded.Requirements.Value == nil {
@@ -6475,9 +6332,11 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 		Source:        NewPluginSourceRemote(),
 	}
 	detail := PluginDetail{
-		Apps:            []AppSummary{{ID: "app-1", Name: "App One", NeedsAuth: false}},
+		AppTemplates:    []AppTemplateSummary{},
+		Apps:            []AppSummary{{ID: "app-1", Name: "App One"}},
 		Hooks:           []PluginHookSummary{{EventName: HookEventNamePreToolUse, Key: "hook-1"}},
 		MarketplaceName: "market",
+		MarketplacePath: Null[string](),
 		MCPServers:      []string{"mcp-1"},
 		Skills:          []SkillSummary{{Description: "review", Enabled: true, Name: "review"}},
 		Summary:         summary,
@@ -6488,17 +6347,17 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 		target any
 		want   string
 	}{
-		{name: "install response", value: PluginInstallResponse{AppsNeedingAuth: []AppSummary{{ID: "app-1", Name: "App One", NeedsAuth: true}}, AuthPolicy: PluginAuthPolicyONINSTALL}, target: &PluginInstallResponse{}, want: `{"appsNeedingAuth":[{"id":"app-1","name":"App One","needsAuth":true}],"authPolicy":"ON_INSTALL"}`},
+		{name: "install response", value: PluginInstallResponse{AppsNeedingAuth: []AppSummary{{ID: "app-1", Name: "App One"}}, AuthPolicy: PluginAuthPolicyONINSTALL}, target: &PluginInstallResponse{}, want: `{"appsNeedingAuth":[{"id":"app-1","name":"App One"}],"authPolicy":"ON_INSTALL"}`},
 		{name: "list response", value: PluginListResponse{Marketplaces: []PluginMarketplaceEntry{{Name: "market", Plugins: []PluginSummary{summary}}}}, target: &PluginListResponse{}, want: `{"marketplaces":[{"name":"market","plugins":[{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}]}]}`},
-		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}, want: `{"plugin":{"apps":[{"id":"app-1","name":"App One","needsAuth":false}],"hooks":[{"eventName":"preToolUse","key":"hook-1"}],"marketplaceName":"market","mcpServers":["mcp-1"],"skills":[{"description":"review","enabled":true,"name":"review"}],"summary":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}}`},
+		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}, want: `{"plugin":{"appTemplates":[],"apps":[{"id":"app-1","name":"App One"}],"hooks":[{"eventName":"preToolUse","key":"hook-1"}],"marketplaceName":"market","marketplacePath":null,"mcpServers":["mcp-1"],"skills":[{"description":"review","enabled":true,"name":"review"}],"summary":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}}`},
 		{name: "share delete params", value: PluginShareDeleteParams{RemotePluginID: "remote-1"}, target: &PluginShareDeleteParams{}, want: `{"remotePluginId":"remote-1"}`},
 		{name: "share delete response", value: PluginShareDeleteResponse{}, target: &PluginShareDeleteResponse{}, want: `{}`},
 		{name: "share list params", value: PluginShareListParams{}, target: &PluginShareListParams{}, want: `{}`},
-		{name: "share list response", value: PluginShareListResponse{Data: []PluginShareListItem{{Plugin: summary, ShareURL: "https://example.test/share"}}}, target: &PluginShareListResponse{}, want: `{"data":[{"plugin":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}},"shareUrl":"https://example.test/share"}]}`},
-		{name: "share save params", value: PluginShareSaveParams{Discoverability: Value(PluginShareDiscoverabilityPRIVATE), PluginPath: "/plugins/plugin-one", RemotePluginID: Null[string](), ShareTargets: Value([]PluginShareTarget{{PrincipalID: "group-1", PrincipalType: PluginSharePrincipalTypeGroup}})}, target: &PluginShareSaveParams{}, want: `{"discoverability":"PRIVATE","pluginPath":"/plugins/plugin-one","remotePluginId":null,"shareTargets":[{"principalId":"group-1","principalType":"group"}]}`},
+		{name: "share list response", value: PluginShareListResponse{Data: []PluginShareListItem{{LocalPluginPath: Value("/plugins/plugin-one"), Plugin: summary}}}, target: &PluginShareListResponse{}, want: `{"data":[{"localPluginPath":"/plugins/plugin-one","plugin":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}]}`},
+		{name: "share save params", value: PluginShareSaveParams{Discoverability: Value(PluginShareDiscoverabilityPRIVATE), PluginPath: "/plugins/plugin-one", RemotePluginID: Null[string](), ShareTargets: Value([]PluginShareTarget{{PrincipalID: "group-1", PrincipalType: PluginSharePrincipalTypeGroup, Role: PluginShareTargetRoleReader}})}, target: &PluginShareSaveParams{}, want: `{"discoverability":"PRIVATE","pluginPath":"/plugins/plugin-one","remotePluginId":null,"shareTargets":[{"principalId":"group-1","principalType":"group","role":"reader"}]}`},
 		{name: "share save response", value: PluginShareSaveResponse{RemotePluginID: "remote-1", ShareURL: "https://example.test/plugin"}, target: &PluginShareSaveResponse{}, want: `{"remotePluginId":"remote-1","shareUrl":"https://example.test/plugin"}`},
-		{name: "share update targets params", value: PluginShareUpdateTargetsParams{Discoverability: PluginShareUpdateDiscoverabilityUNLISTED, RemotePluginID: "remote-1", ShareTargets: []PluginShareTarget{{PrincipalID: "user-1", PrincipalType: PluginSharePrincipalTypeUser}}}, target: &PluginShareUpdateTargetsParams{}, want: `{"discoverability":"UNLISTED","remotePluginId":"remote-1","shareTargets":[{"principalId":"user-1","principalType":"user"}]}`},
-		{name: "share update targets response", value: PluginShareUpdateTargetsResponse{Discoverability: PluginShareDiscoverabilityUNLISTED, Principals: []PluginSharePrincipal{{Name: "User One", PrincipalID: "user-1", PrincipalType: PluginSharePrincipalTypeUser}}}, target: &PluginShareUpdateTargetsResponse{}, want: `{"discoverability":"UNLISTED","principals":[{"name":"User One","principalId":"user-1","principalType":"user"}]}`},
+		{name: "share update targets params", value: PluginShareUpdateTargetsParams{Discoverability: PluginShareUpdateDiscoverabilityUNLISTED, RemotePluginID: "remote-1", ShareTargets: []PluginShareTarget{{PrincipalID: "user-1", PrincipalType: PluginSharePrincipalTypeUser, Role: PluginShareTargetRoleEditor}}}, target: &PluginShareUpdateTargetsParams{}, want: `{"discoverability":"UNLISTED","remotePluginId":"remote-1","shareTargets":[{"principalId":"user-1","principalType":"user","role":"editor"}]}`},
+		{name: "share update targets response", value: PluginShareUpdateTargetsResponse{Discoverability: PluginShareDiscoverabilityUNLISTED, Principals: []PluginSharePrincipal{{Name: "User One", PrincipalID: "user-1", PrincipalType: PluginSharePrincipalTypeUser, Role: PluginSharePrincipalRoleOwner}}}, target: &PluginShareUpdateTargetsResponse{}, want: `{"discoverability":"UNLISTED","principals":[{"name":"User One","principalId":"user-1","principalType":"user","role":"owner"}]}`},
 		{name: "skill read params", value: PluginSkillReadParams{RemoteMarketplaceName: "market", RemotePluginID: "remote-1", SkillName: "review"}, target: &PluginSkillReadParams{}, want: `{"remoteMarketplaceName":"market","remotePluginId":"remote-1","skillName":"review"}`},
 		{name: "skill read response", value: PluginSkillReadResponse{Contents: Null[string]()}, target: &PluginSkillReadResponse{}, want: `{"contents":null}`},
 		{name: "uninstall params", value: PluginUninstallParams{PluginID: "plugin-1"}, target: &PluginUninstallParams{}, want: `{"pluginId":"plugin-1"}`},

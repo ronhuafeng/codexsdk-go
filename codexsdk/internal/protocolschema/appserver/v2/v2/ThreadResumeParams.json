@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ThreadResumeParams",
-  "description": "There are three ways to resume a thread: 1. By thread_id: load the thread from disk by thread_id and resume it. 2. By history: instantiate the thread from memory and resume it. 3. By path: load the thread from disk by path and resume it.\n\nThe precedence is: history > path > thread_id. If using history or path, the thread_id param will be ignored.\n\nPrefer using thread_id whenever possible.",
+  "description": "There are three ways to resume a thread: 1. By thread_id: load the thread from disk by thread_id and resume it. 2. By history: instantiate the thread from memory and resume it. 3. By path: load the thread from disk by path and resume it.\n\nFor non-running threads, the precedence is: history > non-empty path > thread_id. If using history or a non-empty path for a non-running thread, the thread_id param will be ignored.\n\nIf thread_id identifies a running thread, app-server rejoins that thread and treats a non-empty path as a consistency check against the active rollout path. Empty string path values are treated as absent.\n\nPrefer using thread_id whenever possible.",
   "type": "object",
   "required": [
     "threadId"
@@ -67,6 +67,17 @@
         "$ref": "#/definitions/ResponseItem"
       }
     },
+    "initialTurnsPage": {
+      "description": "When present, include a `thread/turns/list` page in the resume response so clients can bootstrap recent turns without a second request.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ThreadResumeInitialTurnsPageParams"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "model": {
       "description": "Configuration overrides for the resumed thread, if any.",
       "type": [
@@ -81,27 +92,19 @@
       ]
     },
     "path": {
-      "description": "[UNSTABLE] Specify the rollout path to resume from. If specified, the thread_id param will be ignored.",
+      "description": "[UNSTABLE] Specify the rollout path to resume from. If specified for a non-running thread, the thread_id param will be ignored. If thread_id identifies a running thread, the path must match the active rollout path.",
+      "default": null,
       "type": [
         "string",
         "null"
       ]
     },
     "permissions": {
-      "description": "Named profile selection for the resumed thread. Cannot be combined with `sandbox`. Use bounded `modifications` for supported thread adjustments instead of replacing the full permissions profile.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/PermissionProfileSelectionParams"
-        },
-        {
-          "type": "null"
-        }
+      "description": "Named profile id for the resumed thread. Cannot be combined with `sandbox`.",
+      "type": [
+        "string",
+        "null"
       ]
-    },
-    "persistExtendedHistory": {
-      "description": "Deprecated and ignored by app-server. Kept only so older clients can continue sending the field while rollout persistence always uses the limited history policy.",
-      "default": false,
-      "type": "boolean"
     },
     "personality": {
       "anyOf": [
@@ -112,6 +115,16 @@
           "type": "null"
         }
       ]
+    },
+    "runtimeWorkspaceRoots": {
+      "description": "Replace the thread's runtime workspace roots. Paths must be absolute.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/AbsolutePathBuf"
+      }
     },
     "sandbox": {
       "anyOf": [
@@ -137,6 +150,30 @@
     "AbsolutePathBuf": {
       "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
       "type": "string"
+    },
+    "AgentMessageInputContent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "encrypted_content",
+            "type"
+          ],
+          "properties": {
+            "encrypted_content": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "encrypted_content"
+              ],
+              "title": "EncryptedContentAgentMessageInputContentType"
+            }
+          },
+          "title": "EncryptedContentAgentMessageInputContent"
+        }
+      ]
     },
     "ApprovalsReviewer": {
       "description": "Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.",
@@ -336,6 +373,26 @@
             }
           },
           "title": "InputImageFunctionCallOutputContentItem"
+        },
+        {
+          "type": "object",
+          "required": [
+            "encrypted_content",
+            "type"
+          ],
+          "properties": {
+            "encrypted_content": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "encrypted_content"
+              ],
+              "title": "EncryptedContentFunctionCallOutputContentItemType"
+            }
+          },
+          "title": "EncryptedContentFunctionCallOutputContentItem"
         }
       ]
     },
@@ -428,65 +485,6 @@
           "enum": [
             "final_answer"
           ]
-        }
-      ]
-    },
-    "PermissionProfileModificationParams": {
-      "oneOf": [
-        {
-          "description": "Additional concrete directory that should be writable.",
-          "type": "object",
-          "required": [
-            "path",
-            "type"
-          ],
-          "properties": {
-            "path": {
-              "$ref": "#/definitions/AbsolutePathBuf"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "additionalWritableRoot"
-              ],
-              "title": "AdditionalWritableRootPermissionProfileModificationParamsType"
-            }
-          },
-          "title": "AdditionalWritableRootPermissionProfileModificationParams"
-        }
-      ]
-    },
-    "PermissionProfileSelectionParams": {
-      "oneOf": [
-        {
-          "description": "Select a named built-in or user-defined profile and optionally apply bounded modifications that Codex knows how to validate.",
-          "type": "object",
-          "required": [
-            "id",
-            "type"
-          ],
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "modifications": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "$ref": "#/definitions/PermissionProfileModificationParams"
-              }
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "profile"
-              ],
-              "title": "ProfilePermissionProfileSelectionParamsType"
-            }
-          },
-          "title": "ProfilePermissionProfileSelectionParams"
         }
       ]
     },
@@ -611,6 +609,37 @@
             }
           },
           "title": "MessageResponseItem"
+        },
+        {
+          "type": "object",
+          "required": [
+            "author",
+            "content",
+            "recipient",
+            "type"
+          ],
+          "properties": {
+            "author": {
+              "type": "string"
+            },
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AgentMessageInputContent"
+              }
+            },
+            "recipient": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "agent_message"
+              ],
+              "title": "AgentMessageResponseItemType"
+            }
+          },
+          "title": "AgentMessageResponseItem"
         },
         {
           "type": "object",
@@ -1001,6 +1030,22 @@
             "type"
           ],
           "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "compaction_trigger"
+              ],
+              "title": "CompactionTriggerResponseItemType"
+            }
+          },
+          "title": "CompactionTriggerResponseItem"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
             "encrypted_content": {
               "type": [
                 "string",
@@ -1142,6 +1187,74 @@
         "read-only",
         "workspace-write",
         "danger-full-access"
+      ]
+    },
+    "SortDirection": {
+      "type": "string",
+      "enum": [
+        "asc",
+        "desc"
+      ]
+    },
+    "ThreadResumeInitialTurnsPageParams": {
+      "type": "object",
+      "properties": {
+        "itemsView": {
+          "description": "How much item detail to include for each returned turn; defaults to summary.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TurnItemsView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "description": "Optional turn page size.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "sortDirection": {
+          "description": "Optional turn pagination direction; defaults to descending.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SortDirection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "TurnItemsView": {
+      "oneOf": [
+        {
+          "description": "`items` was not loaded for this turn. The field is intentionally empty.",
+          "type": "string",
+          "enum": [
+            "notLoaded"
+          ]
+        },
+        {
+          "description": "`items` contains only a display summary for this turn.",
+          "type": "string",
+          "enum": [
+            "summary"
+          ]
+        },
+        {
+          "description": "`items` contains every ThreadItem available from persisted app-server history for this turn.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        }
       ]
     }
   }

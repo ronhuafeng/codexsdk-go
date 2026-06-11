@@ -52,7 +52,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			}
 		}
 	}
-	if got, want := len(selected), 390; got != want {
+	if got, want := len(selected), 429; got != want {
 		t.Fatalf("selected generated type count = %d, want %d", got, want)
 	}
 	for _, name := range []string{
@@ -216,7 +216,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"HookStartedNotification",
 		"PermissionsRequestApprovalParams",
 		"PermissionsRequestApprovalResponse",
-		"PermissionProfileNetworkPermissions",
 		"PluginDetail",
 		"PluginInstallParams",
 		"PluginInstallResponse",
@@ -245,7 +244,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"PluginUninstallParams",
 		"PluginUninstallResponse",
 		"PluginsMigration",
-		"ProfileV2",
 		"ProcessExitedNotification",
 		"ProcessKillParams",
 		"ProcessKillResponse",
@@ -438,7 +436,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"disableTimeout":     "*bool",
 		"env":                "*protocolv2.Nullable[map[string]*protocolv2.Nullable[string]]",
 		"outputBytesCap":     "*protocolv2.Nullable[uint64]",
-		"permissionProfile":  "*protocolv2.Nullable[PermissionProfile]",
+		"permissionProfile":  "*protocolv2.Nullable[string]",
 		"processId":          "*protocolv2.Nullable[string]",
 		"sandboxPolicy":      "*protocolv2.Nullable[SandboxPolicy]",
 		"size":               "*protocolv2.Nullable[CommandExecTerminalSize]",
@@ -487,14 +485,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		if got := commandExecTerminalSizeFields[fieldName].GoType; got != wantGoType {
 			t.Fatalf("CommandExecTerminalSize.%s GoType = %q, want %q", fieldName, got, wantGoType)
 		}
-	}
-	permissionNetwork := selectedByName["PermissionProfileNetworkPermissions"]
-	permissionNetworkFields := map[string]FieldPlan{}
-	for _, field := range permissionNetwork.Fields {
-		permissionNetworkFields[field.FieldName] = field
-	}
-	if got := permissionNetworkFields["enabled"].GoType; got != "bool" {
-		t.Fatalf("PermissionProfileNetworkPermissions.enabled GoType = %q, want bool", got)
 	}
 	configBatchWrite := selectedByName["ConfigBatchWriteParams"]
 	configBatchWriteFields := map[string]FieldPlan{}
@@ -594,45 +584,38 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		configFields[field.FieldName] = field
 	}
 	for fieldName, wantGoType := range map[string]string{
-		"analytics":                      "*protocolv2.Nullable[AnalyticsConfig]",
-		"approval_policy":                "*protocolv2.Nullable[AskForApproval]",
-		"approvals_reviewer":             "*protocolv2.Nullable[ApprovalsReviewer]",
-		"apps":                           "*protocolv2.Nullable[AppsConfig]",
-		"compact_prompt":                 "*protocolv2.Nullable[string]",
-		"developer_instructions":         "*protocolv2.Nullable[string]",
-		"forced_chatgpt_workspace_id":    "*protocolv2.Nullable[string]",
-		"forced_login_method":            "*protocolv2.Nullable[ForcedLoginMethod]",
-		"instructions":                   "*protocolv2.Nullable[string]",
-		"model":                          "*protocolv2.Nullable[string]",
-		"model_auto_compact_token_limit": "*protocolv2.Nullable[int64]",
-		"model_context_window":           "*protocolv2.Nullable[int64]",
-		"model_provider":                 "*protocolv2.Nullable[string]",
-		"model_reasoning_effort":         "*protocolv2.Nullable[ReasoningEffort]",
-		"model_reasoning_summary":        "*protocolv2.Nullable[ReasoningSummary]",
-		"model_verbosity":                "*protocolv2.Nullable[Verbosity]",
-		"profile":                        "*protocolv2.Nullable[string]",
-		"profiles":                       "*map[string]ProfileV2",
-		"review_model":                   "*protocolv2.Nullable[string]",
-		"sandbox_mode":                   "*protocolv2.Nullable[SandboxMode]",
-		"sandbox_workspace_write":        "*protocolv2.Nullable[SandboxWorkspaceWrite]",
-		"service_tier":                   "*protocolv2.Nullable[string]",
-		"tools":                          "*protocolv2.Nullable[ToolsV2]",
-		"web_search":                     "*protocolv2.Nullable[WebSearchMode]",
+		"analytics":                            "*protocolv2.Nullable[AnalyticsConfig]",
+		"approval_policy":                      "*protocolv2.Nullable[AskForApproval]",
+		"approvals_reviewer":                   "*protocolv2.Nullable[ApprovalsReviewer]",
+		"apps":                                 "*protocolv2.Nullable[AppsConfig]",
+		"compact_prompt":                       "*protocolv2.Nullable[string]",
+		"desktop":                              "*protocolv2.Nullable[map[string]protocolv2.JSONValue]",
+		"developer_instructions":               "*protocolv2.Nullable[string]",
+		"forced_chatgpt_workspace_id":          "*protocolv2.Nullable[ForcedChatgptWorkspaceIds]",
+		"forced_login_method":                  "*protocolv2.Nullable[ForcedLoginMethod]",
+		"instructions":                         "*protocolv2.Nullable[string]",
+		"model":                                "*protocolv2.Nullable[string]",
+		"model_auto_compact_token_limit":       "*protocolv2.Nullable[int64]",
+		"model_auto_compact_token_limit_scope": "*protocolv2.Nullable[AutoCompactTokenLimitScope]",
+		"model_context_window":                 "*protocolv2.Nullable[int64]",
+		"model_provider":                       "*protocolv2.Nullable[string]",
+		"model_reasoning_effort":               "*protocolv2.Nullable[ReasoningEffort]",
+		"model_reasoning_summary":              "*protocolv2.Nullable[ReasoningSummary]",
+		"model_verbosity":                      "*protocolv2.Nullable[Verbosity]",
+		"review_model":                         "*protocolv2.Nullable[string]",
+		"sandbox_mode":                         "*protocolv2.Nullable[SandboxMode]",
+		"sandbox_workspace_write":              "*protocolv2.Nullable[SandboxWorkspaceWrite]",
+		"service_tier":                         "*protocolv2.Nullable[string]",
+		"tools":                                "*protocolv2.Nullable[ToolsV2]",
+		"web_search":                           "*protocolv2.Nullable[WebSearchMode]",
 	} {
 		if got := configFields[fieldName].GoType; got != wantGoType {
 			t.Fatalf("Config.%s GoType = %q, want %q", fieldName, got, wantGoType)
 		}
 	}
-	if configFields["profiles"].Kind != FieldPlanTypedMap {
-		t.Fatalf("Config.profiles Kind = %s, want %s", configFields["profiles"].Kind, FieldPlanTypedMap)
-	}
 	analyticsConfig := selectedByName["AnalyticsConfig"]
 	if !analyticsConfig.OpenDynamicProperties {
 		t.Fatal("AnalyticsConfig should preserve reviewed additionalProperties=true as dynamic JSON properties")
-	}
-	profile := selectedByName["ProfileV2"]
-	if !profile.OpenDynamicProperties {
-		t.Fatal("ProfileV2 should preserve reviewed additionalProperties=true as dynamic JSON properties")
 	}
 	configLayer := selectedByName["ConfigLayer"]
 	configLayerFields := map[string]FieldPlan{}
@@ -1235,7 +1218,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"config":             "*protocolv2.Nullable[map[string]protocolv2.JSONValue]",
 		"dynamicTools":       "*protocolv2.Nullable[[]DynamicToolSpec]",
 		"environments":       "*protocolv2.Nullable[[]TurnEnvironmentParams]",
-		"permissions":        "*protocolv2.Nullable[PermissionProfileSelectionParams]",
+		"permissions":        "*protocolv2.Nullable[string]",
 		"serviceTier":        "*protocolv2.Nullable[string]",
 		"sessionStartSource": "*protocolv2.Nullable[ThreadStartSource]",
 		"threadSource":       "*protocolv2.Nullable[ThreadSource]",
@@ -1275,7 +1258,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"environments":               "*protocolv2.Nullable[[]TurnEnvironmentParams]",
 		"input":                      "[]UserInput",
 		"outputSchema":               "*protocolv2.OutputSchema",
-		"permissions":                "*protocolv2.Nullable[PermissionProfileSelectionParams]",
+		"permissions":                "*protocolv2.Nullable[string]",
 		"responsesapiClientMetadata": "*protocolv2.Nullable[map[string]string]",
 		"sandboxPolicy":              "*protocolv2.Nullable[SandboxPolicy]",
 		"summary":                    "*protocolv2.Nullable[ReasoningSummary]",
@@ -1310,7 +1293,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 	for fieldName, wantGoType := range map[string]string{
 		"config":      "*protocolv2.Nullable[map[string]protocolv2.JSONValue]",
 		"history":     "*protocolv2.Nullable[[]ResponseItem]",
-		"permissions": "*protocolv2.Nullable[PermissionProfileSelectionParams]",
+		"permissions": "*protocolv2.Nullable[string]",
 		"serviceTier": "*protocolv2.Nullable[string]",
 		"threadId":    "string",
 	} {
@@ -1927,9 +1910,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 	pluginShareListItemFields := generatedFields("PluginShareListItem")
 	if pluginShareListItemFields["localPluginPath"].GoType != "*protocolv2.Nullable[string]" ||
 		pluginShareListItemFields["plugin"].GoType != "PluginSummary" ||
-		!pluginShareListItemFields["plugin"].Required ||
-		pluginShareListItemFields["shareUrl"].GoType != "string" ||
-		!pluginShareListItemFields["shareUrl"].Required {
+		!pluginShareListItemFields["plugin"].Required {
 		t.Fatalf("PluginShareListItem fields = %#v", pluginShareListItemFields)
 	}
 	pluginShareSaveParamsFields := generatedFields("PluginShareSaveParams")
@@ -2253,7 +2234,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			"instructionSources":      "*[]string",
 			"model":                   "string",
 			"modelProvider":           "string",
-			"permissionProfile":       "*protocolv2.Nullable[PermissionProfile]",
 			"reasoningEffort":         "*protocolv2.Nullable[ReasoningEffort]",
 			"sandbox":                 "SandboxPolicy",
 			"serviceTier":             "*protocolv2.Nullable[string]",
@@ -2313,9 +2293,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		activeProfileFields[field.FieldName] = field
 	}
 	for fieldName, wantGoType := range map[string]string{
-		"extends":       "*protocolv2.Nullable[string]",
-		"id":            "string",
-		"modifications": "*[]ActivePermissionProfileModification",
+		"extends": "*protocolv2.Nullable[string]",
+		"id":      "string",
 	} {
 		if got := activeProfileFields[fieldName].GoType; got != wantGoType {
 			t.Fatalf("ActivePermissionProfile.%s GoType = %q, want %q", fieldName, got, wantGoType)
@@ -2653,7 +2632,7 @@ func TestSelectGeneratedEnums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(enums), 97; got != want {
+	if got, want := len(enums), 102; got != want {
 		t.Fatalf("selected generated enum count = %d, want %d", got, want)
 	}
 	enumByName := map[string]EnumPlan{}
@@ -2685,7 +2664,6 @@ func TestSelectGeneratedEnums(t *testing.T) {
 		"ReasoningSummary",
 		"ResidencyRequirement",
 		"ThreadMemoryMode",
-		"ThreadSource",
 		"ThreadStartSource",
 		"ThreadUnsubscribeStatus",
 		"WindowsSandboxReadiness",
@@ -2715,7 +2693,7 @@ func TestSelectGeneratedEnums(t *testing.T) {
 		t.Fatalf("NetworkDomainPermission values = %s, want %s", got, want)
 	}
 	networkUnixSocketPermission := enumByName["NetworkUnixSocketPermission"]
-	if got, want := strings.Join(networkUnixSocketPermission.Values, ","), "allow,none"; got != want {
+	if got, want := strings.Join(networkUnixSocketPermission.Values, ","), "allow,deny"; got != want {
 		t.Fatalf("NetworkUnixSocketPermission values = %s, want %s", got, want)
 	}
 	residencyRequirement := enumByName["ResidencyRequirement"]
@@ -2741,10 +2719,6 @@ func TestSelectGeneratedEnums(t *testing.T) {
 	localShellStatus := enumByName["LocalShellStatus"]
 	if got, want := strings.Join(localShellStatus.Values, ","), "completed,in_progress,incomplete"; got != want {
 		t.Fatalf("LocalShellStatus values = %s, want %s", got, want)
-	}
-	threadSource := enumByName["ThreadSource"]
-	if got, want := strings.Join(threadSource.Values, ","), "user,subagent,memory_consolidation"; got != want {
-		t.Fatalf("ThreadSource values = %s, want %s", got, want)
 	}
 	inputModality := enumByName["InputModality"]
 	if got, want := strings.Join(inputModality.Values, ","), "text,image"; got != want {
@@ -2878,7 +2852,7 @@ func TestSelectGeneratedScalarUnions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(unions), 3; got != want {
+	if got, want := len(unions), 4; got != want {
 		t.Fatalf("selected generated scalar union count = %d, want %d", got, want)
 	}
 	unionByName := map[string]ScalarUnionPlan{}
@@ -3365,13 +3339,7 @@ func TestCommandExecPermissionDefinitionsStayShared(t *testing.T) {
 	if !ok {
 		t.Fatal("missing CommandExecutionRequestApprovalParams schema")
 	}
-	for _, name := range []string{
-		"AbsolutePathBuf",
-		"FileSystemAccessMode",
-		"FileSystemPath",
-		"FileSystemSandboxEntry",
-		"FileSystemSpecialPath",
-	} {
+	for _, name := range []string{"AbsolutePathBuf"} {
 		if !bytes.Equal(encodedDefinition(t, commandExec, name), encodedDefinition(t, commandApproval, name)) {
 			t.Fatalf("%s definition differs between CommandExecParams and CommandExecutionRequestApprovalParams", name)
 		}
@@ -3425,8 +3393,6 @@ func TestThreadTurnParamDefinitionsStayShared(t *testing.T) {
 		"AbsolutePathBuf",
 		"ApprovalsReviewer",
 		"AskForApproval",
-		"PermissionProfileModificationParams",
-		"PermissionProfileSelectionParams",
 	} {
 		startDefinition := encodedDefinition(t, threadStart, name)
 		forkDefinition := encodedDefinition(t, threadFork, name)
@@ -3472,7 +3438,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(unions), 37; got != want {
+	if got, want := len(unions), 34; got != want {
 		t.Fatalf("selected generated tagged union count = %d, want %d", got, want)
 	}
 	unionByName := map[string]TaggedUnionPlan{}
@@ -3538,7 +3504,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if clientRequest.Discriminator != "method" {
 		t.Fatalf("ClientRequest discriminator = %q, want method", clientRequest.Discriminator)
 	}
-	if got, want := len(clientRequest.Variants), 99; got != want {
+	if got, want := len(clientRequest.Variants), 117; got != want {
 		t.Fatalf("ClientRequest variant count = %d, want %d", got, want)
 	}
 	var threadStartRequest TaggedUnionVariantPlan
@@ -3579,7 +3545,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverNotification.Discriminator != "method" {
 		t.Fatalf("ServerNotification discriminator = %q, want method", serverNotification.Discriminator)
 	}
-	if got, want := len(serverNotification.Variants), 63; got != want {
+	if got, want := len(serverNotification.Variants), 66; got != want {
 		t.Fatalf("ServerNotification variant count = %d, want %d", got, want)
 	}
 	var errorNotification TaggedUnionVariantPlan
@@ -3621,7 +3587,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverRequest.Discriminator != "method" {
 		t.Fatalf("ServerRequest discriminator = %q, want method", serverRequest.Discriminator)
 	}
-	if got, want := len(serverRequest.Variants), 9; got != want {
+	if got, want := len(serverRequest.Variants), 10; got != want {
 		t.Fatalf("ServerRequest variant count = %d, want %d", got, want)
 	}
 	var commandApprovalRequest TaggedUnionVariantPlan
@@ -3792,7 +3758,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if functionOutputContent.Discriminator != "type" {
 		t.Fatalf("FunctionCallOutputContentItem discriminator = %q, want type", functionOutputContent.Discriminator)
 	}
-	if got, want := len(functionOutputContent.Variants), 2; got != want {
+	if got, want := len(functionOutputContent.Variants), 3; got != want {
 		t.Fatalf("FunctionCallOutputContentItem variant count = %d, want %d", got, want)
 	}
 	localShellAction := unionByName["LocalShellAction"]
@@ -3828,7 +3794,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if responseItem.Discriminator != "type" {
 		t.Fatalf("ResponseItem discriminator = %q, want type", responseItem.Discriminator)
 	}
-	if got, want := len(responseItem.Variants), 14; got != want {
+	if got, want := len(responseItem.Variants), 16; got != want {
 		t.Fatalf("ResponseItem variant count = %d, want %d", got, want)
 	}
 	var messageItem TaggedUnionVariantPlan
@@ -3988,63 +3954,6 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 		t.Fatalf("GuardianApprovalReviewAction.requestPermissions fields = %#v", guardianRequestPermissionsFields)
 	}
 
-	permissionProfile := unionByName["PermissionProfile"]
-	if permissionProfile.Discriminator != "type" {
-		t.Fatalf("PermissionProfile discriminator = %q, want type", permissionProfile.Discriminator)
-	}
-	if got, want := len(permissionProfile.Variants), 3; got != want {
-		t.Fatalf("PermissionProfile variant count = %d, want %d", got, want)
-	}
-	var managedProfile TaggedUnionVariantPlan
-	var externalProfile TaggedUnionVariantPlan
-	for _, variant := range permissionProfile.Variants {
-		switch variant.DiscriminatorValue {
-		case "managed":
-			managedProfile = variant
-		case "external":
-			externalProfile = variant
-		}
-	}
-	managedProfileFields := map[string]FieldPlan{}
-	for _, field := range managedProfile.Fields {
-		managedProfileFields[field.FieldName] = field
-	}
-	if managedProfileFields["fileSystem"].GoType != "PermissionProfileFileSystemPermissions" || managedProfileFields["network"].GoType != "PermissionProfileNetworkPermissions" {
-		t.Fatalf("PermissionProfile managed fields = %#v", managedProfileFields)
-	}
-	externalProfileFields := map[string]FieldPlan{}
-	for _, field := range externalProfile.Fields {
-		externalProfileFields[field.FieldName] = field
-	}
-	if externalProfileFields["network"].GoType != "PermissionProfileNetworkPermissions" {
-		t.Fatalf("PermissionProfile external fields = %#v", externalProfileFields)
-	}
-
-	permissionFileSystem := unionByName["PermissionProfileFileSystemPermissions"]
-	if permissionFileSystem.Discriminator != "type" {
-		t.Fatalf("PermissionProfileFileSystemPermissions discriminator = %q, want type", permissionFileSystem.Discriminator)
-	}
-	if got, want := len(permissionFileSystem.Variants), 2; got != want {
-		t.Fatalf("PermissionProfileFileSystemPermissions variant count = %d, want %d", got, want)
-	}
-	var restrictedFileSystem TaggedUnionVariantPlan
-	for _, variant := range permissionFileSystem.Variants {
-		if variant.DiscriminatorValue == "restricted" {
-			restrictedFileSystem = variant
-		}
-	}
-	restrictedFileSystemFields := map[string]FieldPlan{}
-	for _, field := range restrictedFileSystem.Fields {
-		restrictedFileSystemFields[field.FieldName] = field
-	}
-	if restrictedFileSystemFields["entries"].GoType != "[]FileSystemSandboxEntry" {
-		t.Fatalf("PermissionProfileFileSystemPermissions entries field = %#v", restrictedFileSystemFields["entries"])
-	}
-	globScanMaxDepth := restrictedFileSystemFields["globScanMaxDepth"]
-	if globScanMaxDepth.GoType != "*protocolv2.Nullable[uint64]" || globScanMaxDepth.Minimum == nil || *globScanMaxDepth.Minimum != 1 {
-		t.Fatalf("PermissionProfileFileSystemPermissions globScanMaxDepth field = %#v", globScanMaxDepth)
-	}
-
 	sandboxPolicy := unionByName["SandboxPolicy"]
 	if sandboxPolicy.Discriminator != "type" {
 		t.Fatalf("SandboxPolicy discriminator = %q, want type", sandboxPolicy.Discriminator)
@@ -4088,7 +3997,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if configLayerSource.Discriminator != "type" {
 		t.Fatalf("ConfigLayerSource discriminator = %q, want type", configLayerSource.Discriminator)
 	}
-	if got, want := len(configLayerSource.Variants), 7; got != want {
+	if got, want := len(configLayerSource.Variants), 8; got != want {
 		t.Fatalf("ConfigLayerSource variant count = %d, want %d", got, want)
 	}
 	var mdmLayer TaggedUnionVariantPlan
@@ -4127,64 +4036,6 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 		t.Fatalf("ConfigLayerSource sessionFlags variant = %#v", sessionFlagsLayer)
 	}
 
-	permissionModification := unionByName["PermissionProfileModificationParams"]
-	if permissionModification.Discriminator != "type" {
-		t.Fatalf("PermissionProfileModificationParams discriminator = %q, want type", permissionModification.Discriminator)
-	}
-	if got, want := len(permissionModification.Variants), 1; got != want {
-		t.Fatalf("PermissionProfileModificationParams variant count = %d, want %d", got, want)
-	}
-	modificationVariant := permissionModification.Variants[0]
-	if modificationVariant.DiscriminatorValue != "additionalWritableRoot" || modificationVariant.PayloadTypeName != "PermissionProfileModificationParamsAdditionalWritableRoot" {
-		t.Fatalf("PermissionProfileModificationParams variant = %#v", modificationVariant)
-	}
-	if got, want := len(modificationVariant.Fields), 1; got != want {
-		t.Fatalf("PermissionProfileModificationParams additionalWritableRoot field count = %d, want %d", got, want)
-	}
-	if modificationVariant.Fields[0].FieldName != "path" || modificationVariant.Fields[0].GoType != "string" {
-		t.Fatalf("PermissionProfileModificationParams additionalWritableRoot field = %#v", modificationVariant.Fields[0])
-	}
-
-	permissionSelection := unionByName["PermissionProfileSelectionParams"]
-	if permissionSelection.Discriminator != "type" {
-		t.Fatalf("PermissionProfileSelectionParams discriminator = %q, want type", permissionSelection.Discriminator)
-	}
-	if got, want := len(permissionSelection.Variants), 1; got != want {
-		t.Fatalf("PermissionProfileSelectionParams variant count = %d, want %d", got, want)
-	}
-	profileSelection := permissionSelection.Variants[0]
-	if profileSelection.DiscriminatorValue != "profile" || profileSelection.PayloadTypeName != "PermissionProfileSelectionParamsProfile" {
-		t.Fatalf("PermissionProfileSelectionParams profile variant = %#v", profileSelection)
-	}
-	selectionFields := map[string]FieldPlan{}
-	for _, field := range profileSelection.Fields {
-		selectionFields[field.FieldName] = field
-	}
-	if selectionFields["id"].GoType != "string" || selectionFields["modifications"].GoType != "*protocolv2.Nullable[[]PermissionProfileModificationParams]" {
-		t.Fatalf("PermissionProfileSelectionParams profile fields = %#v", selectionFields)
-	}
-
-	activeProfileModification := unionByName["ActivePermissionProfileModification"]
-	if activeProfileModification.Discriminator != "type" {
-		t.Fatalf("ActivePermissionProfileModification discriminator = %q, want type", activeProfileModification.Discriminator)
-	}
-	if got, want := len(activeProfileModification.Variants), 1; got != want {
-		t.Fatalf("ActivePermissionProfileModification variant count = %d, want %d", got, want)
-	}
-	activeProfileModificationVariant := activeProfileModification.Variants[0]
-	if activeProfileModificationVariant.DiscriminatorValue != "additionalWritableRoot" ||
-		activeProfileModificationVariant.PayloadTypeName != "ActivePermissionProfileModificationAdditionalWritableRoot" {
-		t.Fatalf("ActivePermissionProfileModification variant = %#v", activeProfileModificationVariant)
-	}
-	if got, want := len(activeProfileModificationVariant.Fields), 1; got != want {
-		t.Fatalf("ActivePermissionProfileModification field count = %d, want %d", got, want)
-	}
-	if activeProfileModificationVariant.Fields[0].FieldName != "path" ||
-		activeProfileModificationVariant.Fields[0].GoType != "string" ||
-		!activeProfileModificationVariant.Fields[0].Required {
-		t.Fatalf("ActivePermissionProfileModification field = %#v", activeProfileModificationVariant.Fields[0])
-	}
-
 	userInput := unionByName["UserInput"]
 	if userInput.Discriminator != "type" {
 		t.Fatalf("UserInput discriminator = %q, want type", userInput.Discriminator)
@@ -4215,7 +4066,13 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if textInputFields["text"].GoType != "string" || textInputFields["text_elements"].GoType != "*[]TextElement" {
 		t.Fatalf("UserInput text fields = %#v", textInputFields)
 	}
-	if imageInput.PayloadTypeName != "UserInputImage" || imageInput.Fields[0].FieldName != "url" || imageInput.Fields[0].GoType != "string" {
+	imageInputFields := map[string]FieldPlan{}
+	for _, field := range imageInput.Fields {
+		imageInputFields[field.FieldName] = field
+	}
+	if imageInput.PayloadTypeName != "UserInputImage" ||
+		imageInputFields["detail"].GoType != "*protocolv2.Nullable[ImageDetail]" ||
+		imageInputFields["url"].GoType != "string" {
 		t.Fatalf("UserInput image variant = %#v", imageInput)
 	}
 	mentionFields := map[string]FieldPlan{}
@@ -4238,7 +4095,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if threadItem.Discriminator != "type" {
 		t.Fatalf("ThreadItem discriminator = %q, want type", threadItem.Discriminator)
 	}
-	if got, want := len(threadItem.Variants), 16; got != want {
+	if got, want := len(threadItem.Variants), 17; got != want {
 		t.Fatalf("ThreadItem variant count = %d, want %d", got, want)
 	}
 	var mcpToolCall TaggedUnionVariantPlan
@@ -4527,12 +4384,6 @@ func TestGenerateProtocolTypesEmitsTaggedUnionBoundary(t *testing.T) {
 		"func NewAccountChatGPT(payload AccountChatGPT) Account",
 		"func (value Account) AsAmazonBedrock() (AccountAmazonBedrock, bool)",
 		`return unknownUnionVariant("Account", "type", variant)`,
-		"type PermissionProfile struct {\n\tkind",
-		"func NewPermissionProfileManaged(payload PermissionProfileManaged) PermissionProfile",
-		"func (value PermissionProfile) AsExternal() (PermissionProfileExternal, bool)",
-		`return unknownUnionVariant("PermissionProfile", "type", variant)`,
-		`return nil, fmt.Errorf("encode PermissionProfileFileSystemPermissions.restricted.entries: nil is not allowed")`,
-		`return nil, fmt.Errorf("encode PermissionProfileFileSystemPermissions.restricted.globScanMaxDepth: value must be >= 1")`,
 		"type SandboxPolicy struct {\n\tkind",
 		"func NewSandboxPolicyWorkspaceWrite(payload SandboxPolicyWorkspaceWrite) SandboxPolicy",
 		"func (value SandboxPolicy) AsReadOnly() (SandboxPolicyReadOnly, bool)",

@@ -52,9 +52,11 @@ const (
 	MethodAccountRead                             = "account/read"
 	MethodAccountSendAddCreditsNudgeEmail         = "account/sendAddCreditsNudgeEmail"
 	MethodAccountUpdated                          = "account/updated"
+	MethodAccountUsageRead                        = "account/usage/read"
 	MethodAppList                                 = "app/list"
 	MethodAppListUpdated                          = "app/list/updated"
 	MethodApplyPatchApproval                      = "applyPatchApproval"
+	MethodAttestationGenerate                     = "attestation/generate"
 	MethodCollaborationModeList                   = "collaborationMode/list"
 	MethodCommandExec                             = "command/exec"
 	MethodCommandExecOutputDelta                  = "command/exec/outputDelta"
@@ -68,6 +70,7 @@ const (
 	MethodConfigRequirementsRead                  = "configRequirements/read"
 	MethodConfigWarning                           = "configWarning"
 	MethodDeprecationNotice                       = "deprecationNotice"
+	MethodEnvironmentAdd                          = "environment/add"
 	MethodError                                   = "error"
 	MethodExecCommandApproval                     = "execCommandApproval"
 	MethodExperimentalFeatureEnablementSet        = "experimentalFeature/enablement/set"
@@ -133,9 +136,12 @@ const (
 	MethodModelRerouted                           = "model/rerouted"
 	MethodModelVerification                       = "model/verification"
 	MethodModelProviderCapabilitiesRead           = "modelProvider/capabilities/read"
+	MethodPermissionProfileList                   = "permissionProfile/list"
 	MethodPluginInstall                           = "plugin/install"
+	MethodPluginInstalled                         = "plugin/installed"
 	MethodPluginList                              = "plugin/list"
 	MethodPluginRead                              = "plugin/read"
+	MethodPluginShareCheckout                     = "plugin/share/checkout"
 	MethodPluginShareDelete                       = "plugin/share/delete"
 	MethodPluginShareList                         = "plugin/share/list"
 	MethodPluginShareSave                         = "plugin/share/save"
@@ -148,20 +154,32 @@ const (
 	MethodProcessResizePTY                        = "process/resizePty"
 	MethodProcessSpawn                            = "process/spawn"
 	MethodProcessWriteStdin                       = "process/writeStdin"
+	MethodRemoteControlClientList                 = "remoteControl/client/list"
+	MethodRemoteControlClientRevoke               = "remoteControl/client/revoke"
+	MethodRemoteControlDisable                    = "remoteControl/disable"
+	MethodRemoteControlEnable                     = "remoteControl/enable"
+	MethodRemoteControlPairingStart               = "remoteControl/pairing/start"
+	MethodRemoteControlPairingStatus              = "remoteControl/pairing/status"
 	MethodRemoteControlStatusChanged              = "remoteControl/status/changed"
+	MethodRemoteControlStatusRead                 = "remoteControl/status/read"
 	MethodReviewStart                             = "review/start"
 	MethodServerRequestResolved                   = "serverRequest/resolved"
 	MethodSkillsChanged                           = "skills/changed"
 	MethodSkillsConfigWrite                       = "skills/config/write"
+	MethodSkillsExtraRootsSet                     = "skills/extraRoots/set"
 	MethodSkillsList                              = "skills/list"
 	MethodThreadApproveGuardianDeniedAction       = "thread/approveGuardianDeniedAction"
 	MethodThreadArchive                           = "thread/archive"
 	MethodThreadArchived                          = "thread/archived"
 	MethodThreadBackgroundTerminalsClean          = "thread/backgroundTerminals/clean"
+	MethodThreadBackgroundTerminalsList           = "thread/backgroundTerminals/list"
+	MethodThreadBackgroundTerminalsTerminate      = "thread/backgroundTerminals/terminate"
 	MethodThreadClosed                            = "thread/closed"
 	MethodThreadCompactStart                      = "thread/compact/start"
 	MethodThreadCompacted                         = "thread/compacted"
 	MethodThreadDecrementElicitation              = "thread/decrement_elicitation"
+	MethodThreadDelete                            = "thread/delete"
+	MethodThreadDeleted                           = "thread/deleted"
 	MethodThreadFork                              = "thread/fork"
 	MethodThreadGoalClear                         = "thread/goal/clear"
 	MethodThreadGoalCleared                       = "thread/goal/cleared"
@@ -192,6 +210,9 @@ const (
 	MethodThreadRealtimeTranscriptDone            = "thread/realtime/transcript/done"
 	MethodThreadResume                            = "thread/resume"
 	MethodThreadRollback                          = "thread/rollback"
+	MethodThreadSearch                            = "thread/search"
+	MethodThreadSettingsUpdate                    = "thread/settings/update"
+	MethodThreadSettingsUpdated                   = "thread/settings/updated"
 	MethodThreadShellCommand                      = "thread/shellCommand"
 	MethodThreadStart                             = "thread/start"
 	MethodThreadStarted                           = "thread/started"
@@ -205,6 +226,7 @@ const (
 	MethodTurnCompleted                           = "turn/completed"
 	MethodTurnDiffUpdated                         = "turn/diff/updated"
 	MethodTurnInterrupt                           = "turn/interrupt"
+	MethodTurnModerationMetadata                  = "turn/moderationMetadata"
 	MethodTurnPlanUpdated                         = "turn/plan/updated"
 	MethodTurnStart                               = "turn/start"
 	MethodTurnStarted                             = "turn/started"
@@ -327,6 +349,17 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "ServerNotifications().AccountUpdated",
 		Stability:             MethodStabilityStable,
 	},
+	MethodAccountUsageRead: {
+		Method:                MethodAccountUsageRead,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "account",
+		ParamsOrPayloadSchema: "",
+		ResponseSchema:        "v2/GetAccountTokenUsageResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Accounts().UsageRead",
+		Stability:             MethodStabilityStable,
+	},
 	MethodAppList: {
 		Method:                MethodAppList,
 		Direction:             MethodDirectionClientToServer,
@@ -358,6 +391,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "ApplyPatchApprovalResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "ServerRequests().ApplyPatchApproval",
+		Stability:             MethodStabilityStable,
+	},
+	MethodAttestationGenerate: {
+		Method:                MethodAttestationGenerate,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindRequest,
+		Family:                "attestation",
+		ParamsOrPayloadSchema: "AttestationGenerateParams",
+		ResponseSchema:        "AttestationGenerateResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "ServerRequests().AttestationGenerate",
 		Stability:             MethodStabilityStable,
 	},
 	MethodCollaborationModeList: {
@@ -502,6 +546,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().DeprecationNotice",
 		Stability:             MethodStabilityStable,
+	},
+	MethodEnvironmentAdd: {
+		Method:                MethodEnvironmentAdd,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "environment",
+		ParamsOrPayloadSchema: "EnvironmentAddParams",
+		ResponseSchema:        "v2/EnvironmentAddResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Environments().Add",
+		Stability:             MethodStabilityExperimental,
 	},
 	MethodError: {
 		Method:                MethodError,
@@ -1218,6 +1273,17 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "ModelProviders().CapabilitiesRead",
 		Stability:             MethodStabilityStable,
 	},
+	MethodPermissionProfileList: {
+		Method:                MethodPermissionProfileList,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "permissionProfile",
+		ParamsOrPayloadSchema: "PermissionProfileListParams",
+		ResponseSchema:        "v2/PermissionProfileListResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "PermissionProfiles().List",
+		Stability:             MethodStabilityStable,
+	},
 	MethodPluginInstall: {
 		Method:                MethodPluginInstall,
 		Direction:             MethodDirectionClientToServer,
@@ -1227,6 +1293,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/PluginInstallResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Plugins().Install",
+		Stability:             MethodStabilityStable,
+	},
+	MethodPluginInstalled: {
+		Method:                MethodPluginInstalled,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "plugin",
+		ParamsOrPayloadSchema: "PluginInstalledParams",
+		ResponseSchema:        "v2/PluginInstalledResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Plugins().Installed",
 		Stability:             MethodStabilityStable,
 	},
 	MethodPluginList: {
@@ -1249,6 +1326,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/PluginReadResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Plugins().Read",
+		Stability:             MethodStabilityStable,
+	},
+	MethodPluginShareCheckout: {
+		Method:                MethodPluginShareCheckout,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "plugin",
+		ParamsOrPayloadSchema: "PluginShareCheckoutParams",
+		ResponseSchema:        "v2/PluginShareCheckoutResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Plugins().ShareCheckout",
 		Stability:             MethodStabilityStable,
 	},
 	MethodPluginShareDelete: {
@@ -1383,6 +1471,72 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Processes().WriteStdin",
 		Stability:             MethodStabilityExperimental,
 	},
+	MethodRemoteControlClientList: {
+		Method:                MethodRemoteControlClientList,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "remoteControl",
+		ParamsOrPayloadSchema: "RemoteControlClientsListParams",
+		ResponseSchema:        "v2/RemoteControlClientsListResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "RemoteControl().ClientList",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodRemoteControlClientRevoke: {
+		Method:                MethodRemoteControlClientRevoke,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "remoteControl",
+		ParamsOrPayloadSchema: "RemoteControlClientsRevokeParams",
+		ResponseSchema:        "v2/RemoteControlClientsRevokeResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "RemoteControl().ClientRevoke",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodRemoteControlDisable: {
+		Method:                MethodRemoteControlDisable,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "remoteControl",
+		ParamsOrPayloadSchema: "",
+		ResponseSchema:        "v2/RemoteControlDisableResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "RemoteControl().Disable",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodRemoteControlEnable: {
+		Method:                MethodRemoteControlEnable,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "remoteControl",
+		ParamsOrPayloadSchema: "",
+		ResponseSchema:        "v2/RemoteControlEnableResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "RemoteControl().Enable",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodRemoteControlPairingStart: {
+		Method:                MethodRemoteControlPairingStart,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "remoteControl",
+		ParamsOrPayloadSchema: "RemoteControlPairingStartParams",
+		ResponseSchema:        "v2/RemoteControlPairingStartResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "RemoteControl().PairingStart",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodRemoteControlPairingStatus: {
+		Method:                MethodRemoteControlPairingStatus,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "remoteControl",
+		ParamsOrPayloadSchema: "RemoteControlPairingStatusParams",
+		ResponseSchema:        "v2/RemoteControlPairingStatusResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "RemoteControl().PairingStatus",
+		Stability:             MethodStabilityExperimental,
+	},
 	MethodRemoteControlStatusChanged: {
 		Method:                MethodRemoteControlStatusChanged,
 		Direction:             MethodDirectionServerToClient,
@@ -1393,6 +1547,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().RemoteControlStatusChanged",
 		Stability:             MethodStabilityStable,
+	},
+	MethodRemoteControlStatusRead: {
+		Method:                MethodRemoteControlStatusRead,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "remoteControl",
+		ParamsOrPayloadSchema: "",
+		ResponseSchema:        "v2/RemoteControlStatusReadResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "RemoteControl().StatusRead",
+		Stability:             MethodStabilityExperimental,
 	},
 	MethodReviewStart: {
 		Method:                MethodReviewStart,
@@ -1436,6 +1601,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/SkillsConfigWriteResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Skills().ConfigWrite",
+		Stability:             MethodStabilityStable,
+	},
+	MethodSkillsExtraRootsSet: {
+		Method:                MethodSkillsExtraRootsSet,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "skills",
+		ParamsOrPayloadSchema: "SkillsExtraRootsSetParams",
+		ResponseSchema:        "v2/SkillsExtraRootsSetResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Skills().ExtraRootsSet",
 		Stability:             MethodStabilityStable,
 	},
 	MethodSkillsList: {
@@ -1493,6 +1669,28 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Threads().BackgroundTerminalsClean",
 		Stability:             MethodStabilityExperimental,
 	},
+	MethodThreadBackgroundTerminalsList: {
+		Method:                MethodThreadBackgroundTerminalsList,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadBackgroundTerminalsListParams",
+		ResponseSchema:        "v2/ThreadBackgroundTerminalsListResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().BackgroundTerminalsList",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodThreadBackgroundTerminalsTerminate: {
+		Method:                MethodThreadBackgroundTerminalsTerminate,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadBackgroundTerminalsTerminateParams",
+		ResponseSchema:        "v2/ThreadBackgroundTerminalsTerminateResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().BackgroundTerminalsTerminate",
+		Stability:             MethodStabilityExperimental,
+	},
 	MethodThreadClosed: {
 		Method:                MethodThreadClosed,
 		Direction:             MethodDirectionServerToClient,
@@ -1537,6 +1735,28 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Threads().DecrementElicitation",
 		Stability:             MethodStabilityExperimental,
 	},
+	MethodThreadDelete: {
+		Method:                MethodThreadDelete,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadDeleteParams",
+		ResponseSchema:        "v2/ThreadDeleteResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().Delete",
+		Stability:             MethodStabilityStable,
+	},
+	MethodThreadDeleted: {
+		Method:                MethodThreadDeleted,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindNotification,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadDeletedNotification",
+		ResponseSchema:        "",
+		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
+		FacadeTarget:          "ServerNotifications().ThreadDeleted",
+		Stability:             MethodStabilityStable,
+	},
 	MethodThreadFork: {
 		Method:                MethodThreadFork,
 		Direction:             MethodDirectionClientToServer,
@@ -1557,7 +1777,7 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/ThreadGoalClearResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Threads().GoalClear",
-		Stability:             MethodStabilityExperimental,
+		Stability:             MethodStabilityStable,
 	},
 	MethodThreadGoalCleared: {
 		Method:                MethodThreadGoalCleared,
@@ -1579,7 +1799,7 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/ThreadGoalGetResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Threads().GoalGet",
-		Stability:             MethodStabilityExperimental,
+		Stability:             MethodStabilityStable,
 	},
 	MethodThreadGoalSet: {
 		Method:                MethodThreadGoalSet,
@@ -1590,7 +1810,7 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/ThreadGoalSetResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Threads().GoalSet",
-		Stability:             MethodStabilityExperimental,
+		Stability:             MethodStabilityStable,
 	},
 	MethodThreadGoalUpdated: {
 		Method:                MethodThreadGoalUpdated,
@@ -1867,6 +2087,39 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Threads().Rollback",
 		Stability:             MethodStabilityStable,
 	},
+	MethodThreadSearch: {
+		Method:                MethodThreadSearch,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadSearchParams",
+		ResponseSchema:        "v2/ThreadSearchResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().Search",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodThreadSettingsUpdate: {
+		Method:                MethodThreadSettingsUpdate,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadSettingsUpdateParams",
+		ResponseSchema:        "v2/ThreadSettingsUpdateResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().SettingsUpdate",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodThreadSettingsUpdated: {
+		Method:                MethodThreadSettingsUpdated,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindNotification,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadSettingsUpdatedNotification",
+		ResponseSchema:        "",
+		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
+		FacadeTarget:          "ServerNotifications().ThreadSettingsUpdated",
+		Stability:             MethodStabilityStable,
+	},
 	MethodThreadShellCommand: {
 		Method:                MethodThreadShellCommand,
 		Direction:             MethodDirectionClientToServer,
@@ -2008,6 +2261,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/TurnInterruptResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Turns().Interrupt",
+		Stability:             MethodStabilityStable,
+	},
+	MethodTurnModerationMetadata: {
+		Method:                MethodTurnModerationMetadata,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindNotification,
+		Family:                "turn",
+		ParamsOrPayloadSchema: "TurnModerationMetadataNotification",
+		ResponseSchema:        "",
+		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
+		FacadeTarget:          "ServerNotifications().TurnModerationMetadata",
 		Stability:             MethodStabilityStable,
 	},
 	MethodTurnPlanUpdated: {

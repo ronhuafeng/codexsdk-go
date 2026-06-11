@@ -76,7 +76,6 @@
     },
     "experimentalRawEvents": {
       "description": "If true, opt into emitting raw Responses API items on the event stream. This is for internal use only (e.g. Codex Cloud).",
-      "default": false,
       "type": "boolean"
     },
     "mockExperimentalField": {
@@ -99,20 +98,11 @@
       ]
     },
     "permissions": {
-      "description": "Named profile selection for this thread. Cannot be combined with `sandbox`. Use bounded `modifications` for supported turn/thread adjustments instead of replacing the full permissions profile.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/PermissionProfileSelectionParams"
-        },
-        {
-          "type": "null"
-        }
+      "description": "Named profile id for this thread. Cannot be combined with `sandbox`.",
+      "type": [
+        "string",
+        "null"
       ]
-    },
-    "persistExtendedHistory": {
-      "description": "Deprecated and ignored by app-server. Kept only so older clients can continue sending the field while rollout persistence always uses the limited history policy.",
-      "default": false,
-      "type": "boolean"
     },
     "personality": {
       "anyOf": [
@@ -124,6 +114,16 @@
         }
       ]
     },
+    "runtimeWorkspaceRoots": {
+      "description": "Replace the thread's runtime workspace roots. Paths must be absolute.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/AbsolutePathBuf"
+      }
+    },
     "sandbox": {
       "anyOf": [
         {
@@ -133,6 +133,16 @@
           "type": "null"
         }
       ]
+    },
+    "selectedCapabilityRoots": {
+      "description": "Capability roots selected for this thread by the hosting platform.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/SelectedCapabilityRoot"
+      }
     },
     "serviceName": {
       "type": [
@@ -232,6 +242,36 @@
         }
       ]
     },
+    "CapabilityRootLocation": {
+      "description": "Location used to resolve a selected capability root.",
+      "oneOf": [
+        {
+          "description": "A path owned by an execution environment.",
+          "type": "object",
+          "required": [
+            "environmentId",
+            "path",
+            "type"
+          ],
+          "properties": {
+            "environmentId": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "environment"
+              ],
+              "title": "EnvironmentCapabilityRootLocationType"
+            }
+          },
+          "title": "EnvironmentCapabilityRootLocation"
+        }
+      ]
+    },
     "DynamicToolSpec": {
       "type": "object",
       "required": [
@@ -258,65 +298,6 @@
         }
       }
     },
-    "PermissionProfileModificationParams": {
-      "oneOf": [
-        {
-          "description": "Additional concrete directory that should be writable.",
-          "type": "object",
-          "required": [
-            "path",
-            "type"
-          ],
-          "properties": {
-            "path": {
-              "$ref": "#/definitions/AbsolutePathBuf"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "additionalWritableRoot"
-              ],
-              "title": "AdditionalWritableRootPermissionProfileModificationParamsType"
-            }
-          },
-          "title": "AdditionalWritableRootPermissionProfileModificationParams"
-        }
-      ]
-    },
-    "PermissionProfileSelectionParams": {
-      "oneOf": [
-        {
-          "description": "Select a named built-in or user-defined profile and optionally apply bounded modifications that Codex knows how to validate.",
-          "type": "object",
-          "required": [
-            "id",
-            "type"
-          ],
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "modifications": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "$ref": "#/definitions/PermissionProfileModificationParams"
-              }
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "profile"
-              ],
-              "title": "ProfilePermissionProfileSelectionParamsType"
-            }
-          },
-          "title": "ProfilePermissionProfileSelectionParams"
-        }
-      ]
-    },
     "Personality": {
       "type": "string",
       "enum": [
@@ -333,13 +314,30 @@
         "danger-full-access"
       ]
     },
+    "SelectedCapabilityRoot": {
+      "description": "A user-selected root that can expose one or more runtime capabilities.",
+      "type": "object",
+      "required": [
+        "id",
+        "location"
+      ],
+      "properties": {
+        "id": {
+          "description": "Stable identifier supplied by the capability selection platform.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Where the selected root can be resolved.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CapabilityRootLocation"
+            }
+          ]
+        }
+      }
+    },
     "ThreadSource": {
-      "type": "string",
-      "enum": [
-        "user",
-        "subagent",
-        "memory_consolidation"
-      ]
+      "type": "string"
     },
     "ThreadStartSource": {
       "type": "string",

@@ -23,8 +23,7 @@
       "type": "object",
       "required": [
         "id",
-        "name",
-        "needsAuth"
+        "name"
       ],
       "properties": {
         "description": {
@@ -44,9 +43,6 @@
         },
         "name": {
           "type": "string"
-        },
-        "needsAuth": {
-          "type": "boolean"
         }
       }
     },
