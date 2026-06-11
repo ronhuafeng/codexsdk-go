@@ -1,0 +1,325 @@
+name: Codex Upstream Protocol Drift
+
+on:
+  schedule:
+    - cron: "0 10 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: codex-upstream-protocol-drift
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Detect protocol drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        run: |
+          rustup default stable
+          rustup show
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            libasound2-dev \
+            libssl-dev \
+            pkg-config \
+            protobuf-compiler
+
+      - name: Resolve upstream baseline
+        id: refs
+        run: |
+          set -euo pipefail
+
+          upstream_sha="$(git ls-remote https://github.com/openai/codex.git refs/heads/main | awk '{print $1}')"
+          baseline_sha="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          metadata = json.loads(Path("codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json").read_text())
+          print(metadata["source_commit"])
+          PY
+          )"
+
+          echo "upstream_sha=${upstream_sha}" >> "$GITHUB_OUTPUT"
+          echo "baseline_sha=${baseline_sha}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Codex upstream protocol drift"
+            echo
+            echo "- Baseline: \`${baseline_sha}\`"
+            echo "- Upstream: \`${upstream_sha}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Skip when baseline is current
+        if: steps.refs.outputs.upstream_sha == steps.refs.outputs.baseline_sha
+        run: |
+          echo "Baseline already points at the latest openai/codex main commit." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Close drift issue when baseline is current
+        if: steps.refs.outputs.upstream_sha == steps.refs.outputs.baseline_sha
+        run: |
+          set -euo pipefail
+
+          label="protocol-drift"
+          issue_number="$(
+            gh issue list \
+              --state open \
+              --label "$label" \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue close "$issue_number" \
+              --reason completed \
+              --comment "Closing because the checked-in baseline already points at the latest upstream Codex commit: \`${{ steps.refs.outputs.upstream_sha }}\`."
+            echo "Closed resolved drift issue #${issue_number}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clone upstream Codex
+        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/openai/codex.git /tmp/openai-codex
+
+      - name: Generate drift report
+        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        run: |
+          set -euo pipefail
+          scripts/codexsdk_track_upstream.sh \
+            --codex-repo /tmp/openai-codex \
+            --commit "${{ steps.refs.outputs.upstream_sha }}" \
+            --out /tmp/codexsdk-upstream
+
+      - name: Prepare drift issue
+        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        id: drift
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          reports = Path("/tmp/codexsdk-upstream/reports")
+          drift_path = reports / "drift_summary.json"
+          drift = json.loads(drift_path.read_text())
+          drift_sha = hashlib.sha256(drift_path.read_bytes()).hexdigest()
+
+          baseline = os.environ["BASELINE_SHA"]
+          upstream = os.environ["UPSTREAM_SHA"]
+          run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          status = drift["status"]
+          file_diff = drift["file_diff"]
+          method_diff = drift["method_diff"]
+
+          def short_list(items, limit=20):
+              if not items:
+                  return "_none_"
+              lines = [f"- `{item}`" for item in items[:limit]]
+              if len(items) > limit:
+                  lines.append(f"- ...and {len(items) - limit} more")
+              return "\n".join(lines)
+
+          method_lines = []
+          for schema, diff in method_diff.items():
+              if diff["added"] or diff["removed"]:
+                  method_lines.append(f"### {schema}")
+                  method_lines.append("")
+                  method_lines.append("Added:")
+                  method_lines.append(short_list(diff["added"]))
+                  method_lines.append("")
+                  method_lines.append("Removed:")
+                  method_lines.append(short_list(diff["removed"]))
+                  method_lines.append("")
+          if not method_lines:
+              method_lines.append("_No aggregate method additions or removals._")
+
+          title = f"Protocol drift detected against openai/codex@{upstream[:7]}"
+          body = f"""<!-- codexsdk-upstream-sync
+          baseline_commit: {baseline}
+          upstream_commit: {upstream}
+          drift_sha256: {drift_sha}
+          -->
+
+          ## Protocol Drift Detected
+
+          The checked-in Codex app-server schema baseline no longer matches upstream `openai/codex`.
+
+          - Baseline: `openai/codex@{baseline}`
+          - Upstream: `openai/codex@{upstream}`
+          - Drift status: `{status}`
+          - Drift fingerprint: `{drift_sha}`
+          - Workflow run: {run_url}
+
+          ## File Diff
+
+          - Added: {len(file_diff["added"])}
+          - Changed: {len(file_diff["changed"])}
+          - Removed: {len(file_diff["removed"])}
+
+          ### Added Schemas
+
+          {short_list(file_diff["added"])}
+
+          ### Changed Schemas
+
+          {short_list(file_diff["changed"])}
+
+          ### Removed Schemas
+
+          {short_list(file_diff["removed"])}
+
+          ## Method Diff
+
+          {chr(10).join(method_lines)}
+
+          ## Suggested Local Sync
+
+          ```sh
+          scripts/codexsdk_track_upstream.sh \\
+            --codex-repo /path/to/openai/codex \\
+            --commit {upstream} \\
+            --out /tmp/codexsdk-upstream
+          ```
+
+          Then use `$codexsdk-sync-upstream` to review drift, update the checked-in baseline, regenerate `protocolv2`, reconcile handwritten SDK behavior, and run validation.
+          """
+
+          comment = f"""Protocol drift is still present.
+
+          - Baseline: `openai/codex@{baseline}`
+          - Upstream: `openai/codex@{upstream}`
+          - Drift status: `{status}`
+          - Drift fingerprint: `{drift_sha}`
+          - Workflow run: {run_url}
+          """
+
+          Path("/tmp/codexsdk-upstream/issue-title.txt").write_text(title + "\n")
+          Path("/tmp/codexsdk-upstream/issue-body.md").write_text(body)
+          Path("/tmp/codexsdk-upstream/issue-comment.md").write_text(comment)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"status={status}\n")
+              output.write(f"drift_sha={drift_sha}\n")
+          PY
+        env:
+          BASELINE_SHA: ${{ steps.refs.outputs.baseline_sha }}
+          UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
+
+      - name: Upload drift reports
+        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        uses: actions/upload-artifact@v6
+        with:
+          name: codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}
+          path: /tmp/codexsdk-upstream/reports
+          if-no-files-found: error
+
+      - name: Update workflow summary
+        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        run: |
+          set -euo pipefail
+          {
+            echo
+            echo "- Drift status: \`${{ steps.drift.outputs.status }}\`"
+            echo "- Drift fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`"
+            echo
+            cat /tmp/codexsdk-upstream/reports/SUMMARY.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Close drift issue when drift is clean
+        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha && steps.drift.outputs.status == 'clean'
+        run: |
+          set -euo pipefail
+
+          label="protocol-drift"
+          issue_number="$(
+            gh issue list \
+              --state open \
+              --label "$label" \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue close "$issue_number" \
+              --reason completed \
+              --comment "Closing because the latest checked upstream commit has no schema drift. Upstream: \`${{ steps.refs.outputs.upstream_sha }}\`; fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`."
+            echo "Closed resolved drift issue #${issue_number}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or update drift issue
+        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha && steps.drift.outputs.status == 'review-required'
+        run: |
+          set -euo pipefail
+
+          label="protocol-drift"
+          gh label create "$label" \
+            --description "Upstream Codex app-server protocol drift needs review" \
+            --color "BFDADC" \
+            --force
+
+          issue_number="$(
+            gh issue list \
+              --state open \
+              --label "$label" \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+
+          if [[ -n "$issue_number" ]]; then
+            existing_drift_sha="$(
+              gh issue view "$issue_number" \
+                --json body \
+                --jq '.body' \
+                | sed -n 's/^[[:space:]]*drift_sha256: //p' \
+                | head -n 1 \
+                | tr -d '\r'
+            )"
+            title="$(cat /tmp/codexsdk-upstream/issue-title.txt)"
+
+            gh issue edit "$issue_number" \
+              --title "$title" \
+              --body-file /tmp/codexsdk-upstream/issue-body.md
+
+            if [[ "$existing_drift_sha" == "${{ steps.drift.outputs.drift_sha }}" ]]; then
+              echo "Updated existing drift issue #${issue_number}; fingerprint unchanged, so no comment was added." >> "$GITHUB_STEP_SUMMARY"
+            else
+              gh issue comment "$issue_number" --body-file /tmp/codexsdk-upstream/issue-comment.md
+              echo "Updated existing drift issue #${issue_number} and added a comment for the new fingerprint." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            title="$(cat /tmp/codexsdk-upstream/issue-title.txt)"
+            new_issue_url="$(
+              gh issue create \
+                --title "$title" \
+                --body-file /tmp/codexsdk-upstream/issue-body.md \
+                --label "$label"
+            )"
+            echo "Created drift issue: ${new_issue_url}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
