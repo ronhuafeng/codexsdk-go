@@ -228,7 +228,7 @@ jobs:
 
       - name: Upload drift reports
         if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}
           path: /tmp/codexsdk-upstream/reports
