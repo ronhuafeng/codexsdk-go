@@ -987,8 +987,10 @@ func isJSONValueFieldPath(path string) bool {
 		"v2/McpServerToolCallResponse.json#/properties/_meta",
 		"v2/McpServerToolCallResponse.json#/properties/structuredContent",
 		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/4/properties/arguments",
+		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/5/properties/arguments",
 		"v2/ThreadStartParams.json#/definitions/DynamicToolSpec/properties/inputSchema",
 		"v2/ThreadRealtimeItemAddedNotification.json#/properties/item",
+		"v2/TurnModerationMetadataNotification.json#/properties/metadata",
 		"v2/TurnStartResponse.json#/definitions/McpToolCallResult/properties/_meta",
 		"v2/TurnStartResponse.json#/definitions/McpToolCallResult/properties/structuredContent",
 		"v2/TurnStartResponse.json#/definitions/ThreadItem#/oneOf/7/properties/arguments",
@@ -1001,7 +1003,8 @@ func isJSONValueFieldPath(path string) bool {
 
 func isJSONValueMapPath(path string) bool {
 	switch path {
-	case "v2/ThreadForkParams.json#/properties/config",
+	case "v2/ConfigReadResponse.json#/definitions/Config/properties/desktop",
+		"v2/ThreadForkParams.json#/properties/config",
 		"v2/ThreadResumeParams.json#/properties/config",
 		"v2/ThreadStartParams.json#/properties/config":
 		return true
@@ -1013,9 +1016,11 @@ func isJSONValueMapPath(path string) bool {
 func isJSONValueArrayPath(path string) bool {
 	switch path {
 	case "v2/ListMcpServerStatusResponse.json#/definitions/Resource/properties/icons",
+		"v2/ListMcpServerStatusResponse.json#/definitions/McpServerInfo/properties/icons",
 		"v2/ListMcpServerStatusResponse.json#/definitions/Tool/properties/icons",
 		"v2/McpServerToolCallResponse.json#/properties/content",
 		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/8/properties/tools",
+		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/9/properties/tools",
 		"v2/ThreadInjectItemsParams.json#/properties/items",
 		"v2/TurnStartResponse.json#/definitions/McpToolCallResult/properties/content":
 		return true

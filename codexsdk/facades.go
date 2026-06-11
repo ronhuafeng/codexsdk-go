@@ -1128,9 +1128,6 @@ func rejectThreadForkExperimentalFields(method string, params protocolv2.ThreadF
 	if params.Permissions != nil {
 		return experimentalFieldError(method, "permissions")
 	}
-	if params.PersistExtendedHistory != nil {
-		return experimentalFieldError(method, "persistExtendedHistory")
-	}
 	return nil
 }
 
@@ -1146,9 +1143,6 @@ func rejectThreadResumeExperimentalFields(method string, params protocolv2.Threa
 	}
 	if params.Permissions != nil {
 		return experimentalFieldError(method, "permissions")
-	}
-	if params.PersistExtendedHistory != nil {
-		return experimentalFieldError(method, "persistExtendedHistory")
 	}
 	return nil
 }
@@ -1168,9 +1162,6 @@ func rejectThreadStartExperimentalFields(method string, params protocolv2.Thread
 	}
 	if params.Permissions != nil {
 		return experimentalFieldError(method, "permissions")
-	}
-	if params.PersistExtendedHistory != nil {
-		return experimentalFieldError(method, "persistExtendedHistory")
 	}
 	return nil
 }

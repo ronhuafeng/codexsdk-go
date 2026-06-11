@@ -40,8 +40,8 @@ func TestLookupMethodUnknown(t *testing.T) {
 
 func TestAllMethodsSortedAndComplete(t *testing.T) {
 	methods := AllMethods()
-	if len(methods) != 172 {
-		t.Fatalf("AllMethods length = %d, want 172", len(methods))
+	if len(methods) != 194 {
+		t.Fatalf("AllMethods length = %d, want 194", len(methods))
 	}
 	for i := 1; i < len(methods); i++ {
 		if methods[i-1].Method >= methods[i].Method {

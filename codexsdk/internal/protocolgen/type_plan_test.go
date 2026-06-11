@@ -16,10 +16,10 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(plan.Types), 286; got != want {
+	if got, want := len(plan.Types), 323; got != want {
 		t.Fatalf("type count = %d, want %d", got, want)
 	}
-	if got, want := len(plan.Fields), 697; got != want {
+	if got, want := len(plan.Fields), 801; got != want {
 		t.Fatalf("field count = %d, want %d", got, want)
 	}
 
@@ -27,8 +27,8 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	wantCounts := map[TypePlanKind]int{
 		TypePlanAggregateBundle:       2,
 		TypePlanAnyOfDeferred:         1,
-		TypePlanEmptyStructCandidate:  40,
-		TypePlanObjectStructCandidate: 236,
+		TypePlanEmptyStructCandidate:  46,
+		TypePlanObjectStructCandidate: 267,
 		TypePlanScalarUnionCandidate:  1,
 		TypePlanTaggedUnionCandidate:  6,
 	}
@@ -131,7 +131,7 @@ func TestBuildProtocolTypePlanClassifiesDynamicJSONFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	counts := CountFieldPlanKinds(plan.Fields)
-	if got, want := counts[FieldPlanJSONValue], 14; got != want {
+	if got, want := counts[FieldPlanJSONValue], 15; got != want {
 		t.Fatalf("JSONValue field count = %d, want %d", got, want)
 	}
 	if got, want := counts[FieldPlanDescriptionOnly], 0; got != want {
@@ -153,6 +153,7 @@ func TestBuildProtocolTypePlanClassifiesDynamicJSONFields(t *testing.T) {
 		"v2/McpServerToolCallResponse.json#/properties/structuredContent",
 		"v2/ThreadApproveGuardianDeniedActionParams.json#/properties/event",
 		"v2/ThreadRealtimeItemAddedNotification.json#/properties/item",
+		"v2/TurnModerationMetadataNotification.json#/properties/metadata",
 	} {
 		field := mustField(t, plan, path)
 		if field.Kind != FieldPlanJSONValue {
@@ -437,8 +438,8 @@ func TestBuildProtocolTypePlanNormalizesCommandExecReviewedRefs(t *testing.T) {
 	}{
 		{
 			path:   "v2/CommandExecParams.json#/properties/permissionProfile",
-			kind:   FieldPlanNullableRef,
-			goType: "*protocolv2.Nullable[PermissionProfile]",
+			kind:   FieldPlanNullableScalar,
+			goType: "*protocolv2.Nullable[string]",
 		},
 		{
 			path:   "v2/CommandExecParams.json#/properties/processId",

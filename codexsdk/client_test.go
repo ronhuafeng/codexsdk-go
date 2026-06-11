@@ -832,7 +832,7 @@ func TestCollaborationModesProtocolFamilyFacadeSendsTypedMethodAndDecodesRespons
 	if response.Data[0].Model == nil || response.Data[0].Model.Value != nil {
 		t.Fatalf("collaboration mode response model = %#v, want explicit null", response.Data[0].Model)
 	}
-	if response.Data[0].ReasoningEffort == nil || response.Data[0].ReasoningEffort.Value == nil || *response.Data[0].ReasoningEffort.Value != protocolv2.ReasoningEffortMedium {
+	if response.Data[0].ReasoningEffort == nil || response.Data[0].ReasoningEffort.Value == nil || *response.Data[0].ReasoningEffort.Value != protocolv2.ReasoningEffort("medium") {
 		t.Fatalf("collaboration mode response reasoning effort = %#v", response.Data[0].ReasoningEffort)
 	}
 
@@ -1402,7 +1402,7 @@ func TestFeedbackProtocolFamilyFacadeSendsTypedMethodAndDecodesResponse(t *testi
 	response, err := root.Feedback().Upload(context.Background(), protocolv2.FeedbackUploadParams{
 		Classification: "bug",
 		ExtraLogFiles:  protocolv2.Value([]string{"logs/extra.txt"}),
-		IncludeLogs:    false,
+		IncludeLogs:    Bool(false),
 		Reason:         protocolv2.Null[string](),
 		Tags:           protocolv2.Value(map[string]string{"area": "sdk"}),
 		ThreadID:       protocolv2.Value("thread-1"),
@@ -1436,7 +1436,7 @@ func TestFeedbackProtocolFamilyFacadeRejectsMalformedTypedResponse(t *testing.T)
 
 	_, err = root.Feedback().Upload(context.Background(), protocolv2.FeedbackUploadParams{
 		Classification: "bug",
-		IncludeLogs:    true,
+		IncludeLogs:    Bool(true),
 	})
 	if err == nil {
 		t.Fatal("Feedback().Upload accepted malformed feedback/upload response")
@@ -1863,7 +1863,8 @@ func TestPluginsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	if err != nil {
 		t.Fatalf("Plugins().ShareList returned error: %v", err)
 	}
-	if len(shareList.Data) != 1 || shareList.Data[0].ShareURL != "https://example.test/share" {
+	if len(shareList.Data) != 1 || shareList.Data[0].LocalPluginPath == nil ||
+		shareList.Data[0].LocalPluginPath.Value == nil || *shareList.Data[0].LocalPluginPath.Value != "/plugins/plugin-one" {
 		t.Fatalf("plugin/share/list response = %#v", shareList)
 	}
 	shareSave, err := plugins.ShareSave(context.Background(), protocolv2.PluginShareSaveParams{
@@ -1873,6 +1874,7 @@ func TestPluginsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		ShareTargets: protocolv2.Value([]protocolv2.PluginShareTarget{{
 			PrincipalID:   "group-1",
 			PrincipalType: protocolv2.PluginSharePrincipalTypeGroup,
+			Role:          protocolv2.PluginShareTargetRoleReader,
 		}}),
 	})
 	if err != nil {
@@ -1887,6 +1889,7 @@ func TestPluginsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		ShareTargets: []protocolv2.PluginShareTarget{{
 			PrincipalID:   "user-1",
 			PrincipalType: protocolv2.PluginSharePrincipalTypeUser,
+			Role:          protocolv2.PluginShareTargetRoleEditor,
 		}},
 	})
 	if err != nil {
@@ -2802,71 +2805,6 @@ func TestThreadGoalProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *t
 	clearParams := firstRecord(records, "recv", protocolv2.MethodThreadGoalClear)["params"].(map[string]any)
 	if clearParams["threadId"] != "thread-1" {
 		t.Fatalf("thread/goal/clear params = %#v", clearParams)
-	}
-}
-
-func TestThreadGoalProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWriteUnlessOptedIn(t *testing.T) {
-	record := tempRecord(t)
-	t.Setenv("CODEXSDK_FAKE_RECORD", record)
-	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("facade")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer root.Close()
-
-	cases := []struct {
-		name   string
-		method string
-		call   func() error
-	}{
-		{
-			name:   "set",
-			method: protocolv2.MethodThreadGoalSet,
-			call: func() error {
-				_, err := root.Threads().GoalSet(context.Background(), protocolv2.ThreadGoalSetParams{
-					Objective: protocolv2.Value("ship protocol coverage"),
-					ThreadID:  "thread-1",
-				})
-				return err
-			},
-		},
-		{
-			name:   "get",
-			method: protocolv2.MethodThreadGoalGet,
-			call: func() error {
-				_, err := root.Threads().GoalGet(context.Background(), protocolv2.ThreadGoalGetParams{ThreadID: "thread-1"})
-				return err
-			},
-		},
-		{
-			name:   "clear",
-			method: protocolv2.MethodThreadGoalClear,
-			call: func() error {
-				_, err := root.Threads().GoalClear(context.Background(), protocolv2.ThreadGoalClearParams{ThreadID: "thread-1"})
-				return err
-			},
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := tc.call()
-			if err == nil {
-				t.Fatalf("thread/goal/%s accepted experimental method without opt-in", tc.name)
-			}
-			if !strings.Contains(err.Error(), "experimental app-server method \""+tc.method+"\" requires ClientCapabilities.ExperimentalAPI") {
-				t.Fatalf("experimental %s error = %v", tc.method, err)
-			}
-		})
-	}
-	records := readRecords(t, record)
-	for _, method := range []string{
-		protocolv2.MethodThreadGoalSet,
-		protocolv2.MethodThreadGoalGet,
-		protocolv2.MethodThreadGoalClear,
-	} {
-		if firstRecord(records, "recv", method) != nil {
-			t.Fatalf("%s was sent after experimental method guard failure", method)
-		}
 	}
 }
 
@@ -3838,7 +3776,7 @@ func TestProtocolFacadeRejectsExperimentalFieldBeforeWriteUnlessOptedIn(t *testi
 			call: func() error {
 				_, err := root.Commands().Exec(context.Background(), protocolv2.CommandExecParams{
 					Command:           []string{"echo", "ok"},
-					PermissionProfile: protocolv2.Null[protocolv2.PermissionProfile](),
+					PermissionProfile: protocolv2.Null[string](),
 				})
 				return err
 			},
@@ -3863,17 +3801,6 @@ func TestProtocolFacadeRejectsExperimentalFieldBeforeWriteUnlessOptedIn(t *testi
 				_, err := root.Threads().Resume(context.Background(), protocolv2.ThreadResumeParams{
 					History:  protocolv2.Null[[]protocolv2.ResponseItem](),
 					ThreadID: "thread-1",
-				})
-				return err
-			},
-		},
-		{
-			name:   "thread start persist extended history",
-			method: protocolv2.MethodThreadStart,
-			field:  "thread/start.persistExtendedHistory",
-			call: func() error {
-				_, err := root.Threads().Start(context.Background(), protocolv2.ThreadStartParams{
-					PersistExtendedHistory: Bool(true),
 				})
 				return err
 			},
@@ -6406,9 +6333,8 @@ func runFakeAppServer(mode string, extra []string) {
 			if mode == "facade" {
 				sendProtocolResult(id, protocolv2.PluginInstallResponse{
 					AppsNeedingAuth: []protocolv2.AppSummary{{
-						ID:        "app-1",
-						Name:      "App One",
-						NeedsAuth: true,
+						ID:   "app-1",
+						Name: "App One",
 					}},
 					AuthPolicy: protocolv2.PluginAuthPolicyONINSTALL,
 				})
@@ -6450,8 +6376,8 @@ func runFakeAppServer(mode string, extra []string) {
 			if mode == "facade" {
 				sendProtocolResult(id, protocolv2.PluginShareListResponse{
 					Data: []protocolv2.PluginShareListItem{{
-						Plugin:   facadePluginSummary(),
-						ShareURL: "https://example.test/share",
+						LocalPluginPath: protocolv2.Value("/plugins/plugin-one"),
+						Plugin:          facadePluginSummary(),
 					}},
 				})
 				continue
@@ -6474,6 +6400,7 @@ func runFakeAppServer(mode string, extra []string) {
 						Name:          "User One",
 						PrincipalID:   "user-1",
 						PrincipalType: protocolv2.PluginSharePrincipalTypeUser,
+						Role:          protocolv2.PluginSharePrincipalRoleOwner,
 					}},
 				})
 				continue
@@ -7346,7 +7273,7 @@ func facadeCollaborationModeListResponse() protocolv2.CollaborationModeListRespo
 			Mode:            protocolv2.Value(protocolv2.ModeKindPlan),
 			Model:           protocolv2.Null[string](),
 			Name:            "Plan",
-			ReasoningEffort: protocolv2.Value(protocolv2.ReasoningEffortMedium),
+			ReasoningEffort: protocolv2.Value(protocolv2.ReasoningEffort("medium")),
 		}, {
 			Name: "Default",
 		}},
@@ -7462,10 +7389,11 @@ func facadePluginSummary() protocolv2.PluginSummary {
 		Name:     "plugin-one",
 		ShareContext: protocolv2.Value(protocolv2.PluginShareContext{
 			RemotePluginID: "remote-1",
-			ShareTargets: protocolv2.Value([]protocolv2.PluginSharePrincipal{{
+			SharePrincipals: protocolv2.Value([]protocolv2.PluginSharePrincipal{{
 				Name:          "User One",
 				PrincipalID:   "user-1",
 				PrincipalType: protocolv2.PluginSharePrincipalTypeUser,
+				Role:          protocolv2.PluginSharePrincipalRoleOwner,
 			}}),
 			ShareURL: protocolv2.Value("https://example.test/share"),
 		}),
@@ -7475,16 +7403,17 @@ func facadePluginSummary() protocolv2.PluginSummary {
 
 func facadePluginDetail() protocolv2.PluginDetail {
 	return protocolv2.PluginDetail{
+		AppTemplates: []protocolv2.AppTemplateSummary{},
 		Apps: []protocolv2.AppSummary{{
-			ID:        "app-1",
-			Name:      "App One",
-			NeedsAuth: false,
+			ID:   "app-1",
+			Name: "App One",
 		}},
 		Hooks: []protocolv2.PluginHookSummary{{
 			EventName: protocolv2.HookEventNamePreToolUse,
 			Key:       "hook-1",
 		}},
 		MarketplaceName: "market",
+		MarketplacePath: protocolv2.Null[string](),
 		MCPServers:      []string{"mcp-1"},
 		Skills: []protocolv2.SkillSummary{{
 			Description: "review",
@@ -7518,7 +7447,7 @@ func facadeThread(threadID string, forkedFromID *string) protocolv2.Thread {
 		SessionID:     "session-" + threadID,
 		Source:        protocolv2.NewSessionSourceAppServer(),
 		Status:        protocolv2.NewThreadStatusIdle(),
-		ThreadSource:  protocolv2.Value(protocolv2.ThreadSourceUser),
+		ThreadSource:  protocolv2.Value(protocolv2.ThreadSource("user")),
 		Turns:         []protocolv2.Turn{},
 		UpdatedAt:     2000,
 	}

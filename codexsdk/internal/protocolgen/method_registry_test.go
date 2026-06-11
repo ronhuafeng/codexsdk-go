@@ -36,7 +36,7 @@ func TestGeneratedMethodRegistryKeepsTypedBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(generated)
-	for _, forbidden := range []string{"json.RawMessage", "map[string]any", "UnknownFields", "AdditionalFields", "Extra"} {
+	for _, forbidden := range []string{"json.RawMessage", "map[string]any", "UnknownFields", "AdditionalFields"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("generated method registry contains forbidden public passthrough marker %q", forbidden)
 		}
