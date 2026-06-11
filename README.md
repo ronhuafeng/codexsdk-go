@@ -1,0 +1,233 @@
+# codexsdk-go
+
+Go client and generated protocol types for the Codex app-server JSON-RPC
+protocol.
+
+This project is unofficial and experimental. It is not an OpenAI product, is
+not supported by OpenAI, and may lag or diverge from the Codex CLI/app-server
+implementation. Use it when you want a small Go SDK that talks to a locally
+launched Codex app-server over stdio.
+
+## Status
+
+- License: MIT for this repository.
+- Upstream protocol source: OpenAI Codex, Apache-2.0, generated from the
+  app-server schema baseline recorded in
+  `codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json`.
+- API stability: pre-1.0. Public APIs are intended to be useful and reviewed,
+  but breaking changes can happen before v1.0.
+- Runtime requirement: the SDK launches an external `codex app-server` command.
+  Unit tests and CI do not require a local Codex binary.
+
+## Packages
+
+- `codexsdk`: ergonomic client, stdio transport, typed facades, `ThreadClient`,
+  streaming, approval/server-request handling, and high-level thread helpers.
+- `codexsdk/protocolv2`: generated app-server v2 params, responses,
+  notifications, enums, unions, JSON helpers, and method registry.
+- `codexsdk/internal/protocolgen`: generator internals for the checked-in schema
+  baseline.
+- `codexsdk/internal/protocolschema/appserver/v2`: reviewed schema baseline,
+  classified manifest, coverage matrix, drift report, and provenance metadata.
+
+## Installation
+
+```sh
+go get github.com/ronhuafeng/codexsdk-go
+```
+
+The module targets Go 1.23 or newer.
+
+To run against a real app-server, install Codex CLI separately and make sure
+`codex` is on `PATH`:
+
+```sh
+codex --version
+```
+
+## Quick Start: Typed Client
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	"github.com/ronhuafeng/codexsdk-go/codexsdk"
+	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
+)
+
+func main() {
+	ctx := context.Background()
+	workspace, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := codexsdk.New(codexsdk.ClientOptions{
+		CWD:     workspace,
+		Command: []string{"codex", "app-server", "--listen", "stdio://"},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	resp, err := client.Models().List(ctx, protocolv2.ModelListParams{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("models: %d", len(resp.Data))
+}
+```
+
+## Quick Start: ThreadClient
+
+`ThreadClient` wraps the lower-level `thread/start` and `turn/start` flow and
+drains the stream into a final result.
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	"github.com/ronhuafeng/codexsdk-go/codexsdk"
+)
+
+func main() {
+	ctx := context.Background()
+	workspace, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	model := os.Getenv("CODEXSDK_EXAMPLE_MODEL")
+	if model == "" {
+		log.Fatal("set CODEXSDK_EXAMPLE_MODEL")
+	}
+
+	root, err := codexsdk.New(codexsdk.ClientOptions{
+		CWD:     workspace,
+		Command: []string{"codex", "app-server", "--listen", "stdio://"},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer root.Close()
+
+	threads := root.ThreadClient(codexsdk.ThreadClientOptions{
+		DefaultModel:  model,
+		DefaultCWD:    workspace,
+		DefaultEffort: codexsdk.ReasoningEffortLow,
+	})
+
+	result, err := threads.StartThread(ctx, codexsdk.StartThreadRequest{
+		Input:          codexsdk.Text("Reply with a short confirmation."),
+		Ephemeral:      codexsdk.Bool(true),
+		ApprovalPolicy: codexsdk.ApprovalPolicyNever,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(result.FinalResponse)
+}
+```
+
+More compile-checked examples live in `codexsdk/examples_test.go`.
+
+## Real App-Server Smoke Test
+
+The real smoke test is opt-in because it launches Codex, uses a configured
+model, and may create or consume account state.
+
+```sh
+CODEXSDK_REAL_APP_SERVER_SMOKE=1 \
+CODEXSDK_REAL_APP_SERVER_MODEL=gpt-5-mini \
+go test ./codexsdk -run TestRealAppServerSmokeStartResumeFork -count=1
+```
+
+Optional command override:
+
+```sh
+CODEXSDK_REAL_APP_SERVER_COMMAND='codex app-server --listen stdio://' \
+CODEXSDK_REAL_APP_SERVER_SMOKE=1 \
+CODEXSDK_REAL_APP_SERVER_MODEL=gpt-5-mini \
+go test ./codexsdk -run TestRealAppServerSmokeStartResumeFork -count=1
+```
+
+Normal CI does not run this test.
+
+## Protocol V2 Schema Strategy
+
+`protocolv2` code is generated from a checked-in Codex app-server v2 schema
+baseline, not by shelling out to Codex during normal builds. The baseline is
+tracked with:
+
+- `baseline_metadata.json`: upstream commit, Codex version, generation command,
+  source license, file count, and schema bundle checksum.
+- `manifest.json`: classified method surface, request/notification direction,
+  response schema mapping, facade target, and stable-vs-experimental marking.
+- `coverage_matrix.json`: reviewed support status for methods, types, and key
+  fields.
+- `drift_report.json` and `matrix_update_skeleton.json`: last clean comparison
+  artifacts and the shape of follow-up review work when upstream changes.
+
+Regenerate Go code from the checked-in baseline:
+
+```sh
+go run ./codexsdk/internal/cmd/protocolv2gen
+```
+
+Check generated code reproducibility without modifying the tree:
+
+```sh
+tmp="$(mktemp -d)"
+go run ./codexsdk/internal/cmd/protocolv2gen -out "$tmp"
+diff -u codexsdk/protocolv2/method_registry.gen.go "$tmp/method_registry.gen.go"
+diff -u codexsdk/protocolv2/protocol_types.gen.go "$tmp/protocol_types.gen.go"
+```
+
+## Maintenance
+
+Use the upstream tracking script to generate review artifacts for a Codex
+schema update. The script is read-only for the checked-in baseline unless a
+maintainer copies reviewed files back into the SDK tree.
+
+```sh
+scripts/codexsdk_track_upstream.sh \
+  --codex-repo /path/to/openai/codex \
+  --commit <codex-commit> \
+  --out /tmp/codexsdk-upstream
+```
+
+Then review the generated `reports/SUMMARY.md`, schema drift summary, and matrix
+update skeleton before updating the baseline, manifest, coverage matrix, and
+generated Go code. See `docs/release.md` for the release and schema baseline
+checklists.
+
+## Compatibility Policy
+
+Before v1.0, minor releases may include breaking changes when the upstream
+Codex app-server protocol changes or when the SDK corrects an unsafe public
+API. Patch releases should be backwards compatible except for security or data
+corruption fixes.
+
+After v1.0, the project should follow SemVer for the public API in `codexsdk`
+and `codexsdk/protocolv2`. Generated `protocolv2` additions are usually minor
+changes. Removing or changing generated types, method constants, or facade
+method signatures is a major change unless the upstream protocol removed the
+surface and compatibility cannot be preserved safely.
+
+## Security
+
+Do not put API keys, account tokens, private workspaces, private schema dumps,
+or local absolute paths into issues, tests, schema metadata, or generated
+artifacts. The SDK starts a local app-server process and forwards requests over
+stdio; callers are responsible for choosing an appropriate Codex command,
+working directory, approval policy, and server request handler.
+
+See `SECURITY.md` for vulnerability reporting guidance.
