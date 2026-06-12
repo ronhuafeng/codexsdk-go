@@ -24,6 +24,15 @@ If the commit is missing and cannot be discovered locally, ask for it before cha
 
 Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.cache/` by default. Never check in `.cache` contents.
 
+Use this cache topology unless the user provides an explicit alternative:
+
+- upstream clone: `.cache/openai-codex`
+- sync output: `.cache/codexsdk-upstream-<short-sha>`
+- clean rerun output: `.cache/codexsdk-upstream-<short-sha>-clean`
+- Rust build cache: `.cache/cargo-target/codex`
+
+Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at any time.
+
 ## Workflow
 
 1. Inspect the current repository state.
@@ -66,7 +75,15 @@ Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.c
    - `.cache/codexsdk-upstream-<short-sha>/reports/drift_summary.json`
    - `.cache/codexsdk-upstream-<short-sha>/reports/matrix_update_skeleton.json`
 
-   Treat any added, removed, or changed schema as review-required. Classify method, type, and field changes before updating `manifest.json` or `coverage_matrix.json`.
+   Treat any added, removed, or changed schema as review-required. Classify the drift before updating `manifest.json` or `coverage_matrix.json`:
+
+   - method drift: added or removed request/notification method entries
+   - schema file drift: added, removed, or changed JSON schema files
+   - generated Go type drift: generated struct, enum, union, or nullable field changes
+   - handwritten SDK impact: facade/client/type/test/docs changes needed beyond generated code
+   - coverage impact: `coverage_matrix.json` entries needed for new or changed surface
+
+   For example, an optional nullable field added to an existing response type normally requires generated Go and focused tests, but no facade change unless handwritten SDK code exposes or interprets that field.
 
 4. Update the checked-in baseline only after review.
 
@@ -78,7 +95,14 @@ Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.c
    - update `coverage_matrix.json` with explicit support status, owner, reason, revisit trigger, and exit condition for new or changed surface
    - update `drift_report.json` and `matrix_update_skeleton.json` by rerunning the tracking script after the baseline matches the target schema and copying the clean reports
 
-   Do not check in local absolute paths, private repo paths, account data, or raw smoke-test transcripts.
+   Sanitize checked-in reports before staging:
+
+   - replace local source repo paths with `https://github.com/openai/codex`
+   - replace local generator worktree paths with `codex app-server generate-json-schema --experimental --out <tmpdir>`
+   - include the baseline schema bundle checksum from `baseline_metadata.json`
+   - keep the canonical-JSON comparison note when object member ordering is irrelevant
+
+   Do not check in local absolute paths, `.cache/...` output paths, private repo paths, account data, or raw smoke-test transcripts.
 
 5. Regenerate protocol code.
 
@@ -114,7 +138,14 @@ Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.c
    GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -out "$tmp"
    diff -u codexsdk/protocolv2/method_registry.gen.go "$tmp/method_registry.gen.go"
    diff -u codexsdk/protocolv2/protocol_types.gen.go "$tmp/protocol_types.gen.go"
+
+   rg -n "/Users/|/home/|\\.cache/codexsdk-upstream|\\.cache/openai-codex" \
+     codexsdk/internal/protocolschema/appserver/v2 \
+     .agents/skills/codexsdk-sync-upstream/SKILL.md \
+     .gitignore
    ```
+
+   The path scan may match intentional relative `.cache/...` instructions in this skill or `.gitignore`; it must not find local absolute paths in checked-in schema metadata or reports.
 
    Run the real app-server smoke test only when the user explicitly wants it or the change affects lifecycle behavior:
 
@@ -124,6 +155,24 @@ Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.c
    GOWORK=off go test ./codexsdk -run TestRealAppServerSmokeStartResumeFork -count=1
    ```
 
+8. Before committing, check whether upstream `main` moved.
+
+   ```sh
+   git ls-remote https://github.com/openai/codex.git refs/heads/main
+   ```
+
+   If upstream moved after the selected target, run the tracking script against the new commit without changing checked-in files first. If the new commit is drift-clean relative to the updated baseline, do not chase it with a provenance-only commit unless the user asked for exact latest provenance. If it has real protocol drift, stop and explain the new target so the user can choose whether to continue. Do not enter an unbounded loop chasing a moving upstream branch.
+
+9. After pushing, monitor repository automation when the task is to solve a drift issue.
+
+   Watch the push CI run and the Codex Upstream Protocol Drift workflow run. Cold GitHub runners may spend several minutes compiling Rust before the drift report step advances.
+
+   Confirm the drift issue outcome:
+
+   - if drift is clean, the workflow should close the existing drift issue
+   - if drift remains, the workflow should update the existing drift issue rather than creating duplicates
+   - if upstream moved again, report the exact latest commit and whether the remaining drift is real or clean
+
 ## Decision Rules
 
 - If drift is clean and the user only asked to check a commit, report that no SDK update is needed.
@@ -131,3 +180,4 @@ Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.c
 - If generated Go fails because a new schema shape is unsupported, update `codexsdk/internal/protocolgen` with a reviewed generation rule and focused tests before regenerating.
 - If a method disappears upstream, preserve compatibility only when it is safe and intentional; otherwise document the breaking change.
 - If upstream adds experimental surface, mark it experimental unless it appears in the non-experimental schema comparison and the existing manifest rules say otherwise.
+- If a scheduled or manual drift issue already exists, update or close that issue; do not create a new issue for each upstream commit while the old one is unresolved.
