@@ -6339,6 +6339,7 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 		MarketplaceName: "market",
 		MarketplacePath: Null[string](),
 		MCPServers:      []string{"mcp-1"},
+		ShareURL:        Value("https://example.test/plugin"),
 		Skills:          []SkillSummary{{Description: "review", Enabled: true, Name: "review"}},
 		Summary:         summary,
 	}
@@ -6350,7 +6351,7 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 	}{
 		{name: "install response", value: PluginInstallResponse{AppsNeedingAuth: []AppSummary{{ID: "app-1", Name: "App One"}}, AuthPolicy: PluginAuthPolicyONINSTALL}, target: &PluginInstallResponse{}, want: `{"appsNeedingAuth":[{"id":"app-1","name":"App One"}],"authPolicy":"ON_INSTALL"}`},
 		{name: "list response", value: PluginListResponse{Marketplaces: []PluginMarketplaceEntry{{Name: "market", Plugins: []PluginSummary{summary}}}}, target: &PluginListResponse{}, want: `{"marketplaces":[{"name":"market","plugins":[{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}]}]}`},
-		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}, want: `{"plugin":{"appTemplates":[],"apps":[{"id":"app-1","name":"App One"}],"hooks":[{"eventName":"preToolUse","key":"hook-1"}],"marketplaceName":"market","marketplacePath":null,"mcpServers":["mcp-1"],"skills":[{"description":"review","enabled":true,"name":"review"}],"summary":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}}`},
+		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}, want: `{"plugin":{"appTemplates":[],"apps":[{"id":"app-1","name":"App One"}],"hooks":[{"eventName":"preToolUse","key":"hook-1"}],"marketplaceName":"market","marketplacePath":null,"mcpServers":["mcp-1"],"shareUrl":"https://example.test/plugin","skills":[{"description":"review","enabled":true,"name":"review"}],"summary":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}}`},
 		{name: "share delete params", value: PluginShareDeleteParams{RemotePluginID: "remote-1"}, target: &PluginShareDeleteParams{}, want: `{"remotePluginId":"remote-1"}`},
 		{name: "share delete response", value: PluginShareDeleteResponse{}, target: &PluginShareDeleteResponse{}, want: `{}`},
 		{name: "share list params", value: PluginShareListParams{}, target: &PluginShareListParams{}, want: `{}`},

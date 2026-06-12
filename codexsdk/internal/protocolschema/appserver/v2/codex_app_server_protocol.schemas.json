@@ -15616,6 +15616,12 @@
               "type": "string"
             }
           },
+          "shareUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "skills": {
             "type": "array",
             "items": {

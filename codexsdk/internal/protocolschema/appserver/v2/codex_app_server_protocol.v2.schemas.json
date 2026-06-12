@@ -9402,6 +9402,12 @@
             "type": "string"
           }
         },
+        "shareUrl": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "skills": {
           "type": "array",
           "items": {
@@ -15701,44 +15707,6 @@
         }
       }
     },
-    "ClientInfo": {
-      "type": "object",
-      "required": [
-        "name",
-        "version"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "version": {
-          "type": "string"
-        }
-      }
-    },
-    "FuzzyFileSearchSessionUpdateParams": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionUpdateParams",
-      "type": "object",
-      "required": [
-        "query",
-        "sessionId"
-      ],
-      "properties": {
-        "query": {
-          "type": "string"
-        },
-        "sessionId": {
-          "type": "string"
-        }
-      }
-    },
     "InitializeCapabilities": {
       "description": "Client-declared capabilities negotiated during initialize.",
       "type": "object",
@@ -15765,26 +15733,37 @@
         }
       }
     },
-    "InitializeParams": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "InitializeParams",
+    "ClientInfo": {
       "type": "object",
       "required": [
-        "clientInfo"
+        "name",
+        "version"
       ],
       "properties": {
-        "capabilities": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/InitializeCapabilities"
-            },
-            {
-              "type": "null"
-            }
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
           ]
         },
-        "clientInfo": {
-          "$ref": "#/definitions/ClientInfo"
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "FuzzyFileSearchSessionCompletedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionCompletedNotification",
+      "type": "object",
+      "required": [
+        "sessionId"
+      ],
+      "properties": {
+        "sessionId": {
+          "type": "string"
         }
       }
     },
@@ -15836,34 +15815,65 @@
         "directory"
       ]
     },
-    "FuzzyFileSearchSessionStartParams": {
+    "InitializeParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionStartParams",
+      "title": "InitializeParams",
       "type": "object",
       "required": [
-        "roots",
+        "clientInfo"
+      ],
+      "properties": {
+        "capabilities": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InitializeCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clientInfo": {
+          "$ref": "#/definitions/ClientInfo"
+        }
+      }
+    },
+    "FuzzyFileSearchSessionUpdatedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionUpdatedNotification",
+      "type": "object",
+      "required": [
+        "files",
+        "query",
         "sessionId"
       ],
       "properties": {
-        "roots": {
+        "files": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/FuzzyFileSearchResult"
           }
+        },
+        "query": {
+          "type": "string"
         },
         "sessionId": {
           "type": "string"
         }
       }
     },
-    "FuzzyFileSearchSessionStopParams": {
+    "FuzzyFileSearchSessionUpdateParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionStopParams",
+      "title": "FuzzyFileSearchSessionUpdateParams",
       "type": "object",
       "required": [
+        "query",
         "sessionId"
       ],
       "properties": {
+        "query": {
+          "type": "string"
+        },
         "sessionId": {
           "type": "string"
         }
@@ -15895,9 +15905,9 @@
         }
       }
     },
-    "FuzzyFileSearchSessionCompletedNotification": {
+    "FuzzyFileSearchSessionStopParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionCompletedNotification",
+      "title": "FuzzyFileSearchSessionStopParams",
       "type": "object",
       "required": [
         "sessionId"
@@ -15908,24 +15918,20 @@
         }
       }
     },
-    "FuzzyFileSearchSessionUpdatedNotification": {
+    "FuzzyFileSearchSessionStartParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionUpdatedNotification",
+      "title": "FuzzyFileSearchSessionStartParams",
       "type": "object",
       "required": [
-        "files",
-        "query",
+        "roots",
         "sessionId"
       ],
       "properties": {
-        "files": {
+        "roots": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/FuzzyFileSearchResult"
+            "type": "string"
           }
-        },
-        "query": {
-          "type": "string"
         },
         "sessionId": {
           "type": "string"

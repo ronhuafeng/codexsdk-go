@@ -12608,6 +12608,7 @@ type PluginDetail struct {
 	MarketplaceName string               `json:"marketplaceName"`
 	MarketplacePath *Nullable[string]    `json:"marketplacePath,omitempty"`
 	MCPServers      []string             `json:"mcpServers"`
+	ShareURL        *Nullable[string]    `json:"shareUrl,omitempty"`
 	Skills          []SkillSummary       `json:"skills"`
 	Summary         PluginSummary        `json:"summary"`
 }
@@ -12680,6 +12681,10 @@ func (value *PluginDetail) UnmarshalJSON(data []byte) error {
 	}
 	if !seenMCPServers {
 		return missingRequiredField("PluginDetail.mcpServers")
+	}
+	_, err = decodeNullableJSONField[string](fields, "shareUrl", "PluginDetail.shareUrl", &decoded.ShareURL)
+	if err != nil {
+		return err
 	}
 	seenSkills, err := decodeJSONField(fields, "skills", "PluginDetail.skills", false, &decoded.Skills)
 	if err != nil {

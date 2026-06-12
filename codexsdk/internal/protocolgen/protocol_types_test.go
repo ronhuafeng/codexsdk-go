@@ -1906,6 +1906,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		pluginDetailFields["marketplacePath"].GoType != "*protocolv2.Nullable[string]" ||
 		pluginDetailFields["mcpServers"].GoType != "[]string" ||
 		!pluginDetailFields["mcpServers"].Required ||
+		pluginDetailFields["shareUrl"].GoType != "*protocolv2.Nullable[string]" ||
+		pluginDetailFields["shareUrl"].Required ||
 		pluginDetailFields["skills"].GoType != "[]SkillSummary" ||
 		!pluginDetailFields["skills"].Required ||
 		pluginDetailFields["summary"].GoType != "PluginSummary" ||
