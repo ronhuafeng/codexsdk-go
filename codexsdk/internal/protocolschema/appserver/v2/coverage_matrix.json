@@ -7880,6 +7880,19 @@
       "type": "ThreadRealtimeSdpNotification"
     },
     {
+      "exit_condition": "Regenerate if upstream schema drift changes realtime architecture override semantics or enum values.",
+      "field": "architecture",
+      "owner": "codex-go-sdk",
+      "path": "v2/ThreadRealtimeStartParams.json#/properties/architecture",
+      "reason": "Generated as an optional nullable RealtimeConversationArchitecture enum field preserving omit/null/value semantics.",
+      "required": false,
+      "revisit_trigger": "protocolv2 generation or upstream schema drift",
+      "schema": "v2/ThreadRealtimeStartParams.json",
+      "stability": "experimental",
+      "status": "supported-generated",
+      "type": "ThreadRealtimeStartParams"
+    },
+    {
       "exit_condition": "Regenerate if upstream schema drift changes this field shape, requiredness, enum values, or omit/null/value semantics.",
       "field": "model",
       "owner": "codex-go-sdk",

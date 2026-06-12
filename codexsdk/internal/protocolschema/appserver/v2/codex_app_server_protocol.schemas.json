@@ -10042,6 +10042,13 @@
           }
         }
       },
+      "RealtimeConversationArchitecture": {
+        "type": "string",
+        "enum": [
+          "realtimeapi",
+          "avas"
+        ]
+      },
       "RealtimeConversationVersion": {
         "type": "string",
         "enum": [
@@ -10132,6 +10139,17 @@
           "threadId"
         ],
         "properties": {
+          "architecture": {
+            "description": "Overrides the configured realtime architecture for this session only.",
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/RealtimeConversationArchitecture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "model": {
             "description": "Overrides the configured realtime model for this session only.",
             "type": [
@@ -18100,6 +18118,16 @@
       "AppsDefaultConfig": {
         "type": "object",
         "properties": {
+          "approvals_reviewer": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/ApprovalsReviewer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "destructive_enabled": {
             "default": true,
             "type": "boolean"

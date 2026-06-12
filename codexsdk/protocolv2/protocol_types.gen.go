@@ -3282,6 +3282,44 @@ func (value *RateLimitReachedType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type RealtimeConversationArchitecture string
+
+const (
+	RealtimeConversationArchitectureRealtimeapi RealtimeConversationArchitecture = "realtimeapi"
+	RealtimeConversationArchitectureAvas        RealtimeConversationArchitecture = "avas"
+)
+
+func (value RealtimeConversationArchitecture) IsValid() bool {
+	switch value {
+	case RealtimeConversationArchitectureRealtimeapi:
+		return true
+	case RealtimeConversationArchitectureAvas:
+		return true
+	default:
+		return false
+	}
+}
+
+func (value RealtimeConversationArchitecture) MarshalJSON() ([]byte, error) {
+	if !value.IsValid() {
+		return nil, invalidEnumValue("RealtimeConversationArchitecture", string(value))
+	}
+	return json.Marshal(string(value))
+}
+
+func (value *RealtimeConversationArchitecture) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	parsed := RealtimeConversationArchitecture(raw)
+	if !parsed.IsValid() {
+		return invalidEnumValue("RealtimeConversationArchitecture", raw)
+	}
+	*value = parsed
+	return nil
+}
+
 type RealtimeConversationVersion string
 
 const (
@@ -5407,9 +5445,10 @@ func (value *AppsConfig) UnmarshalJSON(data []byte) error {
 }
 
 type AppsDefaultConfig struct {
-	DestructiveEnabled *bool `json:"destructive_enabled,omitempty"`
-	Enabled            *bool `json:"enabled,omitempty"`
-	OpenWorldEnabled   *bool `json:"open_world_enabled,omitempty"`
+	ApprovalsReviewer  *Nullable[ApprovalsReviewer] `json:"approvals_reviewer,omitempty"`
+	DestructiveEnabled *bool                        `json:"destructive_enabled,omitempty"`
+	Enabled            *bool                        `json:"enabled,omitempty"`
+	OpenWorldEnabled   *bool                        `json:"open_world_enabled,omitempty"`
 }
 
 func (value *AppsDefaultConfig) UnmarshalJSON(data []byte) error {
@@ -5418,6 +5457,10 @@ func (value *AppsDefaultConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded AppsDefaultConfig
+	_, err = decodeNullableJSONField[ApprovalsReviewer](fields, "approvals_reviewer", "AppsDefaultConfig.approvals_reviewer", &decoded.ApprovalsReviewer)
+	if err != nil {
+		return err
+	}
 	_, err = decodeJSONField(fields, "destructive_enabled", "AppsDefaultConfig.destructive_enabled", false, &decoded.DestructiveEnabled)
 	if err != nil {
 		return err
@@ -18124,14 +18167,15 @@ func (value *ThreadRealtimeSdpNotification) UnmarshalJSON(data []byte) error {
 }
 
 type ThreadRealtimeStartParams struct {
-	Model             *Nullable[string]                       `json:"model,omitempty"`
-	OutputModality    RealtimeOutputModality                  `json:"outputModality"`
-	Prompt            *Nullable[string]                       `json:"prompt,omitempty"`
-	RealtimeSessionID *Nullable[string]                       `json:"realtimeSessionId,omitempty"`
-	ThreadID          string                                  `json:"threadId"`
-	Transport         *Nullable[ThreadRealtimeStartTransport] `json:"transport,omitempty"`
-	Version           *Nullable[RealtimeConversationVersion]  `json:"version,omitempty"`
-	Voice             *Nullable[RealtimeVoice]                `json:"voice,omitempty"`
+	Architecture      *Nullable[RealtimeConversationArchitecture] `json:"architecture,omitempty"`
+	Model             *Nullable[string]                           `json:"model,omitempty"`
+	OutputModality    RealtimeOutputModality                      `json:"outputModality"`
+	Prompt            *Nullable[string]                           `json:"prompt,omitempty"`
+	RealtimeSessionID *Nullable[string]                           `json:"realtimeSessionId,omitempty"`
+	ThreadID          string                                      `json:"threadId"`
+	Transport         *Nullable[ThreadRealtimeStartTransport]     `json:"transport,omitempty"`
+	Version           *Nullable[RealtimeConversationVersion]      `json:"version,omitempty"`
+	Voice             *Nullable[RealtimeVoice]                    `json:"voice,omitempty"`
 }
 
 func (value *ThreadRealtimeStartParams) UnmarshalJSON(data []byte) error {
@@ -18140,6 +18184,10 @@ func (value *ThreadRealtimeStartParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded ThreadRealtimeStartParams
+	_, err = decodeNullableJSONField[RealtimeConversationArchitecture](fields, "architecture", "ThreadRealtimeStartParams.architecture", &decoded.Architecture)
+	if err != nil {
+		return err
+	}
 	_, err = decodeNullableJSONField[string](fields, "model", "ThreadRealtimeStartParams.model", &decoded.Model)
 	if err != nil {
 		return err

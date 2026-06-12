@@ -575,6 +575,15 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 	if configReadResponseFields["origins"].Kind != FieldPlanTypedMap {
 		t.Fatalf("ConfigReadResponse.origins Kind = %s, want %s", configReadResponseFields["origins"].Kind, FieldPlanTypedMap)
 	}
+	appsDefaultConfig := selectedByName["AppsDefaultConfig"]
+	appsDefaultConfigFields := map[string]FieldPlan{}
+	for _, field := range appsDefaultConfig.Fields {
+		appsDefaultConfigFields[field.FieldName] = field
+	}
+	if appsDefaultConfigFields["approvals_reviewer"].GoType != "*protocolv2.Nullable[ApprovalsReviewer]" ||
+		appsDefaultConfigFields["approvals_reviewer"].Required {
+		t.Fatalf("AppsDefaultConfig.approvals_reviewer field = %#v", appsDefaultConfigFields["approvals_reviewer"])
+	}
 	config := selectedByName["Config"]
 	if !config.OpenDynamicProperties {
 		t.Fatal("Config should preserve reviewed additionalProperties=true as dynamic JSON properties")
@@ -1425,7 +1434,9 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		t.Fatalf("ThreadRealtimeSdpNotification.sdp field = %#v", threadRealtimeSdpFields["sdp"])
 	}
 	threadRealtimeStartFields := generatedFields("ThreadRealtimeStartParams")
-	if threadRealtimeStartFields["outputModality"].GoType != "RealtimeOutputModality" ||
+	if threadRealtimeStartFields["architecture"].GoType != "*protocolv2.Nullable[RealtimeConversationArchitecture]" ||
+		threadRealtimeStartFields["architecture"].Required ||
+		threadRealtimeStartFields["outputModality"].GoType != "RealtimeOutputModality" ||
 		!threadRealtimeStartFields["outputModality"].Required ||
 		threadRealtimeStartFields["prompt"].GoType != "*protocolv2.Nullable[string]" ||
 		threadRealtimeStartFields["prompt"].Required ||
@@ -2632,7 +2643,7 @@ func TestSelectGeneratedEnums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(enums), 102; got != want {
+	if got, want := len(enums), 103; got != want {
 		t.Fatalf("selected generated enum count = %d, want %d", got, want)
 	}
 	enumByName := map[string]EnumPlan{}
@@ -2662,6 +2673,7 @@ func TestSelectGeneratedEnums(t *testing.T) {
 		"PluginAvailability",
 		"ProcessOutputStream",
 		"ReasoningSummary",
+		"RealtimeConversationArchitecture",
 		"ResidencyRequirement",
 		"ThreadMemoryMode",
 		"ThreadStartSource",

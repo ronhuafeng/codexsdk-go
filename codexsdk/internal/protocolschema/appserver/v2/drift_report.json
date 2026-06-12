@@ -3,7 +3,7 @@
   "comparison_mode": "canonical-json",
   "target": {
     "source_repo": "https://github.com/openai/codex",
-    "source_commit": "c09df9e35319e46baa11791d92adabab45d9202a",
+    "source_commit": "52a50aec709d1934522d7ebdd9ceb4dc75c198f9",
     "codex_version": "codex-cli 0.0.0",
     "generator": "cargo",
     "generator_detail": "codex app-server generate-json-schema --experimental --out <tmpdir>"
@@ -32,7 +32,7 @@
     }
   },
   "matrix_update_skeleton": "matrix_update_skeleton.json",
-  "baseline_schema_bundle_sha256": "f1d414cd65d7950be91fbd841f87c8329cefafa27827c347e30247214c0785d4",
+  "baseline_schema_bundle_sha256": "0d96215a1a90f50bd565b35d27640e67ff24b2fda6e680e4ec106dbaea0ff432",
   "comparison_command": "codex app-server generate-json-schema --experimental --out <tmpdir>",
   "note": "This report compares canonical JSON, so object member ordering differences in generated schema bundles do not count as protocol drift."
 }

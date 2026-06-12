@@ -8,6 +8,17 @@
     "threadId"
   ],
   "properties": {
+    "architecture": {
+      "description": "Overrides the configured realtime architecture for this session only.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RealtimeConversationArchitecture"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "model": {
       "description": "Overrides the configured realtime model for this session only.",
       "type": [
@@ -71,6 +82,13 @@
     }
   },
   "definitions": {
+    "RealtimeConversationArchitecture": {
+      "type": "string",
+      "enum": [
+        "realtimeapi",
+        "avas"
+      ]
+    },
     "RealtimeConversationVersion": {
       "type": "string",
       "enum": [

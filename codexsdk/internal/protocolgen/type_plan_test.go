@@ -19,7 +19,7 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	if got, want := len(plan.Types), 325; got != want {
 		t.Fatalf("type count = %d, want %d", got, want)
 	}
-	if got, want := len(plan.Fields), 802; got != want {
+	if got, want := len(plan.Fields), 803; got != want {
 		t.Fatalf("field count = %d, want %d", got, want)
 	}
 
