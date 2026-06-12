@@ -16,11 +16,13 @@ Use the repository's existing tracking script first, then review protocol drift 
 Collect or infer:
 
 - upstream Codex commit or ref, preferably a full SHA after resolution
-- local OpenAI Codex repo path, from the prompt or `CODEXSDK_CODEX_REPO`
+- local OpenAI Codex repo path, from the prompt, `CODEXSDK_CODEX_REPO`, or default `.cache/openai-codex`
 - generator mode: default to `cargo`; use `binary` only when the provided `codex` binary is known to be built from the target commit
-- output workdir, defaulting to a fresh path under `/tmp`
+- output workdir, defaulting to `.cache/codexsdk-upstream-<short-sha>`
 
-If the commit or Codex repo path is missing and cannot be discovered locally, ask for it before changing files.
+If the commit is missing and cannot be discovered locally, ask for it before changing files.
+
+Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.cache/` by default. Never check in `.cache` contents.
 
 ## Workflow
 
@@ -35,11 +37,23 @@ If the commit or Codex repo path is missing and cannot be discovered locally, as
 
 2. Resolve the target commit and generate drift artifacts.
 
+   Prepare the default cache locations:
+
    ```sh
-   scripts/codexsdk_track_upstream.sh \
-     --codex-repo /path/to/openai/codex \
+   mkdir -p .cache
+   if [ ! -d .cache/openai-codex/.git ]; then
+     git clone https://github.com/openai/codex.git .cache/openai-codex
+   else
+     git -C .cache/openai-codex fetch origin
+   fi
+   ```
+
+   ```sh
+   CARGO_TARGET_DIR="$PWD/.cache/cargo-target/codex" \
+     scripts/codexsdk_track_upstream.sh \
+     --codex-repo "$PWD/.cache/openai-codex" \
      --commit <codex-commit> \
-     --out /tmp/codexsdk-upstream
+     --out "$PWD/.cache/codexsdk-upstream-<short-sha>"
    ```
 
    The script is intentionally read-only for the checked-in baseline. It writes candidate schemas under `schema/` and review reports under `reports/`.
@@ -48,9 +62,9 @@ If the commit or Codex repo path is missing and cannot be discovered locally, as
 
    Read:
 
-   - `/tmp/codexsdk-upstream/reports/SUMMARY.md`
-   - `/tmp/codexsdk-upstream/reports/drift_summary.json`
-   - `/tmp/codexsdk-upstream/reports/matrix_update_skeleton.json`
+   - `.cache/codexsdk-upstream-<short-sha>/reports/SUMMARY.md`
+   - `.cache/codexsdk-upstream-<short-sha>/reports/drift_summary.json`
+   - `.cache/codexsdk-upstream-<short-sha>/reports/matrix_update_skeleton.json`
 
    Treat any added, removed, or changed schema as review-required. Classify method, type, and field changes before updating `manifest.json` or `coverage_matrix.json`.
 
@@ -58,7 +72,7 @@ If the commit or Codex repo path is missing and cannot be discovered locally, as
 
    Update files under `codexsdk/internal/protocolschema/appserver/v2`:
 
-   - copy reviewed schema changes from `/tmp/codexsdk-upstream/schema`
+   - copy reviewed schema changes from `.cache/codexsdk-upstream-<short-sha>/schema`
    - update `baseline_metadata.json` with public provenance only: upstream URL, full commit SHA, Codex version, source license, repo-relative source paths, schema count, and schema bundle checksum
    - update `manifest.json` according to `manifest_generation.json` rules and response mappings
    - update `coverage_matrix.json` with explicit support status, owner, reason, revisit trigger, and exit condition for new or changed surface

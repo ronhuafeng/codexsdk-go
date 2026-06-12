@@ -1211,6 +1211,19 @@
       "type": "PermissionsRequestApprovalResponse"
     },
     {
+      "exit_condition": "Regenerate if upstream schema drift changes autoResolutionMs semantics.",
+      "field": "autoResolutionMs",
+      "owner": "codex-go-sdk",
+      "path": "ToolRequestUserInputParams.json#/properties/autoResolutionMs",
+      "reason": "Generated as an optional nullable uint64 field preserving omit/null/value semantics.",
+      "required": false,
+      "revisit_trigger": "protocolv2 generation or upstream schema drift",
+      "schema": "ToolRequestUserInputParams.json",
+      "stability": "stable",
+      "status": "supported-generated",
+      "type": "ToolRequestUserInputParams"
+    },
+    {
       "exit_condition": "Regenerate if upstream schema drift changes itemId string semantics.",
       "field": "itemId",
       "owner": "codex-go-sdk",
@@ -14277,6 +14290,26 @@
       "stability": "stable",
       "status": "supported-generated",
       "type": "ModelVerificationNotification"
+    },
+    {
+      "exit_condition": "Classify generation if upstream schema drift makes this nullable wrapper part of the public generated API.",
+      "owner": "codex-go-sdk",
+      "reason": "Reviewed upstream nullable params wrapper; aggregate request generation preserves null/object semantics separately.",
+      "revisit_trigger": "protocolv2 generation or upstream schema drift",
+      "schema": "v2/NullableRemoteControlDisableParams.json",
+      "stability": "experimental",
+      "status": "deferred",
+      "type": "NullableRemoteControlDisableParams"
+    },
+    {
+      "exit_condition": "Classify generation if upstream schema drift makes this nullable wrapper part of the public generated API.",
+      "owner": "codex-go-sdk",
+      "reason": "Reviewed upstream nullable params wrapper; aggregate request generation preserves null/object semantics separately.",
+      "revisit_trigger": "protocolv2 generation or upstream schema drift",
+      "schema": "v2/NullableRemoteControlEnableParams.json",
+      "stability": "experimental",
+      "status": "deferred",
+      "type": "NullableRemoteControlEnableParams"
     },
     {
       "exit_condition": "Regenerate if upstream schema drift changes this type shape, requiredness, enum values, or omit/null/value semantics.",

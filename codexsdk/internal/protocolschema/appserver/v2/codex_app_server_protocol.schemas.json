@@ -2098,7 +2098,14 @@
               "title": "RemoteControl/enableRequestMethod"
             },
             "params": {
-              "type": "null"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/v2/RemoteControlEnableParams"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "title": "RemoteControl/enableRequest"
@@ -2121,7 +2128,14 @@
               "title": "RemoteControl/disableRequestMethod"
             },
             "params": {
-              "type": "null"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/v2/RemoteControlDisableParams"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "title": "RemoteControl/disableRequest"
@@ -4441,6 +4455,15 @@
         "turnId"
       ],
       "properties": {
+        "autoResolutionMs": {
+          "default": null,
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "itemId": {
           "type": "string"
         },
@@ -9898,7 +9921,7 @@
             ]
           },
           "responsesapiClientMetadata": {
-            "description": "Optional turn-scoped Responses API client metadata.",
+            "description": "Optional metadata to enrich Codex's ResponsesAPI turn metadata.\n\nEntries are flattened into the JSON string sent as `client_metadata[\"x-codex-turn-metadata\"]` on ResponsesAPI HTTP and websocket requests.\n\nThey are not sent as top-level ResponsesAPI `client_metadata` keys, and reserved keys such as `session_id`, `thread_id`, `turn_id`, and `window_id` cannot be overridden.",
             "type": [
               "object",
               "null"
@@ -9988,7 +10011,7 @@
             }
           },
           "responsesapiClientMetadata": {
-            "description": "Optional turn-scoped Responses API client metadata.",
+            "description": "Optional metadata to enrich Codex's ResponsesAPI turn metadata.\n\nEntries are flattened into the JSON string sent as `client_metadata[\"x-codex-turn-metadata\"]` on ResponsesAPI HTTP and websocket requests.\n\nThey are not sent as top-level ResponsesAPI `client_metadata` keys, and reserved keys such as `session_id`, `thread_id`, `turn_id`, and `window_id` cannot be overridden.",
             "type": [
               "object",
               "null"
@@ -10504,6 +10527,46 @@
             }
           }
         }
+      },
+      "RemoteControlEnableParams": {
+        "type": "object",
+        "properties": {
+          "ephemeral": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NullableRemoteControlEnableParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Nullable_RemoteControlEnableParams",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/v2/RemoteControlEnableParams"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "RemoteControlDisableParams": {
+        "type": "object",
+        "properties": {
+          "ephemeral": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NullableRemoteControlDisableParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Nullable_RemoteControlDisableParams",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/v2/RemoteControlDisableParams"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "RemoteControlPairingStartParams": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -15385,6 +15448,12 @@
           "name"
         ],
         "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "description": {
             "type": [
               "string",
@@ -15414,6 +15483,12 @@
         ],
         "properties": {
           "canonicalConnectorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
             "type": [
               "string",
               "null"

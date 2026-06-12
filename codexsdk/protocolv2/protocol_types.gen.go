@@ -5139,6 +5139,7 @@ func (value *AppScreenshot) UnmarshalJSON(data []byte) error {
 }
 
 type AppSummary struct {
+	Category    *Nullable[string] `json:"category,omitempty"`
 	Description *Nullable[string] `json:"description,omitempty"`
 	ID          string            `json:"id"`
 	InstallURL  *Nullable[string] `json:"installUrl,omitempty"`
@@ -5151,6 +5152,10 @@ func (value *AppSummary) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded AppSummary
+	_, err = decodeNullableJSONField[string](fields, "category", "AppSummary.category", &decoded.Category)
+	if err != nil {
+		return err
+	}
 	_, err = decodeNullableJSONField[string](fields, "description", "AppSummary.description", &decoded.Description)
 	if err != nil {
 		return err
@@ -5182,6 +5187,7 @@ func (value *AppSummary) UnmarshalJSON(data []byte) error {
 
 type AppTemplateSummary struct {
 	CanonicalConnectorID *Nullable[string]                       `json:"canonicalConnectorId,omitempty"`
+	Category             *Nullable[string]                       `json:"category,omitempty"`
 	Description          *Nullable[string]                       `json:"description,omitempty"`
 	LogoURL              *Nullable[string]                       `json:"logoUrl,omitempty"`
 	LogoURLDark          *Nullable[string]                       `json:"logoUrlDark,omitempty"`
@@ -5206,6 +5212,10 @@ func (value *AppTemplateSummary) UnmarshalJSON(data []byte) error {
 	}
 	var decoded AppTemplateSummary
 	_, err = decodeNullableJSONField[string](fields, "canonicalConnectorId", "AppTemplateSummary.canonicalConnectorId", &decoded.CanonicalConnectorID)
+	if err != nil {
+		return err
+	}
+	_, err = decodeNullableJSONField[string](fields, "category", "AppTemplateSummary.category", &decoded.Category)
 	if err != nil {
 		return err
 	}
@@ -14705,6 +14715,27 @@ func (value *RemoteControlClientsRevokeResponse) UnmarshalJSON(data []byte) erro
 	return nil
 }
 
+type RemoteControlDisableParams struct {
+	Ephemeral *bool `json:"ephemeral,omitempty"`
+}
+
+func (value *RemoteControlDisableParams) UnmarshalJSON(data []byte) error {
+	fields, err := decodeObjectFields(data, "RemoteControlDisableParams")
+	if err != nil {
+		return err
+	}
+	var decoded RemoteControlDisableParams
+	_, err = decodeJSONField(fields, "ephemeral", "RemoteControlDisableParams.ephemeral", false, &decoded.Ephemeral)
+	if err != nil {
+		return err
+	}
+	if err := rejectUnexpectedFields(fields, "RemoteControlDisableParams"); err != nil {
+		return err
+	}
+	*value = decoded
+	return nil
+}
+
 type RemoteControlDisableResponse struct {
 	EnvironmentID  *Nullable[string]             `json:"environmentId,omitempty"`
 	InstallationID string                        `json:"installationId"`
@@ -14744,6 +14775,27 @@ func (value *RemoteControlDisableResponse) UnmarshalJSON(data []byte) error {
 		return missingRequiredField("RemoteControlDisableResponse.status")
 	}
 	if err := rejectUnexpectedFields(fields, "RemoteControlDisableResponse"); err != nil {
+		return err
+	}
+	*value = decoded
+	return nil
+}
+
+type RemoteControlEnableParams struct {
+	Ephemeral *bool `json:"ephemeral,omitempty"`
+}
+
+func (value *RemoteControlEnableParams) UnmarshalJSON(data []byte) error {
+	fields, err := decodeObjectFields(data, "RemoteControlEnableParams")
+	if err != nil {
+		return err
+	}
+	var decoded RemoteControlEnableParams
+	_, err = decodeJSONField(fields, "ephemeral", "RemoteControlEnableParams.ephemeral", false, &decoded.Ephemeral)
+	if err != nil {
+		return err
+	}
+	if err := rejectUnexpectedFields(fields, "RemoteControlEnableParams"); err != nil {
 		return err
 	}
 	*value = decoded
@@ -19802,10 +19854,11 @@ func (value *ToolRequestUserInputOption) UnmarshalJSON(data []byte) error {
 }
 
 type ToolRequestUserInputParams struct {
-	ItemID    string                         `json:"itemId"`
-	Questions []ToolRequestUserInputQuestion `json:"questions"`
-	ThreadID  string                         `json:"threadId"`
-	TurnID    string                         `json:"turnId"`
+	AutoResolutionMS *Nullable[uint64]              `json:"autoResolutionMs,omitempty"`
+	ItemID           string                         `json:"itemId"`
+	Questions        []ToolRequestUserInputQuestion `json:"questions"`
+	ThreadID         string                         `json:"threadId"`
+	TurnID           string                         `json:"turnId"`
 }
 
 func (value ToolRequestUserInputParams) MarshalJSON() ([]byte, error) {
@@ -19822,6 +19875,10 @@ func (value *ToolRequestUserInputParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded ToolRequestUserInputParams
+	_, err = decodeNullableJSONField[uint64](fields, "autoResolutionMs", "ToolRequestUserInputParams.autoResolutionMs", &decoded.AutoResolutionMS)
+	if err != nil {
+		return err
+	}
 	seenItemID, err := decodeJSONField(fields, "itemId", "ToolRequestUserInputParams.itemId", false, &decoded.ItemID)
 	if err != nil {
 		return err
@@ -24614,11 +24671,13 @@ type ClientRequestExperimentalFeatureEnablementSet struct {
 }
 
 type ClientRequestRemoteControlEnable struct {
-	ID RequestId `json:"id"`
+	ID     RequestId                            `json:"id"`
+	Params *Nullable[RemoteControlEnableParams] `json:"params,omitempty"`
 }
 
 type ClientRequestRemoteControlDisable struct {
-	ID RequestId `json:"id"`
+	ID     RequestId                             `json:"id"`
+	Params *Nullable[RemoteControlDisableParams] `json:"params,omitempty"`
 }
 
 type ClientRequestRemoteControlStatusRead struct {
@@ -27318,22 +27377,26 @@ func (value ClientRequest) MarshalJSON() ([]byte, error) {
 			return nil, invalidUnionVariant("ClientRequest", "remoteControl/enable")
 		}
 		return json.Marshal(struct {
-			ID     RequestId `json:"id"`
-			Method string    `json:"method"`
+			ID     RequestId                            `json:"id"`
+			Method string                               `json:"method"`
+			Params *Nullable[RemoteControlEnableParams] `json:"params,omitempty"`
 		}{
 			ID:     value.variantRemoteControlEnable.ID,
 			Method: "remoteControl/enable",
+			Params: value.variantRemoteControlEnable.Params,
 		})
 	case ClientRequestKindRemoteControlDisable:
 		if value.variantRemoteControlDisable == nil {
 			return nil, invalidUnionVariant("ClientRequest", "remoteControl/disable")
 		}
 		return json.Marshal(struct {
-			ID     RequestId `json:"id"`
-			Method string    `json:"method"`
+			ID     RequestId                             `json:"id"`
+			Method string                                `json:"method"`
+			Params *Nullable[RemoteControlDisableParams] `json:"params,omitempty"`
 		}{
 			ID:     value.variantRemoteControlDisable.ID,
 			Method: "remoteControl/disable",
+			Params: value.variantRemoteControlDisable.Params,
 		})
 	case ClientRequestKindRemoteControlStatusRead:
 		if value.variantRemoteControlStatusRead == nil {
@@ -29432,12 +29495,9 @@ func (value *ClientRequest) UnmarshalJSON(data []byte) error {
 		if !seenID {
 			return missingRequiredField("ClientRequest.id")
 		}
-		variantParams, seenParams := fields["params"]
-		if seenParams {
-			delete(fields, "params")
-			if variantParams.Kind() != JSONKindNull {
-				return fmt.Errorf("decode ClientRequest.remoteControl/enable.params: expected null")
-			}
+		_, err = decodeNullableJSONField[RemoteControlEnableParams](fields, "params", "ClientRequest.params", &decoded.Params)
+		if err != nil {
+			return err
 		}
 		if err := rejectUnexpectedFields(fields, "ClientRequest.remoteControl/enable"); err != nil {
 			return err
@@ -29453,12 +29513,9 @@ func (value *ClientRequest) UnmarshalJSON(data []byte) error {
 		if !seenID {
 			return missingRequiredField("ClientRequest.id")
 		}
-		variantParams, seenParams := fields["params"]
-		if seenParams {
-			delete(fields, "params")
-			if variantParams.Kind() != JSONKindNull {
-				return fmt.Errorf("decode ClientRequest.remoteControl/disable.params: expected null")
-			}
+		_, err = decodeNullableJSONField[RemoteControlDisableParams](fields, "params", "ClientRequest.params", &decoded.Params)
+		if err != nil {
+			return err
 		}
 		if err := rejectUnexpectedFields(fields, "ClientRequest.remoteControl/disable"); err != nil {
 			return err

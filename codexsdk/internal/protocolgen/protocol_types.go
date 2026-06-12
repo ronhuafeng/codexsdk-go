@@ -1805,6 +1805,13 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 	switch schemaPath {
 	case "ApplyPatchApprovalResponse.json":
 		return name == "NetworkPolicyAmendment"
+	case "ClientRequest.json":
+		switch name {
+		case "RemoteControlDisableParams", "RemoteControlEnableParams":
+			return true
+		default:
+			return false
+		}
 	case "CommandExecutionRequestApprovalParams.json":
 		switch name {
 		case "AdditionalFileSystemPermissions",

@@ -16,17 +16,17 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(plan.Types), 323; got != want {
+	if got, want := len(plan.Types), 325; got != want {
 		t.Fatalf("type count = %d, want %d", got, want)
 	}
-	if got, want := len(plan.Fields), 801; got != want {
+	if got, want := len(plan.Fields), 802; got != want {
 		t.Fatalf("field count = %d, want %d", got, want)
 	}
 
 	counts := CountTypePlanKinds(plan.Types)
 	wantCounts := map[TypePlanKind]int{
 		TypePlanAggregateBundle:       2,
-		TypePlanAnyOfDeferred:         1,
+		TypePlanAnyOfDeferred:         3,
 		TypePlanEmptyStructCandidate:  46,
 		TypePlanObjectStructCandidate: 267,
 		TypePlanScalarUnionCandidate:  1,

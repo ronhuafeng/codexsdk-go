@@ -8333,9 +8333,10 @@ func TestGeneratedChatgptAuthTokensRefreshResponseRejectsMalformedProtocol(t *te
 func TestGeneratedToolRequestUserInputParamsMarshal(t *testing.T) {
 	isOther := true
 	params := ToolRequestUserInputParams{
-		ItemID:   "item-1",
-		ThreadID: "thread-1",
-		TurnID:   "turn-1",
+		AutoResolutionMS: Value(uint64(1500)),
+		ItemID:           "item-1",
+		ThreadID:         "thread-1",
+		TurnID:           "turn-1",
 		Questions: []ToolRequestUserInputQuestion{{
 			Header:  "Auth",
 			ID:      "token",
@@ -8351,7 +8352,7 @@ func TestGeneratedToolRequestUserInputParamsMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"itemId":"item-1","questions":[{"header":"Auth","id":"token","isOther":true,"options":[{"description":"Use the configured account.","label":"Configured"}],"question":"Which account should be used?"}],"threadId":"thread-1","turnId":"turn-1"}`
+	want := `{"autoResolutionMs":1500,"itemId":"item-1","questions":[{"header":"Auth","id":"token","isOther":true,"options":[{"description":"Use the configured account.","label":"Configured"}],"question":"Which account should be used?"}],"threadId":"thread-1","turnId":"turn-1"}`
 	if got := string(raw); got != want {
 		t.Fatalf("ToolRequestUserInputParams JSON = %s, want %s", got, want)
 	}
@@ -8701,6 +8702,35 @@ func TestGeneratedClientRequestMarshalAndUnmarshal(t *testing.T) {
 	}
 	if payload, ok := decodedReset.AsMemoryReset(); !ok || payload.ID.Kind() != RequestIdKindInt64 {
 		t.Fatalf("decoded ClientRequest memory/reset = %#v, ok=%t", payload, ok)
+	}
+
+	enable := NewClientRequestRemoteControlEnable(ClientRequestRemoteControlEnable{
+		ID:     NewRequestIdString("remote-1"),
+		Params: Value(RemoteControlEnableParams{Ephemeral: boolPtr(true)}),
+	})
+	enableRaw, err := json.Marshal(enable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(enableRaw), `{"id":"remote-1","method":"remoteControl/enable","params":{"ephemeral":true}}`; got != want {
+		t.Fatalf("ClientRequest remoteControl/enable JSON = %s, want %s", got, want)
+	}
+	var decodedEnable ClientRequest
+	if err := json.Unmarshal(enableRaw, &decodedEnable); err != nil {
+		t.Fatal(err)
+	}
+	enablePayload, ok := decodedEnable.AsRemoteControlEnable()
+	if !ok || enablePayload.Params == nil || enablePayload.Params.Value == nil || enablePayload.Params.Value.Ephemeral == nil || !*enablePayload.Params.Value.Ephemeral {
+		t.Fatalf("decoded ClientRequest remoteControl/enable = %#v, ok=%t", enablePayload, ok)
+	}
+
+	var decodedDisable ClientRequest
+	if err := json.Unmarshal([]byte(`{"id":"remote-2","method":"remoteControl/disable","params":null}`), &decodedDisable); err != nil {
+		t.Fatal(err)
+	}
+	disablePayload, ok := decodedDisable.AsRemoteControlDisable()
+	if !ok || disablePayload.Params == nil || disablePayload.Params.Value != nil {
+		t.Fatalf("decoded ClientRequest remoteControl/disable = %#v, ok=%t", disablePayload, ok)
 	}
 }
 

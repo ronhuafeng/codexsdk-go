@@ -6,6 +6,7 @@ coverage.out
 
 # Protocol maintenance scratch space
 codexsdk-upstream/
+.cache/
 
 # Local editor and OS files
 .DS_Store

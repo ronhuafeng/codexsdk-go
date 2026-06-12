@@ -71,7 +71,7 @@
     "experimental_schema_command": "codex app-server generate-json-schema --experimental --out <tmpdir>",
     "response_mapping_source": "codex-rs/app-server-protocol/src/protocol/common.rs",
     "source_repo": "https://github.com/openai/codex",
-    "source_commit": "598125109dd2e098486884d8fb563ebe90bc24da",
+    "source_commit": "c09df9e35319e46baa11791d92adabab45d9202a",
     "stable_schema_command": "codex app-server generate-json-schema --out <tmpdir>"
   },
   "non_goals": [

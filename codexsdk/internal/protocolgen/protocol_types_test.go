@@ -52,7 +52,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			}
 		}
 	}
-	if got, want := len(selected), 429; got != want {
+	if got, want := len(selected), 431; got != want {
 		t.Fatalf("selected generated type count = %d, want %d", got, want)
 	}
 	for _, name := range []string{
