@@ -72,7 +72,7 @@ func validateJSONRPCRequest(fields map[string]json.RawMessage) error {
 			return fmt.Errorf("decode JSONRPCMessage.request: decode JSONRPCRequest.trace: %w", err)
 		}
 	}
-	return rejectUnexpectedJSONRPCFields(fields, "JSONRPCMessage.request", "id", "method", "params", "trace")
+	return nil
 }
 
 func validateJSONRPCNotification(fields map[string]json.RawMessage) error {
@@ -82,7 +82,7 @@ func validateJSONRPCNotification(fields map[string]json.RawMessage) error {
 	if err := validateOptionalJSONValue(fields, "params", "JSONRPCNotification.params"); err != nil {
 		return fmt.Errorf("decode JSONRPCMessage.notification: %w", err)
 	}
-	return rejectUnexpectedJSONRPCFields(fields, "JSONRPCMessage.notification", "method", "params")
+	return nil
 }
 
 func validateJSONRPCResponse(fields map[string]json.RawMessage) error {
@@ -92,7 +92,7 @@ func validateJSONRPCResponse(fields map[string]json.RawMessage) error {
 	if err := validateRequiredJSONValue(fields["result"], "JSONRPCResponse.result"); err != nil {
 		return fmt.Errorf("decode JSONRPCMessage.response: %w", err)
 	}
-	return rejectUnexpectedJSONRPCFields(fields, "JSONRPCMessage.response", "id", "result")
+	return nil
 }
 
 func validateJSONRPCError(fields map[string]json.RawMessage) error {
@@ -112,10 +112,7 @@ func validateJSONRPCError(fields map[string]json.RawMessage) error {
 	if err := validateOptionalJSONValue(errorFields, "data", "JSONRPCErrorError.data"); err != nil {
 		return fmt.Errorf("decode JSONRPCMessage.error: %w", err)
 	}
-	if err := rejectUnexpectedJSONRPCFields(errorFields, "JSONRPCErrorError", "code", "data", "message"); err != nil {
-		return fmt.Errorf("decode JSONRPCMessage.error: %w", err)
-	}
-	return rejectUnexpectedJSONRPCFields(fields, "JSONRPCMessage.error", "id", "error")
+	return nil
 }
 
 func decodeJSONRPCObjectFields(data []byte, path string) (map[string]json.RawMessage, error) {
@@ -161,19 +158,6 @@ func decodeJSONRPCObjectFields(data []byte, path string) (map[string]json.RawMes
 		return nil, fmt.Errorf("decode %s: %w", path, err)
 	}
 	return fields, nil
-}
-
-func rejectUnexpectedJSONRPCFields(fields map[string]json.RawMessage, path string, allowed ...string) error {
-	allowedSet := map[string]bool{}
-	for _, field := range allowed {
-		allowedSet[field] = true
-	}
-	for field := range fields {
-		if !allowedSet[field] {
-			return fmt.Errorf("decode %s: unknown field %q", path, field)
-		}
-	}
-	return nil
 }
 
 func validateRequiredJSONString(raw json.RawMessage, path string) error {

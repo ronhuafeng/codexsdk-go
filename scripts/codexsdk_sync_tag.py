@@ -131,11 +131,23 @@ def remote_tag_commit(remote: str, tag: str) -> str | None:
 
 
 def create_tag(tag: str, commit: str, message: str) -> None:
-    subprocess.run(["git", "tag", "-a", tag, commit, "-m", message], check=True)
+    subprocess.run(
+        ["git", "tag", "-a", tag, commit, "-m", message],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
 
 
 def push_tag(remote: str, tag: str) -> None:
-    subprocess.run(["git", "push", remote, f"refs/tags/{tag}:refs/tags/{tag}"], check=True)
+    subprocess.run(
+        ["git", "push", remote, f"refs/tags/{tag}:refs/tags/{tag}"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
 
 
 def main() -> int:
@@ -173,11 +185,17 @@ def main() -> int:
             payload["action"] = "block"
             payload["reason"] = "remote upstream sync tag already exists at a different commit"
             payload["remote_commit"] = remote_commit
-            print(json.dumps(payload, indent=2, sort_keys=True) if args.json else payload["reason"])
+            if args.json:
+                print(json.dumps(payload, indent=2, sort_keys=True))
+            else:
+                print(payload["reason"], file=sys.stderr)
             return 1
 
     if choice.action == "block":
-        print(json.dumps(payload, indent=2, sort_keys=True) if args.json else choice.reason)
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        elif args.create:
+            print(choice.reason, file=sys.stderr)
         return 1 if args.create else 0
 
     if args.create and choice.action == "create":
@@ -192,9 +210,6 @@ def main() -> int:
 
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
-    else:
-        print(f"{payload['action']}: {choice.tag_name}")
-        print(message, end="")
     return 0
 
 

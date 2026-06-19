@@ -35,6 +35,36 @@ func TestValidateJSONRPCEnvelopeAcceptsCanonicalShapes(t *testing.T) {
 	}
 }
 
+func TestValidateJSONRPCEnvelopeAcceptsExtraMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		line string
+	}{
+		{
+			name: "request",
+			line: `{"id":"go-sdk-1","method":"turn/start","params":{"threadId":"thread-1"},"trace":null,"meta":{"source":"test"}}`,
+		},
+		{
+			name: "notification",
+			line: `{"method":"initialized","meta":{"source":"test"}}`,
+		},
+		{
+			name: "response",
+			line: `{"id":"go-sdk-1","result":{"ok":true},"meta":{"source":"test"}}`,
+		},
+		{
+			name: "error",
+			line: `{"id":42,"error":{"code":-32603,"data":null,"message":"boom","meta":{"source":"test"}},"meta":{"source":"test"}}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateJSONRPCEnvelope([]byte(tc.line)); err != nil {
+				t.Fatalf("validateJSONRPCEnvelope rejected extra %s metadata: %v", tc.name, err)
+			}
+		})
+	}
+}
+
 func TestValidateJSONRPCEnvelopeRejectsMalformedProtocol(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -47,11 +77,6 @@ func TestValidateJSONRPCEnvelopeRejectsMalformedProtocol(t *testing.T) {
 			wantErr: "decode JSONRPCMessage: expected exactly one JSON-RPC envelope shape",
 		},
 		{
-			name:    "response unknown field",
-			line:    `{"id":"go-sdk-1","result":{"ok":true},"extra":true}`,
-			wantErr: `decode JSONRPCMessage.response: unknown field "extra"`,
-		},
-		{
 			name:    "duplicate top-level key",
 			line:    `{"id":"go-sdk-1","id":"go-sdk-2","result":{"ok":true}}`,
 			wantErr: `decode JSONRPCMessage: duplicate object key "id"`,
@@ -60,11 +85,6 @@ func TestValidateJSONRPCEnvelopeRejectsMalformedProtocol(t *testing.T) {
 			name:    "error missing nested code",
 			line:    `{"id":1,"error":{"message":"boom"}}`,
 			wantErr: "decode JSONRPCMessage.error: decode JSONRPCErrorError.code: missing required field",
-		},
-		{
-			name:    "error nested unknown field",
-			line:    `{"id":1,"error":{"code":-32603,"message":"boom","extra":true}}`,
-			wantErr: `decode JSONRPCMessage.error: decode JSONRPCErrorError: unknown field "extra"`,
 		},
 		{
 			name:    "request trace wrong shape",

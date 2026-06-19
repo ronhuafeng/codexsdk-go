@@ -161,7 +161,8 @@ jobs:
               --target-sha "${{ steps.refs.outputs.upstream_sha }}" \
               --target-explicit "${{ steps.refs.outputs.target_explicit }}" \
               --mode "${mode}" \
-              --allow-downgrade "${ALLOW_DOWNGRADE}"
+              --allow-downgrade "${ALLOW_DOWNGRADE}" \
+              --json
           )"
           printf '%s\n' "${policy_json}" | tee /tmp/codexsdk-target-policy.json
 

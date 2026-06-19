@@ -223,6 +223,26 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 		t.Fatal("root Client missing Close")
 	}
 
+	threadClient := reflect.TypeOf((*ThreadClient)(nil)).Elem()
+	wantThreadClientMethods := map[string]struct{}{
+		"ForkThread":         {},
+		"ResumeThread":       {},
+		"ResumeThreadStream": {},
+		"StartThread":        {},
+		"StartThreadStream":  {},
+	}
+	if threadClient.NumMethod() != len(wantThreadClientMethods) {
+		t.Fatalf("ThreadClient method count = %d, want %d", threadClient.NumMethod(), len(wantThreadClientMethods))
+	}
+	for name := range wantThreadClientMethods {
+		if _, ok := threadClient.MethodByName(name); !ok {
+			t.Fatalf("ThreadClient missing %s method", name)
+		}
+	}
+	if _, ok := threadClient.MethodByName("Close"); ok {
+		t.Fatal("ThreadClient exposes Close; root Client owns app-server lifecycle")
+	}
+
 	commands := reflect.TypeOf((*Commands)(nil)).Elem()
 	wantCommandMethods := map[string]struct{}{
 		"Exec":          {},
@@ -4094,7 +4114,7 @@ func TestThreadClientOptionsDefaultModelCWDAndEffort(t *testing.T) {
 		DefaultCWD:    "/workspace/thread",
 		DefaultEffort: ReasoningEffortHigh,
 	})
-	defer client.Close()
+	defer root.Close()
 
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{Input: Text("defaults")}); err != nil {
 		t.Fatalf("StartThread returned error: %v", err)
@@ -4154,6 +4174,33 @@ func TestThreadClientRejectsUnsupportedInputTypeBeforeThreadStart(t *testing.T) 
 	}
 	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodThreadStart) != nil {
 		t.Fatal("thread/start was sent after unsupported input preflight failure")
+	}
+}
+
+func TestThreadClientRejectsBlankFileInputBeforeThreadStart(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
+	_, err = client.StartThread(context.Background(), StartThreadRequest{
+		Input: []InputItem{
+			{Type: InputItemText, Text: "read this"},
+			{Type: InputItemFile, Path: "  "},
+		},
+	})
+	if err == nil {
+		t.Fatal("StartThread accepted blank file input path")
+	}
+	if !strings.Contains(err.Error(), "InputItem[1].Path is required for file input") {
+		t.Fatalf("blank file input error = %v", err)
+	}
+	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodThreadStart) != nil {
+		t.Fatal("thread/start was sent after blank file input preflight failure")
 	}
 }
 
@@ -4336,7 +4383,7 @@ func TestRequestMappingSteeringForkAndAggregateInputStats(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	result, err := client.StartThread(context.Background(), StartThreadRequest{
 		Input:             TextAndFiles("hello", []string{"/tmp/a.txt", "/tmp/b.txt"}),
@@ -4417,7 +4464,7 @@ func TestStreamingCompletedResultAndFinalAPIDrainsSamePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	stream, err := client.StartThreadStream(context.Background(), StartThreadRequest{Input: Text("stream")})
 	if err != nil {
@@ -4520,7 +4567,7 @@ func TestOutputSchemaMappingStartResumeAndStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	startFinalSchema := mustOutputSchema(t, `{"type":"object","properties":{"startFinal":{"type":"string"}},"required":["startFinal"],"additionalProperties":false}`)
 	startStreamSchema := mustOutputSchema(t, `{"type":"object","properties":{"startStream":{"type":"boolean"}},"required":["startStream"],"additionalProperties":false}`)
@@ -4588,7 +4635,7 @@ func TestEmptyOutputSchemaOmitted(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{
 		Input: Text("empty schema"),
@@ -5431,7 +5478,7 @@ func TestTurnErrorsAndLocalCancellationAreDistinct(t *testing.T) {
 	if !waitForRecord(t, record, "recv", "turn/interrupt", time.Second) {
 		t.Fatalf("context deadline did not best-effort interrupt turn; records=%#v", readRecords(t, record))
 	}
-	_ = hanging.Close()
+	_ = root.Close()
 }
 
 func TestTransportErrorDoesNotExposeStderrTail(t *testing.T) {
@@ -5478,7 +5525,7 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{Input: Text("approval")}); err != nil {
 		t.Fatalf("nil handler approval should be denied safely without SDK error: %v", err)
 	}
-	_ = client.Close()
+	_ = root.Close()
 	approvalResponse := firstRecord(readRecords(t, record), "recv-response", "")
 	if decision := approvalResponse["result"].(map[string]any)["decision"]; decision != "decline" {
 		t.Fatalf("nil handler decision = %#v", approvalResponse)
@@ -5506,7 +5553,7 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{Input: Text("approval")}); err != nil {
 		t.Fatal(err)
 	}
-	_ = client.Close()
+	_ = root.Close()
 	approvalResponse = firstRecord(readRecords(t, record), "recv-response", "")
 	if decision := approvalResponse["result"].(map[string]any)["decision"]; decision != "acceptForSession" {
 		t.Fatalf("handler decision = %#v", approvalResponse)
@@ -5915,7 +5962,16 @@ func TestCloseIdempotencyAndConcurrentRouting(t *testing.T) {
 	}
 }
 
-func newFakeClient(t *testing.T, mode string, handler ServerRequestHandler) ThreadClient {
+type testThreadClient struct {
+	ThreadClient
+	close func() error
+}
+
+func (c testThreadClient) Close() error {
+	return c.close()
+}
+
+func newFakeClient(t *testing.T, mode string, handler ServerRequestHandler) testThreadClient {
 	t.Helper()
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
@@ -5926,7 +5982,10 @@ func newFakeClient(t *testing.T, mode string, handler ServerRequestHandler) Thre
 	if err != nil {
 		t.Fatalf("New(%s) error: %v", mode, err)
 	}
-	return root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
+	return testThreadClient{
+		ThreadClient: root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"}),
+		close:        root.Close,
+	}
 }
 
 func fakeCommand(mode string, extra ...string) []string {

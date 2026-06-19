@@ -280,6 +280,7 @@ def main() -> int:
     parser.add_argument("--target-explicit", default="false", type=parse_bool)
     parser.add_argument("--mode", choices=("scheduled", "manual"), default="manual")
     parser.add_argument("--allow-downgrade", default="false", type=parse_bool)
+    parser.add_argument("--json", action="store_true", help="print machine-readable decision JSON to stdout")
     args = parser.parse_args()
 
     decision = evaluate_policy(
@@ -291,7 +292,8 @@ def main() -> int:
         mode=args.mode,
         allow_downgrade=args.allow_downgrade,
     )
-    print(json.dumps(decision, indent=2, sort_keys=True))
+    if args.json:
+        print(json.dumps(decision, indent=2, sort_keys=True))
     return 0
 
 
