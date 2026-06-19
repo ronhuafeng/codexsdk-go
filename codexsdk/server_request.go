@@ -222,8 +222,7 @@ func isSupportedServerRequest(req ServerRequest) bool {
 		ServerRequestUserInput,
 		ServerRequestMCPElicitation,
 		ServerRequestToolCall,
-		ServerRequestChatGPTAuthRefresh,
-		ServerRequestCurrentTimeRead:
+		ServerRequestChatGPTAuthRefresh:
 		return true
 	default:
 		return false
@@ -395,13 +394,6 @@ func serverRequestFromMethod(method string, params map[string]any) (ServerReques
 			return req, err
 		}
 		req.ChatGPTAuthTokensRefresh = &typed
-	case protocolv2.MethodCurrentTimeRead:
-		var typed protocolv2.CurrentTimeReadParams
-		if err := decodeServerRequestParams(method, params, &typed); err != nil {
-			return req, err
-		}
-		req.ThreadID = typed.ThreadID
-		req.CurrentTimeRead = &typed
 	case protocolv2.MethodItemToolCall:
 		var typed protocolv2.DynamicToolCallParams
 		if err := decodeServerRequestParams(method, params, &typed); err != nil {
@@ -466,8 +458,6 @@ func serverRequestKind(method string) ServerRequestKind {
 		return ServerRequestToolCall
 	case protocolv2.MethodAccountChatGPTAuthTokensRefresh:
 		return ServerRequestChatGPTAuthRefresh
-	case protocolv2.MethodCurrentTimeRead:
-		return ServerRequestCurrentTimeRead
 	case "attestation/generate":
 		return ServerRequestAttestation
 	default:
@@ -547,11 +537,6 @@ func serverRequestResponseResult(req ServerRequest, response ServerRequestRespon
 			return *response.ChatGPTAuthTokensRefresh, nil
 		}
 		return nil, fmt.Errorf("codexsdk: %s requires typed ChatGPTAuthTokensRefresh response", req.Method)
-	case ServerRequestCurrentTimeRead:
-		if response.CurrentTimeRead != nil {
-			return *response.CurrentTimeRead, nil
-		}
-		return nil, fmt.Errorf("codexsdk: %s requires typed CurrentTimeRead response", req.Method)
 	case ServerRequestToolCall:
 		if response.DynamicToolCall != nil {
 			return *response.DynamicToolCall, nil

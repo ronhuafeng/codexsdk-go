@@ -601,6 +601,7 @@
               }
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -657,12 +658,6 @@
                 "$ref": "#/definitions/AgentMessageInputContent"
               }
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -704,12 +699,6 @@
               }
             },
             "encrypted_content": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "id": {
               "type": [
                 "string",
                 "null"
@@ -761,6 +750,7 @@
             },
             "id": {
               "description": "Legacy id field retained for compatibility with older payloads.",
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -805,6 +795,7 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -858,6 +849,7 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -900,12 +892,6 @@
             "call_id": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -942,6 +928,7 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -990,12 +977,6 @@
             "call_id": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -1043,12 +1024,6 @@
             "execution": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -1093,6 +1068,7 @@
               ]
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -1127,16 +1103,14 @@
         {
           "type": "object",
           "required": [
+            "id",
             "result",
             "status",
             "type"
           ],
           "properties": {
             "id": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             },
             "metadata": {
               "anyOf": [
@@ -1179,12 +1153,6 @@
           "properties": {
             "encrypted_content": {
               "type": "string"
-            },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
             },
             "metadata": {
               "anyOf": [
@@ -1244,12 +1212,6 @@
                 "null"
               ]
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -1291,12 +1253,6 @@
     "ResponseItemMetadata": {
       "type": "object",
       "properties": {
-        "source_call_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "turn_id": {
           "type": [
             "string",

@@ -1710,9 +1710,6 @@ func isGeneratedDefinitionScalarUnionCheckpoint(schemaPath string, name string) 
 }
 
 func isGeneratedDefinitionScalarAliasCheckpoint(schemaPath string, name string) bool {
-	if name == "LegacyAppPathString" {
-		return true
-	}
 	switch schemaPath {
 	case "v2/ConfigReadResponse.json",
 		"v2/ThreadSettingsUpdateParams.json",
@@ -1914,12 +1911,10 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 			return false
 		}
 	case "v2/ExternalAgentConfigImportCompletedNotification.json":
-		return name == "ExternalAgentConfigImportTypeResult"
-	case "v2/ExternalAgentConfigImportHistoriesReadResponse.json":
 		switch name {
-		case "ExternalAgentConfigImportHistory",
-			"ExternalAgentConfigImportItemTypeFailure",
-			"ExternalAgentConfigImportItemTypeSuccess":
+		case "ExternalAgentConfigImportItemTypeFailure",
+			"ExternalAgentConfigImportItemTypeSuccess",
+			"ExternalAgentConfigImportTypeResult":
 			return true
 		default:
 			return false
@@ -2044,7 +2039,6 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		case "CollabAgentState",
 			"FileUpdateChange",
 			"HookPromptFragment",
-			"McpToolCallAppContext",
 			"McpToolCallError",
 			"McpToolCallResult",
 			"MemoryCitation",

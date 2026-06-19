@@ -886,6 +886,8 @@ func scalarAliasRefGoType(ref string) (string, bool) {
 	switch refTypeName(ref) {
 	case "AgentPath":
 		return "string", true
+	case "ApiPathString":
+		return "string", true
 	case "AbsolutePathBuf":
 		return "string", true
 	case "ThreadId":

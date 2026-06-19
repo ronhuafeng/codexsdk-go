@@ -52,7 +52,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			}
 		}
 	}
-	if got, want := len(selected), 445; got != want {
+	if got, want := len(selected), 439; got != want {
 		t.Fatalf("selected generated type count = %d, want %d", got, want)
 	}
 	for _, name := range []string{
@@ -119,8 +119,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"CreditsSnapshot",
 		"DynamicToolCallResponse",
 		"DynamicToolCallParams",
-		"CurrentTimeReadParams",
-		"CurrentTimeReadResponse",
 		"ErrorNotification",
 		"ExecCommandApprovalParams",
 		"ExecCommandApprovalResponse",
@@ -131,12 +129,9 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ExperimentalFeatureListResponse",
 		"ExternalAgentConfigDetectParams",
 		"ExternalAgentConfigDetectResponse",
-		"ExternalAgentConfigImportHistoriesReadResponse",
-		"ExternalAgentConfigImportHistory",
 		"ExternalAgentConfigImportItemTypeFailure",
 		"ExternalAgentConfigImportItemTypeSuccess",
 		"ExternalAgentConfigImportParams",
-		"ExternalAgentConfigImportProgressNotification",
 		"ExternalAgentConfigImportResponse",
 		"ExternalAgentConfigImportTypeResult",
 		"ExternalAgentConfigMigrationItem",
@@ -289,7 +284,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"SkillToolDependency",
 		"ManagedHooksRequirements",
 		"McpServerMigration",
-		"McpToolCallAppContext",
 		"McpToolCallError",
 		"McpToolCallResult",
 		"MemoryCitation",
@@ -794,7 +788,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"additionalPermissions":           "*protocolv2.Nullable[AdditionalPermissionProfile]",
 		"availableDecisions":              "*protocolv2.Nullable[[]CommandExecutionApprovalDecision]",
 		"commandActions":                  "*protocolv2.Nullable[[]CommandAction]",
-		"cwd":                             "*protocolv2.Nullable[LegacyAppPathString]",
+		"cwd":                             "*protocolv2.Nullable[string]",
 		"proposedNetworkPolicyAmendments": "*protocolv2.Nullable[[]NetworkPolicyAmendment]",
 	} {
 		if got := commandApprovalFields[fieldName].GoType; got != wantGoType {
@@ -1437,10 +1431,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		t.Fatalf("ThreadRealtimeSdpNotification.sdp field = %#v", threadRealtimeSdpFields["sdp"])
 	}
 	threadRealtimeStartFields := generatedFields("ThreadRealtimeStartParams")
-	if threadRealtimeStartFields["clientManagedHandoffs"].GoType != "*protocolv2.Nullable[bool]" ||
-		threadRealtimeStartFields["clientManagedHandoffs"].Required ||
-		threadRealtimeStartFields["codexResponseHandoffPrefix"].GoType != "*protocolv2.Nullable[string]" ||
-		threadRealtimeStartFields["codexResponseHandoffPrefix"].Required ||
+	if threadRealtimeStartFields["architecture"].GoType != "*protocolv2.Nullable[RealtimeConversationArchitecture]" ||
+		threadRealtimeStartFields["architecture"].Required ||
 		threadRealtimeStartFields["codexResponseItemPrefix"].GoType != "*protocolv2.Nullable[string]" ||
 		threadRealtimeStartFields["codexResponseItemPrefix"].Required ||
 		threadRealtimeStartFields["codexResponsesAsItems"].GoType != "*protocolv2.Nullable[bool]" ||
@@ -1457,6 +1449,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		!threadRealtimeStartFields["threadId"].Required ||
 		threadRealtimeStartFields["transport"].GoType != "*protocolv2.Nullable[ThreadRealtimeStartTransport]" ||
 		threadRealtimeStartFields["transport"].Required ||
+		threadRealtimeStartFields["version"].GoType != "*protocolv2.Nullable[RealtimeConversationVersion]" ||
+		threadRealtimeStartFields["version"].Required ||
 		threadRealtimeStartFields["voice"].GoType != "*protocolv2.Nullable[RealtimeVoice]" ||
 		threadRealtimeStartFields["voice"].Required {
 		t.Fatalf("ThreadRealtimeStartParams fields = %#v", threadRealtimeStartFields)
@@ -2267,7 +2261,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			"approvalPolicy":          "AskForApproval",
 			"approvalsReviewer":       "ApprovalsReviewer",
 			"cwd":                     "string",
-			"instructionSources":      "*[]LegacyAppPathString",
+			"instructionSources":      "*[]string",
 			"model":                   "string",
 			"modelProvider":           "string",
 			"reasoningEffort":         "*protocolv2.Nullable[ReasoningEffort]",
@@ -3323,11 +3317,11 @@ func TestPermissionApprovalDefinitionsStayShared(t *testing.T) {
 	for _, name := range []string{
 		"AdditionalFileSystemPermissions",
 		"AdditionalNetworkPermissions",
+		"ApiPathString",
 		"FileSystemAccessMode",
 		"FileSystemPath",
 		"FileSystemSandboxEntry",
 		"FileSystemSpecialPath",
-		"LegacyAppPathString",
 	} {
 		commandDefinition := encodedDefinition(t, commandApproval, name)
 		requestDefinition := encodedDefinition(t, permissionsRequest, name)
@@ -3604,7 +3598,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if clientRequest.Discriminator != "method" {
 		t.Fatalf("ClientRequest discriminator = %q, want method", clientRequest.Discriminator)
 	}
-	if got, want := len(clientRequest.Variants), 120; got != want {
+	if got, want := len(clientRequest.Variants), 119; got != want {
 		t.Fatalf("ClientRequest variant count = %d, want %d", got, want)
 	}
 	var threadStartRequest TaggedUnionVariantPlan
@@ -3645,7 +3639,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverNotification.Discriminator != "method" {
 		t.Fatalf("ServerNotification discriminator = %q, want method", serverNotification.Discriminator)
 	}
-	if got, want := len(serverNotification.Variants), 67; got != want {
+	if got, want := len(serverNotification.Variants), 66; got != want {
 		t.Fatalf("ServerNotification variant count = %d, want %d", got, want)
 	}
 	var errorNotification TaggedUnionVariantPlan
@@ -3687,7 +3681,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverRequest.Discriminator != "method" {
 		t.Fatalf("ServerRequest discriminator = %q, want method", serverRequest.Discriminator)
 	}
-	if got, want := len(serverRequest.Variants), 11; got != want {
+	if got, want := len(serverRequest.Variants), 10; got != want {
 		t.Fatalf("ServerRequest variant count = %d, want %d", got, want)
 	}
 	var commandApprovalRequest TaggedUnionVariantPlan
@@ -3969,11 +3963,24 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if got, want := len(fileSystemPath.Variants), 3; got != want {
 		t.Fatalf("FileSystemPath variant count = %d, want %d", got, want)
 	}
+	var literalPath TaggedUnionVariantPlan
 	var specialPath TaggedUnionVariantPlan
 	for _, variant := range fileSystemPath.Variants {
+		if variant.DiscriminatorValue == "path" {
+			literalPath = variant
+		}
 		if variant.DiscriminatorValue == "special" {
 			specialPath = variant
 		}
+	}
+	if literalPath.PayloadTypeName != "FileSystemPathPath" {
+		t.Fatalf("FileSystemPath path payload = %q, want FileSystemPathPath", literalPath.PayloadTypeName)
+	}
+	if got, want := len(literalPath.Fields), 1; got != want {
+		t.Fatalf("FileSystemPath path field count = %d, want %d", got, want)
+	}
+	if literalPath.Fields[0].FieldName != "path" || literalPath.Fields[0].GoType != "string" || literalPath.Fields[0].Kind != FieldPlanScalar {
+		t.Fatalf("FileSystemPath path field = %#v", literalPath.Fields[0])
 	}
 	if specialPath.PayloadTypeName != "FileSystemPathSpecial" {
 		t.Fatalf("FileSystemPath special payload = %q, want FileSystemPathSpecial", specialPath.PayloadTypeName)

@@ -370,9 +370,6 @@
         }
       ]
     },
-    "LegacyAppPathString": {
-      "type": "string"
-    },
     "Personality": {
       "type": "string",
       "enum": [
@@ -429,7 +426,7 @@
       ],
       "properties": {
         "cwd": {
-          "$ref": "#/definitions/LegacyAppPathString"
+          "$ref": "#/definitions/AbsolutePathBuf"
         },
         "environmentId": {
           "type": "string"

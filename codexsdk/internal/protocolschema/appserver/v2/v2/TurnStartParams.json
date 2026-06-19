@@ -301,9 +301,6 @@
         "original"
       ]
     },
-    "LegacyAppPathString": {
-      "type": "string"
-    },
     "ModeKind": {
       "description": "Initial collaboration mode to use when the TUI starts.",
       "type": "string",
@@ -510,7 +507,7 @@
       ],
       "properties": {
         "cwd": {
-          "$ref": "#/definitions/LegacyAppPathString"
+          "$ref": "#/definitions/AbsolutePathBuf"
         },
         "environmentId": {
           "type": "string"

@@ -236,19 +236,6 @@
       "type": "CommandExecutionRequestApprovalParams"
     },
     {
-      "exit_condition": "Regenerate if upstream command approval environment id semantics or nullability changes.",
-      "field": "environmentId",
-      "owner": "codex-go-sdk",
-      "path": "CommandExecutionRequestApprovalParams.json#/properties/environmentId",
-      "reason": "Generated as a nullable environment id string field preserving omit/null/value semantics for command approvals.",
-      "required": false,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "CommandExecutionRequestApprovalParams.json",
-      "stability": "stable",
-      "status": "supported-generated",
-      "type": "CommandExecutionRequestApprovalParams"
-    },
-    {
       "exit_condition": "Regenerate if upstream schema drift changes CommandExecutionRequestApprovalParams.itemId semantics.",
       "field": "itemId",
       "owner": "codex-go-sdk",
@@ -364,32 +351,6 @@
       "stability": "stable",
       "status": "supported-generated",
       "type": "CommandExecutionRequestApprovalResponse"
-    },
-    {
-      "exit_condition": "Regenerate if upstream current time request params change.",
-      "field": "threadId",
-      "owner": "codex-go-sdk",
-      "path": "CurrentTimeReadParams.json#/properties/threadId",
-      "reason": "Generated as a required thread id field for current time server requests.",
-      "required": true,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "CurrentTimeReadParams.json",
-      "stability": "experimental",
-      "status": "supported-generated",
-      "type": "CurrentTimeReadParams"
-    },
-    {
-      "exit_condition": "Regenerate if upstream current time response timestamp semantics change.",
-      "field": "currentTimeAt",
-      "owner": "codex-go-sdk",
-      "path": "CurrentTimeReadResponse.json#/properties/currentTimeAt",
-      "reason": "Generated as a required int64 Unix timestamp response field for current time server requests.",
-      "required": true,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "CurrentTimeReadResponse.json",
-      "stability": "experimental",
-      "status": "supported-generated",
-      "type": "CurrentTimeReadResponse"
     },
     {
       "exit_condition": "Regenerate if upstream schema drift changes arguments dynamic JSON semantics.",
@@ -2680,19 +2641,6 @@
       "type": "ExternalAgentConfigImportCompletedNotification"
     },
     {
-      "exit_condition": "Regenerate if upstream external agent import history response fields change.",
-      "field": "data",
-      "owner": "codex-go-sdk",
-      "path": "v2/ExternalAgentConfigImportHistoriesReadResponse.json#/properties/data",
-      "reason": "Generated as a required typed external agent config import history list with nil-list validation.",
-      "required": true,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "v2/ExternalAgentConfigImportHistoriesReadResponse.json",
-      "stability": "stable",
-      "status": "supported-generated",
-      "type": "ExternalAgentConfigImportHistoriesReadResponse"
-    },
-    {
       "exit_condition": "Regenerate if upstream external agent config migration item shape, nested migration details, or required list semantics change.",
       "field": "migrationItems",
       "owner": "codex-go-sdk",
@@ -2704,45 +2652,6 @@
       "stability": "stable",
       "status": "supported-generated",
       "type": "ExternalAgentConfigImportParams"
-    },
-    {
-      "exit_condition": "Regenerate if upstream external agent import source semantics or nullability changes.",
-      "field": "source",
-      "owner": "codex-go-sdk",
-      "path": "v2/ExternalAgentConfigImportParams.json#/properties/source",
-      "reason": "Generated as a nullable source product string field preserving omit/null/value semantics for external agent config import.",
-      "required": false,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "v2/ExternalAgentConfigImportParams.json",
-      "stability": "stable",
-      "status": "supported-generated",
-      "type": "ExternalAgentConfigImportParams"
-    },
-    {
-      "exit_condition": "Regenerate if upstream external agent import progress notification fields change.",
-      "field": "importId",
-      "owner": "codex-go-sdk",
-      "path": "v2/ExternalAgentConfigImportProgressNotification.json#/properties/importId",
-      "reason": "Generated as strict external agent import progress notification fields, including required import id and typed item type result list.",
-      "required": true,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "v2/ExternalAgentConfigImportProgressNotification.json",
-      "stability": "stable",
-      "status": "supported-generated",
-      "type": "ExternalAgentConfigImportProgressNotification"
-    },
-    {
-      "exit_condition": "Regenerate if upstream external agent import progress notification fields change.",
-      "field": "itemTypeResults",
-      "owner": "codex-go-sdk",
-      "path": "v2/ExternalAgentConfigImportProgressNotification.json#/properties/itemTypeResults",
-      "reason": "Generated as strict external agent import progress notification fields, including required import id and typed item type result list.",
-      "required": true,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "v2/ExternalAgentConfigImportProgressNotification.json",
-      "stability": "stable",
-      "status": "supported-generated",
-      "type": "ExternalAgentConfigImportProgressNotification"
     },
     {
       "exit_condition": "Regenerate if upstream external agent import response fields change.",
@@ -8101,24 +8010,11 @@
       "type": "ThreadRealtimeSdpNotification"
     },
     {
-      "exit_condition": "Regenerate if upstream realtime start option fields, nullability, or default semantics change.",
-      "field": "clientManagedHandoffs",
+      "exit_condition": "Regenerate if upstream realtime architecture option semantics, enum values, or nullability change.",
+      "field": "architecture",
       "owner": "codex-go-sdk",
-      "path": "v2/ThreadRealtimeStartParams.json#/properties/clientManagedHandoffs",
-      "reason": "Generated as strict protocolv2 realtime start option fields preserving omit/null/value semantics.",
-      "required": false,
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "v2/ThreadRealtimeStartParams.json",
-      "stability": "experimental",
-      "status": "supported-generated",
-      "type": "ThreadRealtimeStartParams"
-    },
-    {
-      "exit_condition": "Regenerate if upstream realtime start option fields, nullability, or default semantics change.",
-      "field": "codexResponseHandoffPrefix",
-      "owner": "codex-go-sdk",
-      "path": "v2/ThreadRealtimeStartParams.json#/properties/codexResponseHandoffPrefix",
-      "reason": "Generated as strict protocolv2 realtime start option fields preserving omit/null/value semantics.",
+      "path": "v2/ThreadRealtimeStartParams.json#/properties/architecture",
+      "reason": "Generated as an optional nullable realtime architecture enum field preserving omit/null/value semantics.",
       "required": false,
       "revisit_trigger": "protocolv2 generation or upstream schema drift",
       "schema": "v2/ThreadRealtimeStartParams.json",
@@ -11053,18 +10949,6 @@
     },
     {
       "direction": "server_to_client",
-      "exit_condition": "Keep typed current time server-request dispatch and handler response encoding aligned with protocolv2 generation and upstream schema drift.",
-      "kind": "request",
-      "method": "currentTime/read",
-      "owner": "codex-go-sdk",
-      "reason": "Supported by server request dispatch that strictly decodes protocolv2.CurrentTimeReadParams, exposes typed params on ServerRequest, encodes protocolv2.CurrentTimeReadResponse, and focused server request handler tests.",
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "source_schema": "ServerRequest.json",
-      "stability": "experimental",
-      "status": "supported"
-    },
-    {
-      "direction": "server_to_client",
       "exit_condition": "Regenerate if upstream ServerNotification aggregate, method set, params payload schema, requiredness, or nullability changes.",
       "kind": "notification",
       "method": "deprecationNotice",
@@ -11170,30 +11054,6 @@
       "source_schema": "ServerNotification.json",
       "stability": "stable",
       "status": "supported-generated"
-    },
-    {
-      "direction": "server_to_client",
-      "exit_condition": "Regenerate if upstream ServerNotification aggregate, method set, params payload schema, requiredness, or nullability changes.",
-      "kind": "notification",
-      "method": "externalAgentConfig/import/progress",
-      "owner": "codex-go-sdk",
-      "reason": "Supported by generated protocolv2.ServerNotification method-discriminated typed aggregate union with strict params marshal/unmarshal and malformed protocol coverage; transport dispatch and stream projection remain separate responsibilities.",
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "source_schema": "ServerNotification.json",
-      "stability": "stable",
-      "status": "supported-generated"
-    },
-    {
-      "direction": "client_to_server",
-      "exit_condition": "Keep the typed externalAgentConfigs facade aligned with protocolv2 generation and upstream schema drift.",
-      "kind": "request",
-      "method": "externalAgentConfig/import/readHistories",
-      "owner": "codex-go-sdk",
-      "reason": "Supported by ExternalAgentConfigs().ImportReadHistories with protocolv2.ExternalAgentConfigImportHistoriesReadResponse, no-param JSON-RPC request semantics, strict response decode, and focused externalAgentConfigs facade conformance tests.",
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "source_schema": "ClientRequest.json",
-      "stability": "stable",
-      "status": "supported"
     },
     {
       "direction": "client_to_server",
@@ -13208,26 +13068,6 @@
       "type": "CommandExecutionRequestApprovalResponse"
     },
     {
-      "exit_condition": "Regenerate if upstream CurrentTimeReadParams schema drift changes field shape, requiredness, enum values, nullability, or aggregate union semantics.",
-      "owner": "codex-go-sdk",
-      "reason": "Generated as a strict protocolv2 type from reviewed upstream schema baseline with focused marshal/unmarshal and protocol conformance coverage.",
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "CurrentTimeReadParams.json",
-      "stability": "experimental",
-      "status": "supported-generated",
-      "type": "CurrentTimeReadParams"
-    },
-    {
-      "exit_condition": "Regenerate if upstream CurrentTimeReadResponse schema drift changes field shape, requiredness, enum values, nullability, or aggregate union semantics.",
-      "owner": "codex-go-sdk",
-      "reason": "Generated as a strict protocolv2 type from reviewed upstream schema baseline with focused marshal/unmarshal and protocol conformance coverage.",
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "CurrentTimeReadResponse.json",
-      "stability": "experimental",
-      "status": "supported-generated",
-      "type": "CurrentTimeReadResponse"
-    },
-    {
       "exit_condition": "Regenerate if upstream schema drift changes dynamic tool call params.",
       "owner": "codex-go-sdk",
       "reason": "Generated as a strict params struct using JSONValue and Nullable field support.",
@@ -13998,16 +13838,6 @@
       "type": "ExternalAgentConfigImportCompletedNotification"
     },
     {
-      "exit_condition": "Regenerate if upstream ExternalAgentConfigImportHistoriesReadResponse schema drift changes field shape, requiredness, enum values, nullability, or aggregate union semantics.",
-      "owner": "codex-go-sdk",
-      "reason": "Generated as a strict protocolv2 type from reviewed upstream schema baseline with focused marshal/unmarshal and protocol conformance coverage.",
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "v2/ExternalAgentConfigImportHistoriesReadResponse.json",
-      "stability": "stable",
-      "status": "supported-generated",
-      "type": "ExternalAgentConfigImportHistoriesReadResponse"
-    },
-    {
       "exit_condition": "Regenerate if upstream ExternalAgentConfigImportParams or shared migration definitions change.",
       "owner": "codex-go-sdk",
       "reason": "Generated as strict protocolv2 import params with typed ExternalAgentConfigMigrationItem entries, MigrationDetails nested structs, enum validation, and focused malformed protocol coverage.",
@@ -14016,16 +13846,6 @@
       "stability": "stable",
       "status": "supported-generated",
       "type": "ExternalAgentConfigImportParams"
-    },
-    {
-      "exit_condition": "Regenerate if upstream ExternalAgentConfigImportProgressNotification schema drift changes field shape, requiredness, enum values, nullability, or aggregate union semantics.",
-      "owner": "codex-go-sdk",
-      "reason": "Generated as a strict protocolv2 type from reviewed upstream schema baseline with focused marshal/unmarshal and protocol conformance coverage.",
-      "revisit_trigger": "protocolv2 generation or upstream schema drift",
-      "schema": "v2/ExternalAgentConfigImportProgressNotification.json",
-      "stability": "stable",
-      "status": "supported-generated",
-      "type": "ExternalAgentConfigImportProgressNotification"
     },
     {
       "exit_condition": "Regenerate if upstream small utility schema drift changes field shape, requiredness, typed map, or omit/null/value semantics.",

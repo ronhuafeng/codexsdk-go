@@ -296,9 +296,8 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 
 	externalAgentConfigs := reflect.TypeOf((*ExternalAgentConfigs)(nil)).Elem()
 	wantExternalAgentConfigMethods := map[string]struct{}{
-		"Detect":              {},
-		"Import":              {},
-		"ImportReadHistories": {},
+		"Detect": {},
+		"Import": {},
 	}
 	if externalAgentConfigs.NumMethod() != len(wantExternalAgentConfigMethods) {
 		t.Fatalf("ExternalAgentConfigs method count = %d, want %d", externalAgentConfigs.NumMethod(), len(wantExternalAgentConfigMethods))
@@ -1354,14 +1353,6 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 	if importResponse.ImportID != "import-1" {
 		t.Fatalf("externalAgentConfig/import response = %#v", importResponse)
 	}
-	histories, err := externalAgentConfigs.ImportReadHistories(context.Background())
-	if err != nil {
-		t.Fatalf("ExternalAgentConfigs().ImportReadHistories returned error: %v", err)
-	}
-	if len(histories.Data) != 1 || histories.Data[0].ImportID != "import-1" {
-		t.Fatalf("externalAgentConfig/import/readHistories response = %#v", histories)
-	}
-
 	records := readRecords(t, record)
 	detectParams := firstRecord(records, "recv", protocolv2.MethodExternalAgentConfigDetect)["params"].(map[string]any)
 	cwds := detectParams["cwds"].([]any)
@@ -1377,9 +1368,6 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 	if migrationItem["cwd"] != nil || migrationItem["description"] != "Import plugins" ||
 		migrationItem["itemType"] != "PLUGINS" || plugin["marketplaceName"] != "local" {
 		t.Fatalf("externalAgentConfig/import params = %#v", importParams)
-	}
-	if params := firstRecord(records, "recv", protocolv2.MethodExternalAgentConfigImportReadHistories)["params"]; params != nil {
-		t.Fatalf("externalAgentConfig/import/readHistories params = %#v, want omitted", params)
 	}
 }
 
@@ -5163,23 +5151,6 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 			},
 		},
 		{
-			name:   "current time read",
-			method: protocolv2.MethodCurrentTimeRead,
-			params: map[string]any{"threadId": "thread-1"},
-			response: ServerRequestResponse{
-				CurrentTimeRead: &protocolv2.CurrentTimeReadResponse{CurrentTimeAt: 1781717655},
-			},
-			assert: func(t *testing.T, req ServerRequest, result map[string]any) {
-				if req.Kind != ServerRequestCurrentTimeRead || req.CurrentTimeRead == nil ||
-					req.ThreadID != "thread-1" || req.CurrentTimeRead.ThreadID != "thread-1" {
-					t.Fatalf("current time request = %#v", req)
-				}
-				if result["currentTimeAt"] != float64(1781717655) {
-					t.Fatalf("current time response = %#v", result)
-				}
-			},
-		},
-		{
 			name:   "tool call",
 			method: protocolv2.MethodItemToolCall,
 			params: fakeDynamicToolCallParams("thread-1", "turn-tool"),
@@ -5349,12 +5320,6 @@ func TestTypedServerRequestsRejectMalformedBeforeHandler(t *testing.T) {
 			method:  protocolv2.MethodAccountChatGPTAuthTokensRefresh,
 			params:  map[string]any{"reason": "expired"},
 			message: "ChatgptAuthTokensRefreshReason",
-		},
-		{
-			name:    "current time read missing threadId",
-			method:  protocolv2.MethodCurrentTimeRead,
-			params:  map[string]any{},
-			message: "CurrentTimeReadParams.threadId",
 		},
 		{
 			name:    "tool call missing arguments",
@@ -6309,19 +6274,6 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			send(map[string]any{"id": id, "result": map[string]any{"importId": "import-1"}})
-		case "externalAgentConfig/import/readHistories":
-			if mode == "facade" {
-				sendProtocolResult(id, protocolv2.ExternalAgentConfigImportHistoriesReadResponse{
-					Data: []protocolv2.ExternalAgentConfigImportHistory{{
-						CompletedAtMS: 123,
-						Failures:      []protocolv2.ExternalAgentConfigImportItemTypeFailure{},
-						ImportID:      "import-1",
-						Successes:     []protocolv2.ExternalAgentConfigImportItemTypeSuccess{},
-					}},
-				})
-				continue
-			}
-			send(map[string]any{"id": id, "result": map[string]any{"data": []map[string]any{}}})
 		case "feedback/upload":
 			if mode == "feedback-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{}})

@@ -472,32 +472,6 @@
         "original"
       ]
     },
-    "LegacyAppPathString": {
-      "type": "string"
-    },
-    "McpToolCallAppContext": {
-      "type": "object",
-      "required": [
-        "connectorId"
-      ],
-      "properties": {
-        "connectorId": {
-          "type": "string"
-        },
-        "linkId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "resourceUri": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      }
-    },
     "McpToolCallError": {
       "type": "object",
       "required": [
@@ -926,14 +900,6 @@
           "description": "Usually the first user message in the thread, if available.",
           "type": "string"
         },
-        "recencyAt": {
-          "description": "Unix timestamp (in seconds) used for thread recency ordering.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
         "sessionId": {
           "description": "Session id shared by threads that belong to the same session tree.",
           "type": "string"
@@ -1189,7 +1155,7 @@
               "description": "The command's working directory.",
               "allOf": [
                 {
-                  "$ref": "#/definitions/LegacyAppPathString"
+                  "$ref": "#/definitions/AbsolutePathBuf"
                 }
               ]
             },
@@ -1282,16 +1248,6 @@
             "type"
           ],
           "properties": {
-            "appContext": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/McpToolCallAppContext"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "arguments": true,
             "durationMs": {
               "description": "The duration of the MCP tool call in milliseconds.",
@@ -1315,7 +1271,6 @@
               "type": "string"
             },
             "mcpAppResourceUri": {
-              "description": "Deprecated: use `appContext.resourceUri` instead.",
               "type": [
                 "string",
                 "null"

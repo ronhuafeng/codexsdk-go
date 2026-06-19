@@ -2691,29 +2691,6 @@
       "type": "object",
       "required": [
         "id",
-        "method"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "externalAgentConfig/import/readHistories"
-          ],
-          "title": "ExternalAgentConfig/import/readHistoriesRequestMethod"
-        },
-        "params": {
-          "type": "null"
-        }
-      },
-      "title": "ExternalAgentConfig/import/readHistoriesRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
         "method",
         "params"
       ],
@@ -3557,8 +3534,7 @@
       "type": "string",
       "enum": [
         "user",
-        "developer",
-        "assistant"
+        "developer"
       ]
     },
     "DynamicToolNamespaceTool": {
@@ -3730,7 +3706,7 @@
           }
         },
         "includeHome": {
-          "description": "If true, include detection under the user's home directory.",
+          "description": "If true, include detection under the user's home (~/.claude, ~/.codex, etc.).",
           "type": "boolean"
         }
       }
@@ -3746,13 +3722,6 @@
           "items": {
             "$ref": "#/definitions/ExternalAgentConfigMigrationItem"
           }
-        },
-        "source": {
-          "description": "Source product that produced the migration items. Missing means unspecified.",
-          "type": [
-            "string",
-            "null"
-          ]
         }
       }
     },
@@ -4245,10 +4214,6 @@
           "default": false,
           "type": "boolean"
         },
-        "mcpServerOpenaiFormElicitation": {
-          "description": "Allow downstream MCP servers to request OpenAI extended form elicitations.",
-          "type": "boolean"
-        },
         "optOutNotificationMethods": {
           "description": "Exact notification method names that should be suppressed for this connection (for example `thread/started`).",
           "type": [
@@ -4286,9 +4251,6 @@
           "$ref": "#/definitions/ClientInfo"
         }
       }
-    },
-    "LegacyAppPathString": {
-      "type": "string"
     },
     "ListMcpServerStatusParams": {
       "type": "object",
@@ -5245,6 +5207,13 @@
         }
       }
     },
+    "RealtimeConversationArchitecture": {
+      "type": "string",
+      "enum": [
+        "realtimeapi",
+        "avas"
+      ]
+    },
     "RealtimeConversationVersion": {
       "type": "string",
       "enum": [
@@ -5502,6 +5471,7 @@
               }
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -5558,12 +5528,6 @@
                 "$ref": "#/definitions/AgentMessageInputContent"
               }
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -5605,12 +5569,6 @@
               }
             },
             "encrypted_content": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "id": {
               "type": [
                 "string",
                 "null"
@@ -5662,6 +5620,7 @@
             },
             "id": {
               "description": "Legacy id field retained for compatibility with older payloads.",
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -5706,6 +5665,7 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -5759,6 +5719,7 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -5801,12 +5762,6 @@
             "call_id": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -5843,6 +5798,7 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -5891,12 +5847,6 @@
             "call_id": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -5944,12 +5894,6 @@
             "execution": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -5994,6 +5938,7 @@
               ]
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -6028,16 +5973,14 @@
         {
           "type": "object",
           "required": [
+            "id",
             "result",
             "status",
             "type"
           ],
           "properties": {
             "id": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             },
             "metadata": {
               "anyOf": [
@@ -6080,12 +6023,6 @@
           "properties": {
             "encrypted_content": {
               "type": "string"
-            },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
             },
             "metadata": {
               "anyOf": [
@@ -6145,12 +6082,6 @@
                 "null"
               ]
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "metadata": {
               "anyOf": [
                 {
@@ -6192,12 +6123,6 @@
     "ResponseItemMetadata": {
       "type": "object",
       "properties": {
-        "source_call_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "turn_id": {
           "type": [
             "string",
@@ -7386,18 +7311,15 @@
         "threadId"
       ],
       "properties": {
-        "clientManagedHandoffs": {
-          "description": "Leaves Codex response handoffs to the client's explicit append calls instead of forwarding them automatically. Defaults to false.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "codexResponseHandoffPrefix": {
-          "description": "Optional prefix added to automatic V1 Codex commentary sent with `conversation.handoff.append` when `codexResponsesAsItems` is not true. Final answers are sent without the prefix.",
-          "type": [
-            "string",
-            "null"
+        "architecture": {
+          "description": "Overrides the configured realtime architecture for this session only.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RealtimeConversationArchitecture"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "codexResponseItemPrefix": {
@@ -7957,8 +7879,7 @@
       "type": "string",
       "enum": [
         "created_at",
-        "updated_at",
-        "recency_at"
+        "updated_at"
       ]
     },
     "ThreadSource": {
@@ -8287,7 +8208,7 @@
       ],
       "properties": {
         "cwd": {
-          "$ref": "#/definitions/LegacyAppPathString"
+          "$ref": "#/definitions/AbsolutePathBuf"
         },
         "environmentId": {
           "type": "string"

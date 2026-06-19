@@ -70,7 +70,6 @@ const (
 	MethodConfigValueWrite                        = "config/value/write"
 	MethodConfigRequirementsRead                  = "configRequirements/read"
 	MethodConfigWarning                           = "configWarning"
-	MethodCurrentTimeRead                         = "currentTime/read"
 	MethodDeprecationNotice                       = "deprecationNotice"
 	MethodEnvironmentAdd                          = "environment/add"
 	MethodError                                   = "error"
@@ -80,8 +79,6 @@ const (
 	MethodExternalAgentConfigDetect               = "externalAgentConfig/detect"
 	MethodExternalAgentConfigImport               = "externalAgentConfig/import"
 	MethodExternalAgentConfigImportCompleted      = "externalAgentConfig/import/completed"
-	MethodExternalAgentConfigImportProgress       = "externalAgentConfig/import/progress"
-	MethodExternalAgentConfigImportReadHistories  = "externalAgentConfig/import/readHistories"
 	MethodFeedbackUpload                          = "feedback/upload"
 	MethodFSChanged                               = "fs/changed"
 	MethodFSCopy                                  = "fs/copy"
@@ -552,17 +549,6 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "ServerNotifications().ConfigWarning",
 		Stability:             MethodStabilityStable,
 	},
-	MethodCurrentTimeRead: {
-		Method:                MethodCurrentTimeRead,
-		Direction:             MethodDirectionServerToClient,
-		Kind:                  MethodKindRequest,
-		Family:                "currentTime",
-		ParamsOrPayloadSchema: "CurrentTimeReadParams",
-		ResponseSchema:        "CurrentTimeReadResponse.json",
-		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
-		FacadeTarget:          "ServerRequests().CurrentTimeRead",
-		Stability:             MethodStabilityExperimental,
-	},
 	MethodDeprecationNotice: {
 		Method:                MethodDeprecationNotice,
 		Direction:             MethodDirectionServerToClient,
@@ -660,28 +646,6 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "",
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportCompleted",
-		Stability:             MethodStabilityStable,
-	},
-	MethodExternalAgentConfigImportProgress: {
-		Method:                MethodExternalAgentConfigImportProgress,
-		Direction:             MethodDirectionServerToClient,
-		Kind:                  MethodKindNotification,
-		Family:                "externalAgentConfig",
-		ParamsOrPayloadSchema: "ExternalAgentConfigImportProgressNotification",
-		ResponseSchema:        "",
-		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
-		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportProgress",
-		Stability:             MethodStabilityStable,
-	},
-	MethodExternalAgentConfigImportReadHistories: {
-		Method:                MethodExternalAgentConfigImportReadHistories,
-		Direction:             MethodDirectionClientToServer,
-		Kind:                  MethodKindRequest,
-		Family:                "externalAgentConfig",
-		ParamsOrPayloadSchema: "",
-		ResponseSchema:        "v2/ExternalAgentConfigImportHistoriesReadResponse.json",
-		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
-		FacadeTarget:          "ExternalAgentConfigs().ImportReadHistories",
 		Stability:             MethodStabilityStable,
 	},
 	MethodFeedbackUpload: {
@@ -1547,7 +1511,7 @@ var methodRegistry = map[string]MethodInfo{
 		Direction:             MethodDirectionClientToServer,
 		Kind:                  MethodKindRequest,
 		Family:                "remoteControl",
-		ParamsOrPayloadSchema: "RemoteControlDisableParams",
+		ParamsOrPayloadSchema: "",
 		ResponseSchema:        "v2/RemoteControlDisableResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "RemoteControl().Disable",
@@ -1558,7 +1522,7 @@ var methodRegistry = map[string]MethodInfo{
 		Direction:             MethodDirectionClientToServer,
 		Kind:                  MethodKindRequest,
 		Family:                "remoteControl",
-		ParamsOrPayloadSchema: "RemoteControlEnableParams",
+		ParamsOrPayloadSchema: "",
 		ResponseSchema:        "v2/RemoteControlEnableResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "RemoteControl().Enable",

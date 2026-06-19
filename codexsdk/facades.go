@@ -393,14 +393,6 @@ func (f externalAgentConfigsFacade) Import(ctx context.Context, params protocolv
 	return response, nil
 }
 
-func (f externalAgentConfigsFacade) ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error) {
-	var response protocolv2.ExternalAgentConfigImportHistoriesReadResponse
-	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodExternalAgentConfigImportReadHistories, &response); err != nil {
-		return protocolv2.ExternalAgentConfigImportHistoriesReadResponse{}, err
-	}
-	return response, nil
-}
-
 func (f feedbackFacade) Upload(ctx context.Context, params protocolv2.FeedbackUploadParams) (protocolv2.FeedbackUploadResponse, error) {
 	var response protocolv2.FeedbackUploadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFeedbackUpload, params, &response); err != nil {

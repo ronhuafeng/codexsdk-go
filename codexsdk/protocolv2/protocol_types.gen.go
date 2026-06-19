@@ -267,44 +267,6 @@ func (value *AdditionalContextKind) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type AmazonBedrockCredentialSource string
-
-const (
-	AmazonBedrockCredentialSourceCodexManaged AmazonBedrockCredentialSource = "codexManaged"
-	AmazonBedrockCredentialSourceAwsManaged   AmazonBedrockCredentialSource = "awsManaged"
-)
-
-func (value AmazonBedrockCredentialSource) IsValid() bool {
-	switch value {
-	case AmazonBedrockCredentialSourceCodexManaged:
-		return true
-	case AmazonBedrockCredentialSourceAwsManaged:
-		return true
-	default:
-		return false
-	}
-}
-
-func (value AmazonBedrockCredentialSource) MarshalJSON() ([]byte, error) {
-	if !value.IsValid() {
-		return nil, invalidEnumValue("AmazonBedrockCredentialSource", string(value))
-	}
-	return json.Marshal(string(value))
-}
-
-func (value *AmazonBedrockCredentialSource) UnmarshalJSON(data []byte) error {
-	var raw string
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	parsed := AmazonBedrockCredentialSource(raw)
-	if !parsed.IsValid() {
-		return invalidEnumValue("AmazonBedrockCredentialSource", raw)
-	}
-	*value = parsed
-	return nil
-}
-
 type AppTemplateUnavailableReason string
 
 const (
@@ -937,7 +899,6 @@ type ConversationTextRole string
 const (
 	ConversationTextRoleUser      ConversationTextRole = "user"
 	ConversationTextRoleDeveloper ConversationTextRole = "developer"
-	ConversationTextRoleAssistant ConversationTextRole = "assistant"
 )
 
 func (value ConversationTextRole) IsValid() bool {
@@ -945,8 +906,6 @@ func (value ConversationTextRole) IsValid() bool {
 	case ConversationTextRoleUser:
 		return true
 	case ConversationTextRoleDeveloper:
-		return true
-	case ConversationTextRoleAssistant:
 		return true
 	default:
 		return false
@@ -3408,6 +3367,44 @@ func (value *RateLimitReachedType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type RealtimeConversationArchitecture string
+
+const (
+	RealtimeConversationArchitectureRealtimeapi RealtimeConversationArchitecture = "realtimeapi"
+	RealtimeConversationArchitectureAvas        RealtimeConversationArchitecture = "avas"
+)
+
+func (value RealtimeConversationArchitecture) IsValid() bool {
+	switch value {
+	case RealtimeConversationArchitectureRealtimeapi:
+		return true
+	case RealtimeConversationArchitectureAvas:
+		return true
+	default:
+		return false
+	}
+}
+
+func (value RealtimeConversationArchitecture) MarshalJSON() ([]byte, error) {
+	if !value.IsValid() {
+		return nil, invalidEnumValue("RealtimeConversationArchitecture", string(value))
+	}
+	return json.Marshal(string(value))
+}
+
+func (value *RealtimeConversationArchitecture) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	parsed := RealtimeConversationArchitecture(raw)
+	if !parsed.IsValid() {
+		return invalidEnumValue("RealtimeConversationArchitecture", raw)
+	}
+	*value = parsed
+	return nil
+}
+
 type RealtimeConversationVersion string
 
 const (
@@ -4067,7 +4064,6 @@ type ThreadSortKey string
 const (
 	ThreadSortKeyCreatedAt ThreadSortKey = "created_at"
 	ThreadSortKeyUpdatedAt ThreadSortKey = "updated_at"
-	ThreadSortKeyRecencyAt ThreadSortKey = "recency_at"
 )
 
 func (value ThreadSortKey) IsValid() bool {
@@ -4075,8 +4071,6 @@ func (value ThreadSortKey) IsValid() bool {
 	case ThreadSortKeyCreatedAt:
 		return true
 	case ThreadSortKeyUpdatedAt:
-		return true
-	case ThreadSortKeyRecencyAt:
 		return true
 	default:
 		return false
@@ -4569,8 +4563,6 @@ func (value *WriteStatus) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type LegacyAppPathString string
-
 type ReasoningEffort string
 
 type ThreadSource string
@@ -4723,8 +4715,8 @@ func (value *AdditionalContextEntry) UnmarshalJSON(data []byte) error {
 type AdditionalFileSystemPermissions struct {
 	Entries          *Nullable[[]FileSystemSandboxEntry] `json:"entries,omitempty"`
 	GlobScanMaxDepth *Nullable[uint64]                   `json:"globScanMaxDepth,omitempty"`
-	Read             *Nullable[[]LegacyAppPathString]    `json:"read,omitempty"`
-	Write            *Nullable[[]LegacyAppPathString]    `json:"write,omitempty"`
+	Read             *Nullable[[]string]                 `json:"read,omitempty"`
+	Write            *Nullable[[]string]                 `json:"write,omitempty"`
 }
 
 func (value AdditionalFileSystemPermissions) MarshalJSON() ([]byte, error) {
@@ -4752,11 +4744,11 @@ func (value *AdditionalFileSystemPermissions) UnmarshalJSON(data []byte) error {
 	if decoded.GlobScanMaxDepth != nil && decoded.GlobScanMaxDepth.Value != nil && *decoded.GlobScanMaxDepth.Value < 1 {
 		return fmt.Errorf("decode AdditionalFileSystemPermissions.globScanMaxDepth: value must be >= 1")
 	}
-	_, err = decodeNullableJSONField[[]LegacyAppPathString](fields, "read", "AdditionalFileSystemPermissions.read", &decoded.Read)
+	_, err = decodeNullableJSONField[[]string](fields, "read", "AdditionalFileSystemPermissions.read", &decoded.Read)
 	if err != nil {
 		return err
 	}
-	_, err = decodeNullableJSONField[[]LegacyAppPathString](fields, "write", "AdditionalFileSystemPermissions.write", &decoded.Write)
+	_, err = decodeNullableJSONField[[]string](fields, "write", "AdditionalFileSystemPermissions.write", &decoded.Write)
 	if err != nil {
 		return err
 	}
@@ -5538,11 +5530,10 @@ func (value *AppsConfig) UnmarshalJSON(data []byte) error {
 }
 
 type AppsDefaultConfig struct {
-	ApprovalsReviewer        *Nullable[ApprovalsReviewer] `json:"approvals_reviewer,omitempty"`
-	DefaultToolsApprovalMode *Nullable[AppToolApproval]   `json:"default_tools_approval_mode,omitempty"`
-	DestructiveEnabled       *bool                        `json:"destructive_enabled,omitempty"`
-	Enabled                  *bool                        `json:"enabled,omitempty"`
-	OpenWorldEnabled         *bool                        `json:"open_world_enabled,omitempty"`
+	ApprovalsReviewer  *Nullable[ApprovalsReviewer] `json:"approvals_reviewer,omitempty"`
+	DestructiveEnabled *bool                        `json:"destructive_enabled,omitempty"`
+	Enabled            *bool                        `json:"enabled,omitempty"`
+	OpenWorldEnabled   *bool                        `json:"open_world_enabled,omitempty"`
 }
 
 func (value *AppsDefaultConfig) UnmarshalJSON(data []byte) error {
@@ -5552,10 +5543,6 @@ func (value *AppsDefaultConfig) UnmarshalJSON(data []byte) error {
 	}
 	var decoded AppsDefaultConfig
 	_, err = decodeNullableJSONField[ApprovalsReviewer](fields, "approvals_reviewer", "AppsDefaultConfig.approvals_reviewer", &decoded.ApprovalsReviewer)
-	if err != nil {
-		return err
-	}
-	_, err = decodeNullableJSONField[AppToolApproval](fields, "default_tools_approval_mode", "AppsDefaultConfig.default_tools_approval_mode", &decoded.DefaultToolsApprovalMode)
 	if err != nil {
 		return err
 	}
@@ -6427,8 +6414,7 @@ type CommandExecutionRequestApprovalParams struct {
 	AvailableDecisions              *Nullable[[]CommandExecutionApprovalDecision] `json:"availableDecisions,omitempty"`
 	Command                         *Nullable[string]                             `json:"command,omitempty"`
 	CommandActions                  *Nullable[[]CommandAction]                    `json:"commandActions,omitempty"`
-	CWD                             *Nullable[LegacyAppPathString]                `json:"cwd,omitempty"`
-	EnvironmentID                   *Nullable[string]                             `json:"environmentId,omitempty"`
+	CWD                             *Nullable[string]                             `json:"cwd,omitempty"`
 	ItemID                          string                                        `json:"itemId"`
 	NetworkApprovalContext          *Nullable[NetworkApprovalContext]             `json:"networkApprovalContext,omitempty"`
 	ProposedExecpolicyAmendment     *Nullable[[]string]                           `json:"proposedExecpolicyAmendment,omitempty"`
@@ -6465,11 +6451,7 @@ func (value *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) e
 	if err != nil {
 		return err
 	}
-	_, err = decodeNullableJSONField[LegacyAppPathString](fields, "cwd", "CommandExecutionRequestApprovalParams.cwd", &decoded.CWD)
-	if err != nil {
-		return err
-	}
-	_, err = decodeNullableJSONField[string](fields, "environmentId", "CommandExecutionRequestApprovalParams.environmentId", &decoded.EnvironmentID)
+	_, err = decodeNullableJSONField[string](fields, "cwd", "CommandExecutionRequestApprovalParams.cwd", &decoded.CWD)
 	if err != nil {
 		return err
 	}
@@ -7489,54 +7471,6 @@ func (value *CreditsSnapshot) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type CurrentTimeReadParams struct {
-	ThreadID string `json:"threadId"`
-}
-
-func (value *CurrentTimeReadParams) UnmarshalJSON(data []byte) error {
-	fields, err := decodeObjectFields(data, "CurrentTimeReadParams")
-	if err != nil {
-		return err
-	}
-	var decoded CurrentTimeReadParams
-	seenThreadID, err := decodeJSONField(fields, "threadId", "CurrentTimeReadParams.threadId", false, &decoded.ThreadID)
-	if err != nil {
-		return err
-	}
-	if !seenThreadID {
-		return missingRequiredField("CurrentTimeReadParams.threadId")
-	}
-	if err := rejectUnexpectedFields(fields, "CurrentTimeReadParams"); err != nil {
-		return err
-	}
-	*value = decoded
-	return nil
-}
-
-type CurrentTimeReadResponse struct {
-	CurrentTimeAt int64 `json:"currentTimeAt"`
-}
-
-func (value *CurrentTimeReadResponse) UnmarshalJSON(data []byte) error {
-	fields, err := decodeObjectFields(data, "CurrentTimeReadResponse")
-	if err != nil {
-		return err
-	}
-	var decoded CurrentTimeReadResponse
-	seenCurrentTimeAt, err := decodeJSONField(fields, "currentTimeAt", "CurrentTimeReadResponse.currentTimeAt", false, &decoded.CurrentTimeAt)
-	if err != nil {
-		return err
-	}
-	if !seenCurrentTimeAt {
-		return missingRequiredField("CurrentTimeReadResponse.currentTimeAt")
-	}
-	if err := rejectUnexpectedFields(fields, "CurrentTimeReadResponse"); err != nil {
-		return err
-	}
-	*value = decoded
-	return nil
-}
-
 type DeprecationNoticeNotification struct {
 	Details *Nullable[string] `json:"details,omitempty"`
 	Summary string            `json:"summary"`
@@ -8155,100 +8089,8 @@ func (value *ExternalAgentConfigImportCompletedNotification) UnmarshalJSON(data 
 	return nil
 }
 
-type ExternalAgentConfigImportHistoriesReadResponse struct {
-	Data []ExternalAgentConfigImportHistory `json:"data"`
-}
-
-func (value ExternalAgentConfigImportHistoriesReadResponse) MarshalJSON() ([]byte, error) {
-	if value.Data == nil {
-		return nil, fmt.Errorf("encode ExternalAgentConfigImportHistoriesReadResponse.data: nil is not allowed")
-	}
-	type wire ExternalAgentConfigImportHistoriesReadResponse
-	return json.Marshal(wire(value))
-}
-
-func (value *ExternalAgentConfigImportHistoriesReadResponse) UnmarshalJSON(data []byte) error {
-	fields, err := decodeObjectFields(data, "ExternalAgentConfigImportHistoriesReadResponse")
-	if err != nil {
-		return err
-	}
-	var decoded ExternalAgentConfigImportHistoriesReadResponse
-	seenData, err := decodeJSONField(fields, "data", "ExternalAgentConfigImportHistoriesReadResponse.data", false, &decoded.Data)
-	if err != nil {
-		return err
-	}
-	if !seenData {
-		return missingRequiredField("ExternalAgentConfigImportHistoriesReadResponse.data")
-	}
-	if err := rejectUnexpectedFields(fields, "ExternalAgentConfigImportHistoriesReadResponse"); err != nil {
-		return err
-	}
-	*value = decoded
-	return nil
-}
-
-type ExternalAgentConfigImportHistory struct {
-	CompletedAtMS int64                                      `json:"completedAtMs"`
-	Failures      []ExternalAgentConfigImportItemTypeFailure `json:"failures"`
-	ImportID      string                                     `json:"importId"`
-	Successes     []ExternalAgentConfigImportItemTypeSuccess `json:"successes"`
-}
-
-func (value ExternalAgentConfigImportHistory) MarshalJSON() ([]byte, error) {
-	if value.Failures == nil {
-		return nil, fmt.Errorf("encode ExternalAgentConfigImportHistory.failures: nil is not allowed")
-	}
-	if value.Successes == nil {
-		return nil, fmt.Errorf("encode ExternalAgentConfigImportHistory.successes: nil is not allowed")
-	}
-	type wire ExternalAgentConfigImportHistory
-	return json.Marshal(wire(value))
-}
-
-func (value *ExternalAgentConfigImportHistory) UnmarshalJSON(data []byte) error {
-	fields, err := decodeObjectFields(data, "ExternalAgentConfigImportHistory")
-	if err != nil {
-		return err
-	}
-	var decoded ExternalAgentConfigImportHistory
-	seenCompletedAtMS, err := decodeJSONField(fields, "completedAtMs", "ExternalAgentConfigImportHistory.completedAtMs", false, &decoded.CompletedAtMS)
-	if err != nil {
-		return err
-	}
-	if !seenCompletedAtMS {
-		return missingRequiredField("ExternalAgentConfigImportHistory.completedAtMs")
-	}
-	seenFailures, err := decodeJSONField(fields, "failures", "ExternalAgentConfigImportHistory.failures", false, &decoded.Failures)
-	if err != nil {
-		return err
-	}
-	if !seenFailures {
-		return missingRequiredField("ExternalAgentConfigImportHistory.failures")
-	}
-	seenImportID, err := decodeJSONField(fields, "importId", "ExternalAgentConfigImportHistory.importId", false, &decoded.ImportID)
-	if err != nil {
-		return err
-	}
-	if !seenImportID {
-		return missingRequiredField("ExternalAgentConfigImportHistory.importId")
-	}
-	seenSuccesses, err := decodeJSONField(fields, "successes", "ExternalAgentConfigImportHistory.successes", false, &decoded.Successes)
-	if err != nil {
-		return err
-	}
-	if !seenSuccesses {
-		return missingRequiredField("ExternalAgentConfigImportHistory.successes")
-	}
-	if err := rejectUnexpectedFields(fields, "ExternalAgentConfigImportHistory"); err != nil {
-		return err
-	}
-	*value = decoded
-	return nil
-}
-
 type ExternalAgentConfigImportItemTypeFailure struct {
 	CWD          *Nullable[string]                    `json:"cwd,omitempty"`
-	ErrorType    *Nullable[string]                    `json:"errorType,omitempty"`
 	FailureStage string                               `json:"failureStage"`
 	ItemType     ExternalAgentConfigMigrationItemType `json:"itemType"`
 	Message      string                               `json:"message"`
@@ -8262,10 +8104,6 @@ func (value *ExternalAgentConfigImportItemTypeFailure) UnmarshalJSON(data []byte
 	}
 	var decoded ExternalAgentConfigImportItemTypeFailure
 	_, err = decodeNullableJSONField[string](fields, "cwd", "ExternalAgentConfigImportItemTypeFailure.cwd", &decoded.CWD)
-	if err != nil {
-		return err
-	}
-	_, err = decodeNullableJSONField[string](fields, "errorType", "ExternalAgentConfigImportItemTypeFailure.errorType", &decoded.ErrorType)
 	if err != nil {
 		return err
 	}
@@ -8342,7 +8180,6 @@ func (value *ExternalAgentConfigImportItemTypeSuccess) UnmarshalJSON(data []byte
 
 type ExternalAgentConfigImportParams struct {
 	MigrationItems []ExternalAgentConfigMigrationItem `json:"migrationItems"`
-	Source         *Nullable[string]                  `json:"source,omitempty"`
 }
 
 func (value ExternalAgentConfigImportParams) MarshalJSON() ([]byte, error) {
@@ -8366,51 +8203,7 @@ func (value *ExternalAgentConfigImportParams) UnmarshalJSON(data []byte) error {
 	if !seenMigrationItems {
 		return missingRequiredField("ExternalAgentConfigImportParams.migrationItems")
 	}
-	_, err = decodeNullableJSONField[string](fields, "source", "ExternalAgentConfigImportParams.source", &decoded.Source)
-	if err != nil {
-		return err
-	}
 	if err := rejectUnexpectedFields(fields, "ExternalAgentConfigImportParams"); err != nil {
-		return err
-	}
-	*value = decoded
-	return nil
-}
-
-type ExternalAgentConfigImportProgressNotification struct {
-	ImportID        string                                `json:"importId"`
-	ItemTypeResults []ExternalAgentConfigImportTypeResult `json:"itemTypeResults"`
-}
-
-func (value ExternalAgentConfigImportProgressNotification) MarshalJSON() ([]byte, error) {
-	if value.ItemTypeResults == nil {
-		return nil, fmt.Errorf("encode ExternalAgentConfigImportProgressNotification.itemTypeResults: nil is not allowed")
-	}
-	type wire ExternalAgentConfigImportProgressNotification
-	return json.Marshal(wire(value))
-}
-
-func (value *ExternalAgentConfigImportProgressNotification) UnmarshalJSON(data []byte) error {
-	fields, err := decodeObjectFields(data, "ExternalAgentConfigImportProgressNotification")
-	if err != nil {
-		return err
-	}
-	var decoded ExternalAgentConfigImportProgressNotification
-	seenImportID, err := decodeJSONField(fields, "importId", "ExternalAgentConfigImportProgressNotification.importId", false, &decoded.ImportID)
-	if err != nil {
-		return err
-	}
-	if !seenImportID {
-		return missingRequiredField("ExternalAgentConfigImportProgressNotification.importId")
-	}
-	seenItemTypeResults, err := decodeJSONField(fields, "itemTypeResults", "ExternalAgentConfigImportProgressNotification.itemTypeResults", false, &decoded.ItemTypeResults)
-	if err != nil {
-		return err
-	}
-	if !seenItemTypeResults {
-		return missingRequiredField("ExternalAgentConfigImportProgressNotification.itemTypeResults")
-	}
-	if err := rejectUnexpectedFields(fields, "ExternalAgentConfigImportProgressNotification"); err != nil {
 		return err
 	}
 	*value = decoded
@@ -10529,10 +10322,9 @@ func (value *HooksListResponse) UnmarshalJSON(data []byte) error {
 }
 
 type InitializeCapabilities struct {
-	ExperimentalAPI                *bool               `json:"experimentalApi,omitempty"`
-	MCPServerOpenaiFormElicitation *bool               `json:"mcpServerOpenaiFormElicitation,omitempty"`
-	OptOutNotificationMethods      *Nullable[[]string] `json:"optOutNotificationMethods,omitempty"`
-	RequestAttestation             *bool               `json:"requestAttestation,omitempty"`
+	ExperimentalAPI           *bool               `json:"experimentalApi,omitempty"`
+	OptOutNotificationMethods *Nullable[[]string] `json:"optOutNotificationMethods,omitempty"`
+	RequestAttestation        *bool               `json:"requestAttestation,omitempty"`
 }
 
 func (value *InitializeCapabilities) UnmarshalJSON(data []byte) error {
@@ -10542,10 +10334,6 @@ func (value *InitializeCapabilities) UnmarshalJSON(data []byte) error {
 	}
 	var decoded InitializeCapabilities
 	_, err = decodeJSONField(fields, "experimentalApi", "InitializeCapabilities.experimentalApi", false, &decoded.ExperimentalAPI)
-	if err != nil {
-		return err
-	}
-	_, err = decodeJSONField(fields, "mcpServerOpenaiFormElicitation", "InitializeCapabilities.mcpServerOpenaiFormElicitation", false, &decoded.MCPServerOpenaiFormElicitation)
 	if err != nil {
 		return err
 	}
@@ -11939,40 +11727,6 @@ func (value *McpServerToolCallResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := rejectUnexpectedFields(fields, "McpServerToolCallResponse"); err != nil {
-		return err
-	}
-	*value = decoded
-	return nil
-}
-
-type McpToolCallAppContext struct {
-	ConnectorID string            `json:"connectorId"`
-	LinkID      *Nullable[string] `json:"linkId,omitempty"`
-	ResourceURI *Nullable[string] `json:"resourceUri,omitempty"`
-}
-
-func (value *McpToolCallAppContext) UnmarshalJSON(data []byte) error {
-	fields, err := decodeObjectFields(data, "McpToolCallAppContext")
-	if err != nil {
-		return err
-	}
-	var decoded McpToolCallAppContext
-	seenConnectorID, err := decodeJSONField(fields, "connectorId", "McpToolCallAppContext.connectorId", false, &decoded.ConnectorID)
-	if err != nil {
-		return err
-	}
-	if !seenConnectorID {
-		return missingRequiredField("McpToolCallAppContext.connectorId")
-	}
-	_, err = decodeNullableJSONField[string](fields, "linkId", "McpToolCallAppContext.linkId", &decoded.LinkID)
-	if err != nil {
-		return err
-	}
-	_, err = decodeNullableJSONField[string](fields, "resourceUri", "McpToolCallAppContext.resourceUri", &decoded.ResourceURI)
-	if err != nil {
-		return err
-	}
-	if err := rejectUnexpectedFields(fields, "McpToolCallAppContext"); err != nil {
 		return err
 	}
 	*value = decoded
@@ -15786,8 +15540,7 @@ func (value *ResourceTemplate) UnmarshalJSON(data []byte) error {
 }
 
 type ResponseItemMetadata struct {
-	SourceCallID *Nullable[string] `json:"source_call_id,omitempty"`
-	TurnID       *Nullable[string] `json:"turn_id,omitempty"`
+	TurnID *Nullable[string] `json:"turn_id,omitempty"`
 }
 
 func (value *ResponseItemMetadata) UnmarshalJSON(data []byte) error {
@@ -15796,10 +15549,6 @@ func (value *ResponseItemMetadata) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded ResponseItemMetadata
-	_, err = decodeNullableJSONField[string](fields, "source_call_id", "ResponseItemMetadata.source_call_id", &decoded.SourceCallID)
-	if err != nil {
-		return err
-	}
 	_, err = decodeNullableJSONField[string](fields, "turn_id", "ResponseItemMetadata.turn_id", &decoded.TurnID)
 	if err != nil {
 		return err
@@ -16850,7 +16599,6 @@ type Thread struct {
 	ParentThreadID *Nullable[string]       `json:"parentThreadId,omitempty"`
 	Path           *Nullable[string]       `json:"path,omitempty"`
 	Preview        string                  `json:"preview"`
-	RecencyAt      *Nullable[int64]        `json:"recencyAt,omitempty"`
 	SessionID      string                  `json:"sessionId"`
 	Source         SessionSource           `json:"source"`
 	Status         ThreadStatus            `json:"status"`
@@ -16949,10 +16697,6 @@ func (value *Thread) UnmarshalJSON(data []byte) error {
 	}
 	if !seenPreview {
 		return missingRequiredField("Thread.preview")
-	}
-	_, err = decodeNullableJSONField[int64](fields, "recencyAt", "Thread.recencyAt", &decoded.RecencyAt)
-	if err != nil {
-		return err
 	}
 	seenSessionID, err := decodeJSONField(fields, "sessionId", "Thread.sessionId", false, &decoded.SessionID)
 	if err != nil {
@@ -17525,7 +17269,7 @@ type ThreadForkResponse struct {
 	ApprovalPolicy          AskForApproval                     `json:"approvalPolicy"`
 	ApprovalsReviewer       ApprovalsReviewer                  `json:"approvalsReviewer"`
 	CWD                     string                             `json:"cwd"`
-	InstructionSources      *[]LegacyAppPathString             `json:"instructionSources,omitempty"`
+	InstructionSources      *[]string                          `json:"instructionSources,omitempty"`
 	Model                   string                             `json:"model"`
 	ModelProvider           string                             `json:"modelProvider"`
 	ReasoningEffort         *Nullable[ReasoningEffort]         `json:"reasoningEffort,omitempty"`
@@ -18798,19 +18542,18 @@ func (value *ThreadRealtimeSdpNotification) UnmarshalJSON(data []byte) error {
 }
 
 type ThreadRealtimeStartParams struct {
-	ClientManagedHandoffs      *Nullable[bool]                         `json:"clientManagedHandoffs,omitempty"`
-	CodexResponseHandoffPrefix *Nullable[string]                       `json:"codexResponseHandoffPrefix,omitempty"`
-	CodexResponseItemPrefix    *Nullable[string]                       `json:"codexResponseItemPrefix,omitempty"`
-	CodexResponsesAsItems      *Nullable[bool]                         `json:"codexResponsesAsItems,omitempty"`
-	IncludeStartupContext      *Nullable[bool]                         `json:"includeStartupContext,omitempty"`
-	Model                      *Nullable[string]                       `json:"model,omitempty"`
-	OutputModality             RealtimeOutputModality                  `json:"outputModality"`
-	Prompt                     *Nullable[string]                       `json:"prompt,omitempty"`
-	RealtimeSessionID          *Nullable[string]                       `json:"realtimeSessionId,omitempty"`
-	ThreadID                   string                                  `json:"threadId"`
-	Transport                  *Nullable[ThreadRealtimeStartTransport] `json:"transport,omitempty"`
-	Version                    *Nullable[RealtimeConversationVersion]  `json:"version,omitempty"`
-	Voice                      *Nullable[RealtimeVoice]                `json:"voice,omitempty"`
+	Architecture            *Nullable[RealtimeConversationArchitecture] `json:"architecture,omitempty"`
+	CodexResponseItemPrefix *Nullable[string]                           `json:"codexResponseItemPrefix,omitempty"`
+	CodexResponsesAsItems   *Nullable[bool]                             `json:"codexResponsesAsItems,omitempty"`
+	IncludeStartupContext   *Nullable[bool]                             `json:"includeStartupContext,omitempty"`
+	Model                   *Nullable[string]                           `json:"model,omitempty"`
+	OutputModality          RealtimeOutputModality                      `json:"outputModality"`
+	Prompt                  *Nullable[string]                           `json:"prompt,omitempty"`
+	RealtimeSessionID       *Nullable[string]                           `json:"realtimeSessionId,omitempty"`
+	ThreadID                string                                      `json:"threadId"`
+	Transport               *Nullable[ThreadRealtimeStartTransport]     `json:"transport,omitempty"`
+	Version                 *Nullable[RealtimeConversationVersion]      `json:"version,omitempty"`
+	Voice                   *Nullable[RealtimeVoice]                    `json:"voice,omitempty"`
 }
 
 func (value *ThreadRealtimeStartParams) UnmarshalJSON(data []byte) error {
@@ -18819,11 +18562,7 @@ func (value *ThreadRealtimeStartParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded ThreadRealtimeStartParams
-	_, err = decodeNullableJSONField[bool](fields, "clientManagedHandoffs", "ThreadRealtimeStartParams.clientManagedHandoffs", &decoded.ClientManagedHandoffs)
-	if err != nil {
-		return err
-	}
-	_, err = decodeNullableJSONField[string](fields, "codexResponseHandoffPrefix", "ThreadRealtimeStartParams.codexResponseHandoffPrefix", &decoded.CodexResponseHandoffPrefix)
+	_, err = decodeNullableJSONField[RealtimeConversationArchitecture](fields, "architecture", "ThreadRealtimeStartParams.architecture", &decoded.Architecture)
 	if err != nil {
 		return err
 	}
@@ -19199,7 +18938,7 @@ type ThreadResumeResponse struct {
 	ApprovalsReviewer       ApprovalsReviewer                  `json:"approvalsReviewer"`
 	CWD                     string                             `json:"cwd"`
 	InitialTurnsPage        *Nullable[TurnsPage]               `json:"initialTurnsPage,omitempty"`
-	InstructionSources      *[]LegacyAppPathString             `json:"instructionSources,omitempty"`
+	InstructionSources      *[]string                          `json:"instructionSources,omitempty"`
 	Model                   string                             `json:"model"`
 	ModelProvider           string                             `json:"modelProvider"`
 	ReasoningEffort         *Nullable[ReasoningEffort]         `json:"reasoningEffort,omitempty"`
@@ -19850,7 +19589,7 @@ type ThreadStartResponse struct {
 	ApprovalPolicy          AskForApproval                     `json:"approvalPolicy"`
 	ApprovalsReviewer       ApprovalsReviewer                  `json:"approvalsReviewer"`
 	CWD                     string                             `json:"cwd"`
-	InstructionSources      *[]LegacyAppPathString             `json:"instructionSources,omitempty"`
+	InstructionSources      *[]string                          `json:"instructionSources,omitempty"`
 	Model                   string                             `json:"model"`
 	ModelProvider           string                             `json:"modelProvider"`
 	ReasoningEffort         *Nullable[ReasoningEffort]         `json:"reasoningEffort,omitempty"`
@@ -20867,8 +20606,8 @@ func (value *TurnDiffUpdatedNotification) UnmarshalJSON(data []byte) error {
 }
 
 type TurnEnvironmentParams struct {
-	CWD           LegacyAppPathString `json:"cwd"`
-	EnvironmentID string              `json:"environmentId"`
+	CWD           string `json:"cwd"`
+	EnvironmentID string `json:"environmentId"`
 }
 
 func (value *TurnEnvironmentParams) UnmarshalJSON(data []byte) error {
@@ -24357,9 +24096,7 @@ type AccountChatGPT struct {
 	PlanType PlanType `json:"planType"`
 }
 
-type AccountAmazonBedrock struct {
-	CredentialSource *AmazonBedrockCredentialSource `json:"credentialSource,omitempty"`
-}
+type AccountAmazonBedrock struct{}
 
 func NewAccountAPIKey() Account {
 	payload := AccountAPIKey{}
@@ -24370,7 +24107,8 @@ func NewAccountChatGPT(payload AccountChatGPT) Account {
 	return Account{kind: AccountKindChatGPT, variantChatGPT: &payload}
 }
 
-func NewAccountAmazonBedrock(payload AccountAmazonBedrock) Account {
+func NewAccountAmazonBedrock() Account {
+	payload := AccountAmazonBedrock{}
 	return Account{kind: AccountKindAmazonBedrock, variantAmazonBedrock: &payload}
 }
 
@@ -24441,11 +24179,9 @@ func (value Account) MarshalJSON() ([]byte, error) {
 			return nil, invalidUnionVariant("Account", "amazonBedrock")
 		}
 		return json.Marshal(struct {
-			CredentialSource *AmazonBedrockCredentialSource `json:"credentialSource,omitempty"`
-			Type             string                         `json:"type"`
+			Type string `json:"type"`
 		}{
-			CredentialSource: value.variantAmazonBedrock.CredentialSource,
-			Type:             "amazonBedrock",
+			Type: "amazonBedrock",
 		})
 	default:
 		return nil, invalidUnionValue("Account")
@@ -24492,10 +24228,6 @@ func (value *Account) UnmarshalJSON(data []byte) error {
 		return nil
 	case "amazonBedrock":
 		var decoded AccountAmazonBedrock
-		_, err = decodeJSONField(fields, "credentialSource", "Account.credentialSource", false, &decoded.CredentialSource)
-		if err != nil {
-			return err
-		}
 		if err := rejectUnexpectedFields(fields, "Account.amazonBedrock"); err != nil {
 			return err
 		}
@@ -24811,250 +24543,248 @@ func (value *ClientNotification) UnmarshalJSON(data []byte) error {
 type ClientRequestKind string
 
 const (
-	ClientRequestKindInitialize                             ClientRequestKind = "initialize"
-	ClientRequestKindThreadStart                            ClientRequestKind = "thread/start"
-	ClientRequestKindThreadResume                           ClientRequestKind = "thread/resume"
-	ClientRequestKindThreadFork                             ClientRequestKind = "thread/fork"
-	ClientRequestKindThreadArchive                          ClientRequestKind = "thread/archive"
-	ClientRequestKindThreadDelete                           ClientRequestKind = "thread/delete"
-	ClientRequestKindThreadUnsubscribe                      ClientRequestKind = "thread/unsubscribe"
-	ClientRequestKindThreadIncrementElicitation             ClientRequestKind = "thread/increment_elicitation"
-	ClientRequestKindThreadDecrementElicitation             ClientRequestKind = "thread/decrement_elicitation"
-	ClientRequestKindThreadNameSet                          ClientRequestKind = "thread/name/set"
-	ClientRequestKindThreadGoalSet                          ClientRequestKind = "thread/goal/set"
-	ClientRequestKindThreadGoalGet                          ClientRequestKind = "thread/goal/get"
-	ClientRequestKindThreadGoalClear                        ClientRequestKind = "thread/goal/clear"
-	ClientRequestKindThreadMetadataUpdate                   ClientRequestKind = "thread/metadata/update"
-	ClientRequestKindThreadSettingsUpdate                   ClientRequestKind = "thread/settings/update"
-	ClientRequestKindThreadMemoryModeSet                    ClientRequestKind = "thread/memoryMode/set"
-	ClientRequestKindMemoryReset                            ClientRequestKind = "memory/reset"
-	ClientRequestKindThreadUnarchive                        ClientRequestKind = "thread/unarchive"
-	ClientRequestKindThreadCompactStart                     ClientRequestKind = "thread/compact/start"
-	ClientRequestKindThreadShellCommand                     ClientRequestKind = "thread/shellCommand"
-	ClientRequestKindThreadApproveGuardianDeniedAction      ClientRequestKind = "thread/approveGuardianDeniedAction"
-	ClientRequestKindThreadBackgroundTerminalsClean         ClientRequestKind = "thread/backgroundTerminals/clean"
-	ClientRequestKindThreadBackgroundTerminalsList          ClientRequestKind = "thread/backgroundTerminals/list"
-	ClientRequestKindThreadBackgroundTerminalsTerminate     ClientRequestKind = "thread/backgroundTerminals/terminate"
-	ClientRequestKindThreadRollback                         ClientRequestKind = "thread/rollback"
-	ClientRequestKindThreadList                             ClientRequestKind = "thread/list"
-	ClientRequestKindThreadSearch                           ClientRequestKind = "thread/search"
-	ClientRequestKindThreadLoadedList                       ClientRequestKind = "thread/loaded/list"
-	ClientRequestKindThreadRead                             ClientRequestKind = "thread/read"
-	ClientRequestKindThreadTurnsList                        ClientRequestKind = "thread/turns/list"
-	ClientRequestKindThreadTurnsItemsList                   ClientRequestKind = "thread/turns/items/list"
-	ClientRequestKindThreadInjectItems                      ClientRequestKind = "thread/inject_items"
-	ClientRequestKindSkillsList                             ClientRequestKind = "skills/list"
-	ClientRequestKindSkillsExtraRootsSet                    ClientRequestKind = "skills/extraRoots/set"
-	ClientRequestKindHooksList                              ClientRequestKind = "hooks/list"
-	ClientRequestKindMarketplaceAdd                         ClientRequestKind = "marketplace/add"
-	ClientRequestKindMarketplaceRemove                      ClientRequestKind = "marketplace/remove"
-	ClientRequestKindMarketplaceUpgrade                     ClientRequestKind = "marketplace/upgrade"
-	ClientRequestKindPluginList                             ClientRequestKind = "plugin/list"
-	ClientRequestKindPluginInstalled                        ClientRequestKind = "plugin/installed"
-	ClientRequestKindPluginRead                             ClientRequestKind = "plugin/read"
-	ClientRequestKindPluginSkillRead                        ClientRequestKind = "plugin/skill/read"
-	ClientRequestKindPluginShareSave                        ClientRequestKind = "plugin/share/save"
-	ClientRequestKindPluginShareUpdateTargets               ClientRequestKind = "plugin/share/updateTargets"
-	ClientRequestKindPluginShareList                        ClientRequestKind = "plugin/share/list"
-	ClientRequestKindPluginShareCheckout                    ClientRequestKind = "plugin/share/checkout"
-	ClientRequestKindPluginShareDelete                      ClientRequestKind = "plugin/share/delete"
-	ClientRequestKindAppList                                ClientRequestKind = "app/list"
-	ClientRequestKindFSReadFile                             ClientRequestKind = "fs/readFile"
-	ClientRequestKindFSWriteFile                            ClientRequestKind = "fs/writeFile"
-	ClientRequestKindFSCreateDirectory                      ClientRequestKind = "fs/createDirectory"
-	ClientRequestKindFSGetMetadata                          ClientRequestKind = "fs/getMetadata"
-	ClientRequestKindFSReadDirectory                        ClientRequestKind = "fs/readDirectory"
-	ClientRequestKindFSRemove                               ClientRequestKind = "fs/remove"
-	ClientRequestKindFSCopy                                 ClientRequestKind = "fs/copy"
-	ClientRequestKindFSWatch                                ClientRequestKind = "fs/watch"
-	ClientRequestKindFSUnwatch                              ClientRequestKind = "fs/unwatch"
-	ClientRequestKindSkillsConfigWrite                      ClientRequestKind = "skills/config/write"
-	ClientRequestKindPluginInstall                          ClientRequestKind = "plugin/install"
-	ClientRequestKindPluginUninstall                        ClientRequestKind = "plugin/uninstall"
-	ClientRequestKindTurnStart                              ClientRequestKind = "turn/start"
-	ClientRequestKindTurnSteer                              ClientRequestKind = "turn/steer"
-	ClientRequestKindTurnInterrupt                          ClientRequestKind = "turn/interrupt"
-	ClientRequestKindThreadRealtimeStart                    ClientRequestKind = "thread/realtime/start"
-	ClientRequestKindThreadRealtimeAppendAudio              ClientRequestKind = "thread/realtime/appendAudio"
-	ClientRequestKindThreadRealtimeAppendText               ClientRequestKind = "thread/realtime/appendText"
-	ClientRequestKindThreadRealtimeAppendSpeech             ClientRequestKind = "thread/realtime/appendSpeech"
-	ClientRequestKindThreadRealtimeStop                     ClientRequestKind = "thread/realtime/stop"
-	ClientRequestKindThreadRealtimeListVoices               ClientRequestKind = "thread/realtime/listVoices"
-	ClientRequestKindReviewStart                            ClientRequestKind = "review/start"
-	ClientRequestKindModelList                              ClientRequestKind = "model/list"
-	ClientRequestKindModelProviderCapabilitiesRead          ClientRequestKind = "modelProvider/capabilities/read"
-	ClientRequestKindExperimentalFeatureList                ClientRequestKind = "experimentalFeature/list"
-	ClientRequestKindPermissionProfileList                  ClientRequestKind = "permissionProfile/list"
-	ClientRequestKindExperimentalFeatureEnablementSet       ClientRequestKind = "experimentalFeature/enablement/set"
-	ClientRequestKindRemoteControlEnable                    ClientRequestKind = "remoteControl/enable"
-	ClientRequestKindRemoteControlDisable                   ClientRequestKind = "remoteControl/disable"
-	ClientRequestKindRemoteControlStatusRead                ClientRequestKind = "remoteControl/status/read"
-	ClientRequestKindRemoteControlPairingStart              ClientRequestKind = "remoteControl/pairing/start"
-	ClientRequestKindRemoteControlPairingStatus             ClientRequestKind = "remoteControl/pairing/status"
-	ClientRequestKindRemoteControlClientList                ClientRequestKind = "remoteControl/client/list"
-	ClientRequestKindRemoteControlClientRevoke              ClientRequestKind = "remoteControl/client/revoke"
-	ClientRequestKindCollaborationModeList                  ClientRequestKind = "collaborationMode/list"
-	ClientRequestKindMockExperimentalMethod                 ClientRequestKind = "mock/experimentalMethod"
-	ClientRequestKindEnvironmentAdd                         ClientRequestKind = "environment/add"
-	ClientRequestKindMCPServerOAuthLogin                    ClientRequestKind = "mcpServer/oauth/login"
-	ClientRequestKindConfigMCPServerReload                  ClientRequestKind = "config/mcpServer/reload"
-	ClientRequestKindMCPServerStatusList                    ClientRequestKind = "mcpServerStatus/list"
-	ClientRequestKindMCPServerResourceRead                  ClientRequestKind = "mcpServer/resource/read"
-	ClientRequestKindMCPServerToolCall                      ClientRequestKind = "mcpServer/tool/call"
-	ClientRequestKindWindowsSandboxSetupStart               ClientRequestKind = "windowsSandbox/setupStart"
-	ClientRequestKindWindowsSandboxReadiness                ClientRequestKind = "windowsSandbox/readiness"
-	ClientRequestKindAccountLoginStart                      ClientRequestKind = "account/login/start"
-	ClientRequestKindAccountLoginCancel                     ClientRequestKind = "account/login/cancel"
-	ClientRequestKindAccountLogout                          ClientRequestKind = "account/logout"
-	ClientRequestKindAccountRateLimitsRead                  ClientRequestKind = "account/rateLimits/read"
-	ClientRequestKindAccountRateLimitResetCreditConsume     ClientRequestKind = "account/rateLimitResetCredit/consume"
-	ClientRequestKindAccountUsageRead                       ClientRequestKind = "account/usage/read"
-	ClientRequestKindAccountSendAddCreditsNudgeEmail        ClientRequestKind = "account/sendAddCreditsNudgeEmail"
-	ClientRequestKindFeedbackUpload                         ClientRequestKind = "feedback/upload"
-	ClientRequestKindCommandExec                            ClientRequestKind = "command/exec"
-	ClientRequestKindCommandExecWrite                       ClientRequestKind = "command/exec/write"
-	ClientRequestKindCommandExecTerminate                   ClientRequestKind = "command/exec/terminate"
-	ClientRequestKindCommandExecResize                      ClientRequestKind = "command/exec/resize"
-	ClientRequestKindProcessSpawn                           ClientRequestKind = "process/spawn"
-	ClientRequestKindProcessWriteStdin                      ClientRequestKind = "process/writeStdin"
-	ClientRequestKindProcessKill                            ClientRequestKind = "process/kill"
-	ClientRequestKindProcessResizePTY                       ClientRequestKind = "process/resizePty"
-	ClientRequestKindConfigRead                             ClientRequestKind = "config/read"
-	ClientRequestKindExternalAgentConfigDetect              ClientRequestKind = "externalAgentConfig/detect"
-	ClientRequestKindExternalAgentConfigImport              ClientRequestKind = "externalAgentConfig/import"
-	ClientRequestKindExternalAgentConfigImportReadHistories ClientRequestKind = "externalAgentConfig/import/readHistories"
-	ClientRequestKindConfigValueWrite                       ClientRequestKind = "config/value/write"
-	ClientRequestKindConfigBatchWrite                       ClientRequestKind = "config/batchWrite"
-	ClientRequestKindConfigRequirementsRead                 ClientRequestKind = "configRequirements/read"
-	ClientRequestKindAccountRead                            ClientRequestKind = "account/read"
-	ClientRequestKindFuzzyFileSearch                        ClientRequestKind = "fuzzyFileSearch"
-	ClientRequestKindFuzzyFileSearchSessionStart            ClientRequestKind = "fuzzyFileSearch/sessionStart"
-	ClientRequestKindFuzzyFileSearchSessionUpdate           ClientRequestKind = "fuzzyFileSearch/sessionUpdate"
-	ClientRequestKindFuzzyFileSearchSessionStop             ClientRequestKind = "fuzzyFileSearch/sessionStop"
+	ClientRequestKindInitialize                         ClientRequestKind = "initialize"
+	ClientRequestKindThreadStart                        ClientRequestKind = "thread/start"
+	ClientRequestKindThreadResume                       ClientRequestKind = "thread/resume"
+	ClientRequestKindThreadFork                         ClientRequestKind = "thread/fork"
+	ClientRequestKindThreadArchive                      ClientRequestKind = "thread/archive"
+	ClientRequestKindThreadDelete                       ClientRequestKind = "thread/delete"
+	ClientRequestKindThreadUnsubscribe                  ClientRequestKind = "thread/unsubscribe"
+	ClientRequestKindThreadIncrementElicitation         ClientRequestKind = "thread/increment_elicitation"
+	ClientRequestKindThreadDecrementElicitation         ClientRequestKind = "thread/decrement_elicitation"
+	ClientRequestKindThreadNameSet                      ClientRequestKind = "thread/name/set"
+	ClientRequestKindThreadGoalSet                      ClientRequestKind = "thread/goal/set"
+	ClientRequestKindThreadGoalGet                      ClientRequestKind = "thread/goal/get"
+	ClientRequestKindThreadGoalClear                    ClientRequestKind = "thread/goal/clear"
+	ClientRequestKindThreadMetadataUpdate               ClientRequestKind = "thread/metadata/update"
+	ClientRequestKindThreadSettingsUpdate               ClientRequestKind = "thread/settings/update"
+	ClientRequestKindThreadMemoryModeSet                ClientRequestKind = "thread/memoryMode/set"
+	ClientRequestKindMemoryReset                        ClientRequestKind = "memory/reset"
+	ClientRequestKindThreadUnarchive                    ClientRequestKind = "thread/unarchive"
+	ClientRequestKindThreadCompactStart                 ClientRequestKind = "thread/compact/start"
+	ClientRequestKindThreadShellCommand                 ClientRequestKind = "thread/shellCommand"
+	ClientRequestKindThreadApproveGuardianDeniedAction  ClientRequestKind = "thread/approveGuardianDeniedAction"
+	ClientRequestKindThreadBackgroundTerminalsClean     ClientRequestKind = "thread/backgroundTerminals/clean"
+	ClientRequestKindThreadBackgroundTerminalsList      ClientRequestKind = "thread/backgroundTerminals/list"
+	ClientRequestKindThreadBackgroundTerminalsTerminate ClientRequestKind = "thread/backgroundTerminals/terminate"
+	ClientRequestKindThreadRollback                     ClientRequestKind = "thread/rollback"
+	ClientRequestKindThreadList                         ClientRequestKind = "thread/list"
+	ClientRequestKindThreadSearch                       ClientRequestKind = "thread/search"
+	ClientRequestKindThreadLoadedList                   ClientRequestKind = "thread/loaded/list"
+	ClientRequestKindThreadRead                         ClientRequestKind = "thread/read"
+	ClientRequestKindThreadTurnsList                    ClientRequestKind = "thread/turns/list"
+	ClientRequestKindThreadTurnsItemsList               ClientRequestKind = "thread/turns/items/list"
+	ClientRequestKindThreadInjectItems                  ClientRequestKind = "thread/inject_items"
+	ClientRequestKindSkillsList                         ClientRequestKind = "skills/list"
+	ClientRequestKindSkillsExtraRootsSet                ClientRequestKind = "skills/extraRoots/set"
+	ClientRequestKindHooksList                          ClientRequestKind = "hooks/list"
+	ClientRequestKindMarketplaceAdd                     ClientRequestKind = "marketplace/add"
+	ClientRequestKindMarketplaceRemove                  ClientRequestKind = "marketplace/remove"
+	ClientRequestKindMarketplaceUpgrade                 ClientRequestKind = "marketplace/upgrade"
+	ClientRequestKindPluginList                         ClientRequestKind = "plugin/list"
+	ClientRequestKindPluginInstalled                    ClientRequestKind = "plugin/installed"
+	ClientRequestKindPluginRead                         ClientRequestKind = "plugin/read"
+	ClientRequestKindPluginSkillRead                    ClientRequestKind = "plugin/skill/read"
+	ClientRequestKindPluginShareSave                    ClientRequestKind = "plugin/share/save"
+	ClientRequestKindPluginShareUpdateTargets           ClientRequestKind = "plugin/share/updateTargets"
+	ClientRequestKindPluginShareList                    ClientRequestKind = "plugin/share/list"
+	ClientRequestKindPluginShareCheckout                ClientRequestKind = "plugin/share/checkout"
+	ClientRequestKindPluginShareDelete                  ClientRequestKind = "plugin/share/delete"
+	ClientRequestKindAppList                            ClientRequestKind = "app/list"
+	ClientRequestKindFSReadFile                         ClientRequestKind = "fs/readFile"
+	ClientRequestKindFSWriteFile                        ClientRequestKind = "fs/writeFile"
+	ClientRequestKindFSCreateDirectory                  ClientRequestKind = "fs/createDirectory"
+	ClientRequestKindFSGetMetadata                      ClientRequestKind = "fs/getMetadata"
+	ClientRequestKindFSReadDirectory                    ClientRequestKind = "fs/readDirectory"
+	ClientRequestKindFSRemove                           ClientRequestKind = "fs/remove"
+	ClientRequestKindFSCopy                             ClientRequestKind = "fs/copy"
+	ClientRequestKindFSWatch                            ClientRequestKind = "fs/watch"
+	ClientRequestKindFSUnwatch                          ClientRequestKind = "fs/unwatch"
+	ClientRequestKindSkillsConfigWrite                  ClientRequestKind = "skills/config/write"
+	ClientRequestKindPluginInstall                      ClientRequestKind = "plugin/install"
+	ClientRequestKindPluginUninstall                    ClientRequestKind = "plugin/uninstall"
+	ClientRequestKindTurnStart                          ClientRequestKind = "turn/start"
+	ClientRequestKindTurnSteer                          ClientRequestKind = "turn/steer"
+	ClientRequestKindTurnInterrupt                      ClientRequestKind = "turn/interrupt"
+	ClientRequestKindThreadRealtimeStart                ClientRequestKind = "thread/realtime/start"
+	ClientRequestKindThreadRealtimeAppendAudio          ClientRequestKind = "thread/realtime/appendAudio"
+	ClientRequestKindThreadRealtimeAppendText           ClientRequestKind = "thread/realtime/appendText"
+	ClientRequestKindThreadRealtimeAppendSpeech         ClientRequestKind = "thread/realtime/appendSpeech"
+	ClientRequestKindThreadRealtimeStop                 ClientRequestKind = "thread/realtime/stop"
+	ClientRequestKindThreadRealtimeListVoices           ClientRequestKind = "thread/realtime/listVoices"
+	ClientRequestKindReviewStart                        ClientRequestKind = "review/start"
+	ClientRequestKindModelList                          ClientRequestKind = "model/list"
+	ClientRequestKindModelProviderCapabilitiesRead      ClientRequestKind = "modelProvider/capabilities/read"
+	ClientRequestKindExperimentalFeatureList            ClientRequestKind = "experimentalFeature/list"
+	ClientRequestKindPermissionProfileList              ClientRequestKind = "permissionProfile/list"
+	ClientRequestKindExperimentalFeatureEnablementSet   ClientRequestKind = "experimentalFeature/enablement/set"
+	ClientRequestKindRemoteControlEnable                ClientRequestKind = "remoteControl/enable"
+	ClientRequestKindRemoteControlDisable               ClientRequestKind = "remoteControl/disable"
+	ClientRequestKindRemoteControlStatusRead            ClientRequestKind = "remoteControl/status/read"
+	ClientRequestKindRemoteControlPairingStart          ClientRequestKind = "remoteControl/pairing/start"
+	ClientRequestKindRemoteControlPairingStatus         ClientRequestKind = "remoteControl/pairing/status"
+	ClientRequestKindRemoteControlClientList            ClientRequestKind = "remoteControl/client/list"
+	ClientRequestKindRemoteControlClientRevoke          ClientRequestKind = "remoteControl/client/revoke"
+	ClientRequestKindCollaborationModeList              ClientRequestKind = "collaborationMode/list"
+	ClientRequestKindMockExperimentalMethod             ClientRequestKind = "mock/experimentalMethod"
+	ClientRequestKindEnvironmentAdd                     ClientRequestKind = "environment/add"
+	ClientRequestKindMCPServerOAuthLogin                ClientRequestKind = "mcpServer/oauth/login"
+	ClientRequestKindConfigMCPServerReload              ClientRequestKind = "config/mcpServer/reload"
+	ClientRequestKindMCPServerStatusList                ClientRequestKind = "mcpServerStatus/list"
+	ClientRequestKindMCPServerResourceRead              ClientRequestKind = "mcpServer/resource/read"
+	ClientRequestKindMCPServerToolCall                  ClientRequestKind = "mcpServer/tool/call"
+	ClientRequestKindWindowsSandboxSetupStart           ClientRequestKind = "windowsSandbox/setupStart"
+	ClientRequestKindWindowsSandboxReadiness            ClientRequestKind = "windowsSandbox/readiness"
+	ClientRequestKindAccountLoginStart                  ClientRequestKind = "account/login/start"
+	ClientRequestKindAccountLoginCancel                 ClientRequestKind = "account/login/cancel"
+	ClientRequestKindAccountLogout                      ClientRequestKind = "account/logout"
+	ClientRequestKindAccountRateLimitsRead              ClientRequestKind = "account/rateLimits/read"
+	ClientRequestKindAccountRateLimitResetCreditConsume ClientRequestKind = "account/rateLimitResetCredit/consume"
+	ClientRequestKindAccountUsageRead                   ClientRequestKind = "account/usage/read"
+	ClientRequestKindAccountSendAddCreditsNudgeEmail    ClientRequestKind = "account/sendAddCreditsNudgeEmail"
+	ClientRequestKindFeedbackUpload                     ClientRequestKind = "feedback/upload"
+	ClientRequestKindCommandExec                        ClientRequestKind = "command/exec"
+	ClientRequestKindCommandExecWrite                   ClientRequestKind = "command/exec/write"
+	ClientRequestKindCommandExecTerminate               ClientRequestKind = "command/exec/terminate"
+	ClientRequestKindCommandExecResize                  ClientRequestKind = "command/exec/resize"
+	ClientRequestKindProcessSpawn                       ClientRequestKind = "process/spawn"
+	ClientRequestKindProcessWriteStdin                  ClientRequestKind = "process/writeStdin"
+	ClientRequestKindProcessKill                        ClientRequestKind = "process/kill"
+	ClientRequestKindProcessResizePTY                   ClientRequestKind = "process/resizePty"
+	ClientRequestKindConfigRead                         ClientRequestKind = "config/read"
+	ClientRequestKindExternalAgentConfigDetect          ClientRequestKind = "externalAgentConfig/detect"
+	ClientRequestKindExternalAgentConfigImport          ClientRequestKind = "externalAgentConfig/import"
+	ClientRequestKindConfigValueWrite                   ClientRequestKind = "config/value/write"
+	ClientRequestKindConfigBatchWrite                   ClientRequestKind = "config/batchWrite"
+	ClientRequestKindConfigRequirementsRead             ClientRequestKind = "configRequirements/read"
+	ClientRequestKindAccountRead                        ClientRequestKind = "account/read"
+	ClientRequestKindFuzzyFileSearch                    ClientRequestKind = "fuzzyFileSearch"
+	ClientRequestKindFuzzyFileSearchSessionStart        ClientRequestKind = "fuzzyFileSearch/sessionStart"
+	ClientRequestKindFuzzyFileSearchSessionUpdate       ClientRequestKind = "fuzzyFileSearch/sessionUpdate"
+	ClientRequestKindFuzzyFileSearchSessionStop         ClientRequestKind = "fuzzyFileSearch/sessionStop"
 )
 
 type ClientRequest struct {
-	kind                                          ClientRequestKind
-	variantInitialize                             *ClientRequestInitialize
-	variantThreadStart                            *ClientRequestThreadStart
-	variantThreadResume                           *ClientRequestThreadResume
-	variantThreadFork                             *ClientRequestThreadFork
-	variantThreadArchive                          *ClientRequestThreadArchive
-	variantThreadDelete                           *ClientRequestThreadDelete
-	variantThreadUnsubscribe                      *ClientRequestThreadUnsubscribe
-	variantThreadIncrementElicitation             *ClientRequestThreadIncrementElicitation
-	variantThreadDecrementElicitation             *ClientRequestThreadDecrementElicitation
-	variantThreadNameSet                          *ClientRequestThreadNameSet
-	variantThreadGoalSet                          *ClientRequestThreadGoalSet
-	variantThreadGoalGet                          *ClientRequestThreadGoalGet
-	variantThreadGoalClear                        *ClientRequestThreadGoalClear
-	variantThreadMetadataUpdate                   *ClientRequestThreadMetadataUpdate
-	variantThreadSettingsUpdate                   *ClientRequestThreadSettingsUpdate
-	variantThreadMemoryModeSet                    *ClientRequestThreadMemoryModeSet
-	variantMemoryReset                            *ClientRequestMemoryReset
-	variantThreadUnarchive                        *ClientRequestThreadUnarchive
-	variantThreadCompactStart                     *ClientRequestThreadCompactStart
-	variantThreadShellCommand                     *ClientRequestThreadShellCommand
-	variantThreadApproveGuardianDeniedAction      *ClientRequestThreadApproveGuardianDeniedAction
-	variantThreadBackgroundTerminalsClean         *ClientRequestThreadBackgroundTerminalsClean
-	variantThreadBackgroundTerminalsList          *ClientRequestThreadBackgroundTerminalsList
-	variantThreadBackgroundTerminalsTerminate     *ClientRequestThreadBackgroundTerminalsTerminate
-	variantThreadRollback                         *ClientRequestThreadRollback
-	variantThreadList                             *ClientRequestThreadList
-	variantThreadSearch                           *ClientRequestThreadSearch
-	variantThreadLoadedList                       *ClientRequestThreadLoadedList
-	variantThreadRead                             *ClientRequestThreadRead
-	variantThreadTurnsList                        *ClientRequestThreadTurnsList
-	variantThreadTurnsItemsList                   *ClientRequestThreadTurnsItemsList
-	variantThreadInjectItems                      *ClientRequestThreadInjectItems
-	variantSkillsList                             *ClientRequestSkillsList
-	variantSkillsExtraRootsSet                    *ClientRequestSkillsExtraRootsSet
-	variantHooksList                              *ClientRequestHooksList
-	variantMarketplaceAdd                         *ClientRequestMarketplaceAdd
-	variantMarketplaceRemove                      *ClientRequestMarketplaceRemove
-	variantMarketplaceUpgrade                     *ClientRequestMarketplaceUpgrade
-	variantPluginList                             *ClientRequestPluginList
-	variantPluginInstalled                        *ClientRequestPluginInstalled
-	variantPluginRead                             *ClientRequestPluginRead
-	variantPluginSkillRead                        *ClientRequestPluginSkillRead
-	variantPluginShareSave                        *ClientRequestPluginShareSave
-	variantPluginShareUpdateTargets               *ClientRequestPluginShareUpdateTargets
-	variantPluginShareList                        *ClientRequestPluginShareList
-	variantPluginShareCheckout                    *ClientRequestPluginShareCheckout
-	variantPluginShareDelete                      *ClientRequestPluginShareDelete
-	variantAppList                                *ClientRequestAppList
-	variantFSReadFile                             *ClientRequestFSReadFile
-	variantFSWriteFile                            *ClientRequestFSWriteFile
-	variantFSCreateDirectory                      *ClientRequestFSCreateDirectory
-	variantFSGetMetadata                          *ClientRequestFSGetMetadata
-	variantFSReadDirectory                        *ClientRequestFSReadDirectory
-	variantFSRemove                               *ClientRequestFSRemove
-	variantFSCopy                                 *ClientRequestFSCopy
-	variantFSWatch                                *ClientRequestFSWatch
-	variantFSUnwatch                              *ClientRequestFSUnwatch
-	variantSkillsConfigWrite                      *ClientRequestSkillsConfigWrite
-	variantPluginInstall                          *ClientRequestPluginInstall
-	variantPluginUninstall                        *ClientRequestPluginUninstall
-	variantTurnStart                              *ClientRequestTurnStart
-	variantTurnSteer                              *ClientRequestTurnSteer
-	variantTurnInterrupt                          *ClientRequestTurnInterrupt
-	variantThreadRealtimeStart                    *ClientRequestThreadRealtimeStart
-	variantThreadRealtimeAppendAudio              *ClientRequestThreadRealtimeAppendAudio
-	variantThreadRealtimeAppendText               *ClientRequestThreadRealtimeAppendText
-	variantThreadRealtimeAppendSpeech             *ClientRequestThreadRealtimeAppendSpeech
-	variantThreadRealtimeStop                     *ClientRequestThreadRealtimeStop
-	variantThreadRealtimeListVoices               *ClientRequestThreadRealtimeListVoices
-	variantReviewStart                            *ClientRequestReviewStart
-	variantModelList                              *ClientRequestModelList
-	variantModelProviderCapabilitiesRead          *ClientRequestModelProviderCapabilitiesRead
-	variantExperimentalFeatureList                *ClientRequestExperimentalFeatureList
-	variantPermissionProfileList                  *ClientRequestPermissionProfileList
-	variantExperimentalFeatureEnablementSet       *ClientRequestExperimentalFeatureEnablementSet
-	variantRemoteControlEnable                    *ClientRequestRemoteControlEnable
-	variantRemoteControlDisable                   *ClientRequestRemoteControlDisable
-	variantRemoteControlStatusRead                *ClientRequestRemoteControlStatusRead
-	variantRemoteControlPairingStart              *ClientRequestRemoteControlPairingStart
-	variantRemoteControlPairingStatus             *ClientRequestRemoteControlPairingStatus
-	variantRemoteControlClientList                *ClientRequestRemoteControlClientList
-	variantRemoteControlClientRevoke              *ClientRequestRemoteControlClientRevoke
-	variantCollaborationModeList                  *ClientRequestCollaborationModeList
-	variantMockExperimentalMethod                 *ClientRequestMockExperimentalMethod
-	variantEnvironmentAdd                         *ClientRequestEnvironmentAdd
-	variantMCPServerOAuthLogin                    *ClientRequestMCPServerOAuthLogin
-	variantConfigMCPServerReload                  *ClientRequestConfigMCPServerReload
-	variantMCPServerStatusList                    *ClientRequestMCPServerStatusList
-	variantMCPServerResourceRead                  *ClientRequestMCPServerResourceRead
-	variantMCPServerToolCall                      *ClientRequestMCPServerToolCall
-	variantWindowsSandboxSetupStart               *ClientRequestWindowsSandboxSetupStart
-	variantWindowsSandboxReadiness                *ClientRequestWindowsSandboxReadiness
-	variantAccountLoginStart                      *ClientRequestAccountLoginStart
-	variantAccountLoginCancel                     *ClientRequestAccountLoginCancel
-	variantAccountLogout                          *ClientRequestAccountLogout
-	variantAccountRateLimitsRead                  *ClientRequestAccountRateLimitsRead
-	variantAccountRateLimitResetCreditConsume     *ClientRequestAccountRateLimitResetCreditConsume
-	variantAccountUsageRead                       *ClientRequestAccountUsageRead
-	variantAccountSendAddCreditsNudgeEmail        *ClientRequestAccountSendAddCreditsNudgeEmail
-	variantFeedbackUpload                         *ClientRequestFeedbackUpload
-	variantCommandExec                            *ClientRequestCommandExec
-	variantCommandExecWrite                       *ClientRequestCommandExecWrite
-	variantCommandExecTerminate                   *ClientRequestCommandExecTerminate
-	variantCommandExecResize                      *ClientRequestCommandExecResize
-	variantProcessSpawn                           *ClientRequestProcessSpawn
-	variantProcessWriteStdin                      *ClientRequestProcessWriteStdin
-	variantProcessKill                            *ClientRequestProcessKill
-	variantProcessResizePTY                       *ClientRequestProcessResizePTY
-	variantConfigRead                             *ClientRequestConfigRead
-	variantExternalAgentConfigDetect              *ClientRequestExternalAgentConfigDetect
-	variantExternalAgentConfigImport              *ClientRequestExternalAgentConfigImport
-	variantExternalAgentConfigImportReadHistories *ClientRequestExternalAgentConfigImportReadHistories
-	variantConfigValueWrite                       *ClientRequestConfigValueWrite
-	variantConfigBatchWrite                       *ClientRequestConfigBatchWrite
-	variantConfigRequirementsRead                 *ClientRequestConfigRequirementsRead
-	variantAccountRead                            *ClientRequestAccountRead
-	variantFuzzyFileSearch                        *ClientRequestFuzzyFileSearch
-	variantFuzzyFileSearchSessionStart            *ClientRequestFuzzyFileSearchSessionStart
-	variantFuzzyFileSearchSessionUpdate           *ClientRequestFuzzyFileSearchSessionUpdate
-	variantFuzzyFileSearchSessionStop             *ClientRequestFuzzyFileSearchSessionStop
+	kind                                      ClientRequestKind
+	variantInitialize                         *ClientRequestInitialize
+	variantThreadStart                        *ClientRequestThreadStart
+	variantThreadResume                       *ClientRequestThreadResume
+	variantThreadFork                         *ClientRequestThreadFork
+	variantThreadArchive                      *ClientRequestThreadArchive
+	variantThreadDelete                       *ClientRequestThreadDelete
+	variantThreadUnsubscribe                  *ClientRequestThreadUnsubscribe
+	variantThreadIncrementElicitation         *ClientRequestThreadIncrementElicitation
+	variantThreadDecrementElicitation         *ClientRequestThreadDecrementElicitation
+	variantThreadNameSet                      *ClientRequestThreadNameSet
+	variantThreadGoalSet                      *ClientRequestThreadGoalSet
+	variantThreadGoalGet                      *ClientRequestThreadGoalGet
+	variantThreadGoalClear                    *ClientRequestThreadGoalClear
+	variantThreadMetadataUpdate               *ClientRequestThreadMetadataUpdate
+	variantThreadSettingsUpdate               *ClientRequestThreadSettingsUpdate
+	variantThreadMemoryModeSet                *ClientRequestThreadMemoryModeSet
+	variantMemoryReset                        *ClientRequestMemoryReset
+	variantThreadUnarchive                    *ClientRequestThreadUnarchive
+	variantThreadCompactStart                 *ClientRequestThreadCompactStart
+	variantThreadShellCommand                 *ClientRequestThreadShellCommand
+	variantThreadApproveGuardianDeniedAction  *ClientRequestThreadApproveGuardianDeniedAction
+	variantThreadBackgroundTerminalsClean     *ClientRequestThreadBackgroundTerminalsClean
+	variantThreadBackgroundTerminalsList      *ClientRequestThreadBackgroundTerminalsList
+	variantThreadBackgroundTerminalsTerminate *ClientRequestThreadBackgroundTerminalsTerminate
+	variantThreadRollback                     *ClientRequestThreadRollback
+	variantThreadList                         *ClientRequestThreadList
+	variantThreadSearch                       *ClientRequestThreadSearch
+	variantThreadLoadedList                   *ClientRequestThreadLoadedList
+	variantThreadRead                         *ClientRequestThreadRead
+	variantThreadTurnsList                    *ClientRequestThreadTurnsList
+	variantThreadTurnsItemsList               *ClientRequestThreadTurnsItemsList
+	variantThreadInjectItems                  *ClientRequestThreadInjectItems
+	variantSkillsList                         *ClientRequestSkillsList
+	variantSkillsExtraRootsSet                *ClientRequestSkillsExtraRootsSet
+	variantHooksList                          *ClientRequestHooksList
+	variantMarketplaceAdd                     *ClientRequestMarketplaceAdd
+	variantMarketplaceRemove                  *ClientRequestMarketplaceRemove
+	variantMarketplaceUpgrade                 *ClientRequestMarketplaceUpgrade
+	variantPluginList                         *ClientRequestPluginList
+	variantPluginInstalled                    *ClientRequestPluginInstalled
+	variantPluginRead                         *ClientRequestPluginRead
+	variantPluginSkillRead                    *ClientRequestPluginSkillRead
+	variantPluginShareSave                    *ClientRequestPluginShareSave
+	variantPluginShareUpdateTargets           *ClientRequestPluginShareUpdateTargets
+	variantPluginShareList                    *ClientRequestPluginShareList
+	variantPluginShareCheckout                *ClientRequestPluginShareCheckout
+	variantPluginShareDelete                  *ClientRequestPluginShareDelete
+	variantAppList                            *ClientRequestAppList
+	variantFSReadFile                         *ClientRequestFSReadFile
+	variantFSWriteFile                        *ClientRequestFSWriteFile
+	variantFSCreateDirectory                  *ClientRequestFSCreateDirectory
+	variantFSGetMetadata                      *ClientRequestFSGetMetadata
+	variantFSReadDirectory                    *ClientRequestFSReadDirectory
+	variantFSRemove                           *ClientRequestFSRemove
+	variantFSCopy                             *ClientRequestFSCopy
+	variantFSWatch                            *ClientRequestFSWatch
+	variantFSUnwatch                          *ClientRequestFSUnwatch
+	variantSkillsConfigWrite                  *ClientRequestSkillsConfigWrite
+	variantPluginInstall                      *ClientRequestPluginInstall
+	variantPluginUninstall                    *ClientRequestPluginUninstall
+	variantTurnStart                          *ClientRequestTurnStart
+	variantTurnSteer                          *ClientRequestTurnSteer
+	variantTurnInterrupt                      *ClientRequestTurnInterrupt
+	variantThreadRealtimeStart                *ClientRequestThreadRealtimeStart
+	variantThreadRealtimeAppendAudio          *ClientRequestThreadRealtimeAppendAudio
+	variantThreadRealtimeAppendText           *ClientRequestThreadRealtimeAppendText
+	variantThreadRealtimeAppendSpeech         *ClientRequestThreadRealtimeAppendSpeech
+	variantThreadRealtimeStop                 *ClientRequestThreadRealtimeStop
+	variantThreadRealtimeListVoices           *ClientRequestThreadRealtimeListVoices
+	variantReviewStart                        *ClientRequestReviewStart
+	variantModelList                          *ClientRequestModelList
+	variantModelProviderCapabilitiesRead      *ClientRequestModelProviderCapabilitiesRead
+	variantExperimentalFeatureList            *ClientRequestExperimentalFeatureList
+	variantPermissionProfileList              *ClientRequestPermissionProfileList
+	variantExperimentalFeatureEnablementSet   *ClientRequestExperimentalFeatureEnablementSet
+	variantRemoteControlEnable                *ClientRequestRemoteControlEnable
+	variantRemoteControlDisable               *ClientRequestRemoteControlDisable
+	variantRemoteControlStatusRead            *ClientRequestRemoteControlStatusRead
+	variantRemoteControlPairingStart          *ClientRequestRemoteControlPairingStart
+	variantRemoteControlPairingStatus         *ClientRequestRemoteControlPairingStatus
+	variantRemoteControlClientList            *ClientRequestRemoteControlClientList
+	variantRemoteControlClientRevoke          *ClientRequestRemoteControlClientRevoke
+	variantCollaborationModeList              *ClientRequestCollaborationModeList
+	variantMockExperimentalMethod             *ClientRequestMockExperimentalMethod
+	variantEnvironmentAdd                     *ClientRequestEnvironmentAdd
+	variantMCPServerOAuthLogin                *ClientRequestMCPServerOAuthLogin
+	variantConfigMCPServerReload              *ClientRequestConfigMCPServerReload
+	variantMCPServerStatusList                *ClientRequestMCPServerStatusList
+	variantMCPServerResourceRead              *ClientRequestMCPServerResourceRead
+	variantMCPServerToolCall                  *ClientRequestMCPServerToolCall
+	variantWindowsSandboxSetupStart           *ClientRequestWindowsSandboxSetupStart
+	variantWindowsSandboxReadiness            *ClientRequestWindowsSandboxReadiness
+	variantAccountLoginStart                  *ClientRequestAccountLoginStart
+	variantAccountLoginCancel                 *ClientRequestAccountLoginCancel
+	variantAccountLogout                      *ClientRequestAccountLogout
+	variantAccountRateLimitsRead              *ClientRequestAccountRateLimitsRead
+	variantAccountRateLimitResetCreditConsume *ClientRequestAccountRateLimitResetCreditConsume
+	variantAccountUsageRead                   *ClientRequestAccountUsageRead
+	variantAccountSendAddCreditsNudgeEmail    *ClientRequestAccountSendAddCreditsNudgeEmail
+	variantFeedbackUpload                     *ClientRequestFeedbackUpload
+	variantCommandExec                        *ClientRequestCommandExec
+	variantCommandExecWrite                   *ClientRequestCommandExecWrite
+	variantCommandExecTerminate               *ClientRequestCommandExecTerminate
+	variantCommandExecResize                  *ClientRequestCommandExecResize
+	variantProcessSpawn                       *ClientRequestProcessSpawn
+	variantProcessWriteStdin                  *ClientRequestProcessWriteStdin
+	variantProcessKill                        *ClientRequestProcessKill
+	variantProcessResizePTY                   *ClientRequestProcessResizePTY
+	variantConfigRead                         *ClientRequestConfigRead
+	variantExternalAgentConfigDetect          *ClientRequestExternalAgentConfigDetect
+	variantExternalAgentConfigImport          *ClientRequestExternalAgentConfigImport
+	variantConfigValueWrite                   *ClientRequestConfigValueWrite
+	variantConfigBatchWrite                   *ClientRequestConfigBatchWrite
+	variantConfigRequirementsRead             *ClientRequestConfigRequirementsRead
+	variantAccountRead                        *ClientRequestAccountRead
+	variantFuzzyFileSearch                    *ClientRequestFuzzyFileSearch
+	variantFuzzyFileSearchSessionStart        *ClientRequestFuzzyFileSearchSessionStart
+	variantFuzzyFileSearchSessionUpdate       *ClientRequestFuzzyFileSearchSessionUpdate
+	variantFuzzyFileSearchSessionStop         *ClientRequestFuzzyFileSearchSessionStop
 }
 
 type ClientRequestInitialize struct {
@@ -25605,10 +25335,6 @@ type ClientRequestExternalAgentConfigImport struct {
 	Params ExternalAgentConfigImportParams `json:"params"`
 }
 
-type ClientRequestExternalAgentConfigImportReadHistories struct {
-	ID RequestId `json:"id"`
-}
-
 type ClientRequestConfigValueWrite struct {
 	ID     RequestId              `json:"id"`
 	Params ConfigValueWriteParams `json:"params"`
@@ -26092,10 +25818,6 @@ func NewClientRequestExternalAgentConfigImport(payload ClientRequestExternalAgen
 	return ClientRequest{kind: ClientRequestKindExternalAgentConfigImport, variantExternalAgentConfigImport: &payload}
 }
 
-func NewClientRequestExternalAgentConfigImportReadHistories(payload ClientRequestExternalAgentConfigImportReadHistories) ClientRequest {
-	return ClientRequest{kind: ClientRequestKindExternalAgentConfigImportReadHistories, variantExternalAgentConfigImportReadHistories: &payload}
-}
-
 func NewClientRequestConfigValueWrite(payload ClientRequestConfigValueWrite) ClientRequest {
 	return ClientRequest{kind: ClientRequestKindConfigValueWrite, variantConfigValueWrite: &payload}
 }
@@ -26356,8 +26078,6 @@ func (value ClientRequest) IsValid() bool {
 		return value.variantExternalAgentConfigDetect != nil
 	case ClientRequestKindExternalAgentConfigImport:
 		return value.variantExternalAgentConfigImport != nil
-	case ClientRequestKindExternalAgentConfigImportReadHistories:
-		return value.variantExternalAgentConfigImportReadHistories != nil
 	case ClientRequestKindConfigValueWrite:
 		return value.variantConfigValueWrite != nil
 	case ClientRequestKindConfigBatchWrite:
@@ -27154,13 +26874,6 @@ func (value ClientRequest) AsExternalAgentConfigImport() (ClientRequestExternalA
 		return ClientRequestExternalAgentConfigImport{}, false
 	}
 	return *value.variantExternalAgentConfigImport, true
-}
-
-func (value ClientRequest) AsExternalAgentConfigImportReadHistories() (ClientRequestExternalAgentConfigImportReadHistories, bool) {
-	if value.kind != ClientRequestKindExternalAgentConfigImportReadHistories || value.variantExternalAgentConfigImportReadHistories == nil {
-		return ClientRequestExternalAgentConfigImportReadHistories{}, false
-	}
-	return *value.variantExternalAgentConfigImportReadHistories, true
 }
 
 func (value ClientRequest) AsConfigValueWrite() (ClientRequestConfigValueWrite, bool) {
@@ -28649,17 +28362,6 @@ func (value ClientRequest) MarshalJSON() ([]byte, error) {
 			ID:     value.variantExternalAgentConfigImport.ID,
 			Method: "externalAgentConfig/import",
 			Params: value.variantExternalAgentConfigImport.Params,
-		})
-	case ClientRequestKindExternalAgentConfigImportReadHistories:
-		if value.variantExternalAgentConfigImportReadHistories == nil {
-			return nil, invalidUnionVariant("ClientRequest", "externalAgentConfig/import/readHistories")
-		}
-		return json.Marshal(struct {
-			ID     RequestId `json:"id"`
-			Method string    `json:"method"`
-		}{
-			ID:     value.variantExternalAgentConfigImportReadHistories.ID,
-			Method: "externalAgentConfig/import/readHistories",
 		})
 	case ClientRequestKindConfigValueWrite:
 		if value.variantConfigValueWrite == nil {
@@ -31103,27 +30805,6 @@ func (value *ClientRequest) UnmarshalJSON(data []byte) error {
 		}
 		*value = ClientRequest{kind: ClientRequestKindExternalAgentConfigImport, variantExternalAgentConfigImport: &decoded}
 		return nil
-	case "externalAgentConfig/import/readHistories":
-		var decoded ClientRequestExternalAgentConfigImportReadHistories
-		seenID, err := decodeJSONField(fields, "id", "ClientRequest.id", false, &decoded.ID)
-		if err != nil {
-			return err
-		}
-		if !seenID {
-			return missingRequiredField("ClientRequest.id")
-		}
-		variantParams, seenParams := fields["params"]
-		if seenParams {
-			delete(fields, "params")
-			if variantParams.Kind() != JSONKindNull {
-				return fmt.Errorf("decode ClientRequest.externalAgentConfig/import/readHistories.params: expected null")
-			}
-		}
-		if err := rejectUnexpectedFields(fields, "ClientRequest.externalAgentConfig/import/readHistories"); err != nil {
-			return err
-		}
-		*value = ClientRequest{kind: ClientRequestKindExternalAgentConfigImportReadHistories, variantExternalAgentConfigImportReadHistories: &decoded}
-		return nil
 	case "config/value/write":
 		var decoded ClientRequestConfigValueWrite
 		seenID, err := decodeJSONField(fields, "id", "ClientRequest.id", false, &decoded.ID)
@@ -32943,7 +32624,7 @@ type FileSystemPath struct {
 }
 
 type FileSystemPathPath struct {
-	Path LegacyAppPathString `json:"path"`
+	Path string `json:"path"`
 }
 
 type FileSystemPathGlobPattern struct {
@@ -33011,8 +32692,8 @@ func (value FileSystemPath) MarshalJSON() ([]byte, error) {
 			return nil, invalidUnionVariant("FileSystemPath", "path")
 		}
 		return json.Marshal(struct {
-			Path LegacyAppPathString `json:"path"`
-			Type string              `json:"type"`
+			Path string `json:"path"`
+			Type string `json:"type"`
 		}{
 			Path: value.variantPath.Path,
 			Type: "path",
@@ -35422,7 +35103,6 @@ type ResponseItemMessage struct {
 type ResponseItemAgentMessage struct {
 	Author    string                          `json:"author"`
 	Content   []AgentMessageInputContent      `json:"content"`
-	ID        *Nullable[string]               `json:"id,omitempty"`
 	Metadata  *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 	Recipient string                          `json:"recipient"`
 }
@@ -35430,7 +35110,6 @@ type ResponseItemAgentMessage struct {
 type ResponseItemReasoning struct {
 	Content          *Nullable[[]ReasoningItemContent] `json:"content,omitempty"`
 	EncryptedContent *Nullable[string]                 `json:"encrypted_content,omitempty"`
-	ID               *Nullable[string]                 `json:"id,omitempty"`
 	Metadata         *Nullable[ResponseItemMetadata]   `json:"metadata,omitempty"`
 	Summary          []ReasoningItemReasoningSummary   `json:"summary"`
 }
@@ -35463,7 +35142,6 @@ type ResponseItemToolSearchCall struct {
 
 type ResponseItemFunctionCallOutput struct {
 	CallID   string                          `json:"call_id"`
-	ID       *Nullable[string]               `json:"id,omitempty"`
 	Metadata *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 	Output   FunctionCallOutputBody          `json:"output"`
 }
@@ -35479,7 +35157,6 @@ type ResponseItemCustomToolCall struct {
 
 type ResponseItemCustomToolCallOutput struct {
 	CallID   string                          `json:"call_id"`
-	ID       *Nullable[string]               `json:"id,omitempty"`
 	Metadata *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 	Name     *Nullable[string]               `json:"name,omitempty"`
 	Output   FunctionCallOutputBody          `json:"output"`
@@ -35488,7 +35165,6 @@ type ResponseItemCustomToolCallOutput struct {
 type ResponseItemToolSearchOutput struct {
 	CallID    *Nullable[string]               `json:"call_id,omitempty"`
 	Execution string                          `json:"execution"`
-	ID        *Nullable[string]               `json:"id,omitempty"`
 	Metadata  *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 	Status    string                          `json:"status"`
 	Tools     []JSONValue                     `json:"tools"`
@@ -35502,7 +35178,7 @@ type ResponseItemWebSearchCall struct {
 }
 
 type ResponseItemImageGenerationCall struct {
-	ID            *Nullable[string]               `json:"id,omitempty"`
+	ID            string                          `json:"id"`
 	Metadata      *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 	Result        string                          `json:"result"`
 	RevisedPrompt *Nullable[string]               `json:"revised_prompt,omitempty"`
@@ -35511,7 +35187,6 @@ type ResponseItemImageGenerationCall struct {
 
 type ResponseItemCompaction struct {
 	EncryptedContent string                          `json:"encrypted_content"`
-	ID               *Nullable[string]               `json:"id,omitempty"`
 	Metadata         *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 }
 
@@ -35521,7 +35196,6 @@ type ResponseItemCompactionTrigger struct {
 
 type ResponseItemContextCompaction struct {
 	EncryptedContent *Nullable[string]               `json:"encrypted_content,omitempty"`
-	ID               *Nullable[string]               `json:"id,omitempty"`
 	Metadata         *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 }
 
@@ -35781,14 +35455,12 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		return json.Marshal(struct {
 			Author    string                          `json:"author"`
 			Content   []AgentMessageInputContent      `json:"content"`
-			ID        *Nullable[string]               `json:"id,omitempty"`
 			Metadata  *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 			Recipient string                          `json:"recipient"`
 			Type      string                          `json:"type"`
 		}{
 			Author:    value.variantAgentMessage.Author,
 			Content:   value.variantAgentMessage.Content,
-			ID:        value.variantAgentMessage.ID,
 			Metadata:  value.variantAgentMessage.Metadata,
 			Recipient: value.variantAgentMessage.Recipient,
 			Type:      "agent_message",
@@ -35803,14 +35475,12 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		return json.Marshal(struct {
 			Content          *Nullable[[]ReasoningItemContent] `json:"content,omitempty"`
 			EncryptedContent *Nullable[string]                 `json:"encrypted_content,omitempty"`
-			ID               *Nullable[string]                 `json:"id,omitempty"`
 			Metadata         *Nullable[ResponseItemMetadata]   `json:"metadata,omitempty"`
 			Summary          []ReasoningItemReasoningSummary   `json:"summary"`
 			Type             string                            `json:"type"`
 		}{
 			Content:          value.variantReasoning.Content,
 			EncryptedContent: value.variantReasoning.EncryptedContent,
-			ID:               value.variantReasoning.ID,
 			Metadata:         value.variantReasoning.Metadata,
 			Summary:          value.variantReasoning.Summary,
 			Type:             "reasoning",
@@ -35882,13 +35552,11 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		}
 		return json.Marshal(struct {
 			CallID   string                          `json:"call_id"`
-			ID       *Nullable[string]               `json:"id,omitempty"`
 			Metadata *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 			Output   FunctionCallOutputBody          `json:"output"`
 			Type     string                          `json:"type"`
 		}{
 			CallID:   value.variantFunctionCallOutput.CallID,
-			ID:       value.variantFunctionCallOutput.ID,
 			Metadata: value.variantFunctionCallOutput.Metadata,
 			Output:   value.variantFunctionCallOutput.Output,
 			Type:     "function_call_output",
@@ -35920,14 +35588,12 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		}
 		return json.Marshal(struct {
 			CallID   string                          `json:"call_id"`
-			ID       *Nullable[string]               `json:"id,omitempty"`
 			Metadata *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 			Name     *Nullable[string]               `json:"name,omitempty"`
 			Output   FunctionCallOutputBody          `json:"output"`
 			Type     string                          `json:"type"`
 		}{
 			CallID:   value.variantCustomToolCallOutput.CallID,
-			ID:       value.variantCustomToolCallOutput.ID,
 			Metadata: value.variantCustomToolCallOutput.Metadata,
 			Name:     value.variantCustomToolCallOutput.Name,
 			Output:   value.variantCustomToolCallOutput.Output,
@@ -35943,7 +35609,6 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		return json.Marshal(struct {
 			CallID    *Nullable[string]               `json:"call_id,omitempty"`
 			Execution string                          `json:"execution"`
-			ID        *Nullable[string]               `json:"id,omitempty"`
 			Metadata  *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 			Status    string                          `json:"status"`
 			Tools     []JSONValue                     `json:"tools"`
@@ -35951,7 +35616,6 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		}{
 			CallID:    value.variantToolSearchOutput.CallID,
 			Execution: value.variantToolSearchOutput.Execution,
-			ID:        value.variantToolSearchOutput.ID,
 			Metadata:  value.variantToolSearchOutput.Metadata,
 			Status:    value.variantToolSearchOutput.Status,
 			Tools:     value.variantToolSearchOutput.Tools,
@@ -35979,7 +35643,7 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 			return nil, invalidUnionVariant("ResponseItem", "image_generation_call")
 		}
 		return json.Marshal(struct {
-			ID            *Nullable[string]               `json:"id,omitempty"`
+			ID            string                          `json:"id"`
 			Metadata      *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 			Result        string                          `json:"result"`
 			RevisedPrompt *Nullable[string]               `json:"revised_prompt,omitempty"`
@@ -35999,12 +35663,10 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		}
 		return json.Marshal(struct {
 			EncryptedContent string                          `json:"encrypted_content"`
-			ID               *Nullable[string]               `json:"id,omitempty"`
 			Metadata         *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 			Type             string                          `json:"type"`
 		}{
 			EncryptedContent: value.variantCompaction.EncryptedContent,
-			ID:               value.variantCompaction.ID,
 			Metadata:         value.variantCompaction.Metadata,
 			Type:             "compaction",
 		})
@@ -36025,12 +35687,10 @@ func (value ResponseItem) MarshalJSON() ([]byte, error) {
 		}
 		return json.Marshal(struct {
 			EncryptedContent *Nullable[string]               `json:"encrypted_content,omitempty"`
-			ID               *Nullable[string]               `json:"id,omitempty"`
 			Metadata         *Nullable[ResponseItemMetadata] `json:"metadata,omitempty"`
 			Type             string                          `json:"type"`
 		}{
 			EncryptedContent: value.variantContextCompaction.EncryptedContent,
-			ID:               value.variantContextCompaction.ID,
 			Metadata:         value.variantContextCompaction.Metadata,
 			Type:             "context_compaction",
 		})
@@ -36107,10 +35767,6 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 		if !seenContent {
 			return missingRequiredField("ResponseItem.content")
 		}
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
-		if err != nil {
-			return err
-		}
 		_, err = decodeNullableJSONField[ResponseItemMetadata](fields, "metadata", "ResponseItem.metadata", &decoded.Metadata)
 		if err != nil {
 			return err
@@ -36134,10 +35790,6 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		_, err = decodeNullableJSONField[string](fields, "encrypted_content", "ResponseItem.encrypted_content", &decoded.EncryptedContent)
-		if err != nil {
-			return err
-		}
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
 		if err != nil {
 			return err
 		}
@@ -36276,10 +35928,6 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 		if !seenCallID {
 			return missingRequiredField("ResponseItem.call_id")
 		}
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
-		if err != nil {
-			return err
-		}
 		_, err = decodeNullableJSONField[ResponseItemMetadata](fields, "metadata", "ResponseItem.metadata", &decoded.Metadata)
 		if err != nil {
 			return err
@@ -36345,10 +35993,6 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 		if !seenCallID {
 			return missingRequiredField("ResponseItem.call_id")
 		}
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
-		if err != nil {
-			return err
-		}
 		_, err = decodeNullableJSONField[ResponseItemMetadata](fields, "metadata", "ResponseItem.metadata", &decoded.Metadata)
 		if err != nil {
 			return err
@@ -36381,10 +36025,6 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 		}
 		if !seenExecution {
 			return missingRequiredField("ResponseItem.execution")
-		}
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
-		if err != nil {
-			return err
 		}
 		_, err = decodeNullableJSONField[ResponseItemMetadata](fields, "metadata", "ResponseItem.metadata", &decoded.Metadata)
 		if err != nil {
@@ -36434,9 +36074,12 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 		return nil
 	case "image_generation_call":
 		var decoded ResponseItemImageGenerationCall
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
+		seenID, err := decodeJSONField(fields, "id", "ResponseItem.id", false, &decoded.ID)
 		if err != nil {
 			return err
+		}
+		if !seenID {
+			return missingRequiredField("ResponseItem.id")
 		}
 		_, err = decodeNullableJSONField[ResponseItemMetadata](fields, "metadata", "ResponseItem.metadata", &decoded.Metadata)
 		if err != nil {
@@ -36474,10 +36117,6 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 		if !seenEncryptedContent {
 			return missingRequiredField("ResponseItem.encrypted_content")
 		}
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
-		if err != nil {
-			return err
-		}
 		_, err = decodeNullableJSONField[ResponseItemMetadata](fields, "metadata", "ResponseItem.metadata", &decoded.Metadata)
 		if err != nil {
 			return err
@@ -36501,10 +36140,6 @@ func (value *ResponseItem) UnmarshalJSON(data []byte) error {
 	case "context_compaction":
 		var decoded ResponseItemContextCompaction
 		_, err = decodeNullableJSONField[string](fields, "encrypted_content", "ResponseItem.encrypted_content", &decoded.EncryptedContent)
-		if err != nil {
-			return err
-		}
-		_, err = decodeNullableJSONField[string](fields, "id", "ResponseItem.id", &decoded.ID)
 		if err != nil {
 			return err
 		}
@@ -37220,7 +36855,6 @@ const (
 	ServerNotificationKindAccountRateLimitsUpdated                ServerNotificationKind = "account/rateLimits/updated"
 	ServerNotificationKindAppListUpdated                          ServerNotificationKind = "app/list/updated"
 	ServerNotificationKindRemoteControlStatusChanged              ServerNotificationKind = "remoteControl/status/changed"
-	ServerNotificationKindExternalAgentConfigImportProgress       ServerNotificationKind = "externalAgentConfig/import/progress"
 	ServerNotificationKindExternalAgentConfigImportCompleted      ServerNotificationKind = "externalAgentConfig/import/completed"
 	ServerNotificationKindFSChanged                               ServerNotificationKind = "fs/changed"
 	ServerNotificationKindItemReasoningSummaryTextDelta           ServerNotificationKind = "item/reasoning/summaryTextDelta"
@@ -37291,7 +36925,6 @@ type ServerNotification struct {
 	variantAccountRateLimitsUpdated                *ServerNotificationAccountRateLimitsUpdated
 	variantAppListUpdated                          *ServerNotificationAppListUpdated
 	variantRemoteControlStatusChanged              *ServerNotificationRemoteControlStatusChanged
-	variantExternalAgentConfigImportProgress       *ServerNotificationExternalAgentConfigImportProgress
 	variantExternalAgentConfigImportCompleted      *ServerNotificationExternalAgentConfigImportCompleted
 	variantFSChanged                               *ServerNotificationFSChanged
 	variantItemReasoningSummaryTextDelta           *ServerNotificationItemReasoningSummaryTextDelta
@@ -37478,10 +37111,6 @@ type ServerNotificationAppListUpdated struct {
 
 type ServerNotificationRemoteControlStatusChanged struct {
 	Params RemoteControlStatusChangedNotification `json:"params"`
-}
-
-type ServerNotificationExternalAgentConfigImportProgress struct {
-	Params ExternalAgentConfigImportProgressNotification `json:"params"`
 }
 
 type ServerNotificationExternalAgentConfigImportCompleted struct {
@@ -37748,10 +37377,6 @@ func NewServerNotificationRemoteControlStatusChanged(payload ServerNotificationR
 	return ServerNotification{kind: ServerNotificationKindRemoteControlStatusChanged, variantRemoteControlStatusChanged: &payload}
 }
 
-func NewServerNotificationExternalAgentConfigImportProgress(payload ServerNotificationExternalAgentConfigImportProgress) ServerNotification {
-	return ServerNotification{kind: ServerNotificationKindExternalAgentConfigImportProgress, variantExternalAgentConfigImportProgress: &payload}
-}
-
 func NewServerNotificationExternalAgentConfigImportCompleted(payload ServerNotificationExternalAgentConfigImportCompleted) ServerNotification {
 	return ServerNotification{kind: ServerNotificationKindExternalAgentConfigImportCompleted, variantExternalAgentConfigImportCompleted: &payload}
 }
@@ -37942,8 +37567,6 @@ func (value ServerNotification) IsValid() bool {
 		return value.variantAppListUpdated != nil
 	case ServerNotificationKindRemoteControlStatusChanged:
 		return value.variantRemoteControlStatusChanged != nil
-	case ServerNotificationKindExternalAgentConfigImportProgress:
-		return value.variantExternalAgentConfigImportProgress != nil
 	case ServerNotificationKindExternalAgentConfigImportCompleted:
 		return value.variantExternalAgentConfigImportCompleted != nil
 	case ServerNotificationKindFSChanged:
@@ -38279,13 +37902,6 @@ func (value ServerNotification) AsRemoteControlStatusChanged() (ServerNotificati
 		return ServerNotificationRemoteControlStatusChanged{}, false
 	}
 	return *value.variantRemoteControlStatusChanged, true
-}
-
-func (value ServerNotification) AsExternalAgentConfigImportProgress() (ServerNotificationExternalAgentConfigImportProgress, bool) {
-	if value.kind != ServerNotificationKindExternalAgentConfigImportProgress || value.variantExternalAgentConfigImportProgress == nil {
-		return ServerNotificationExternalAgentConfigImportProgress{}, false
-	}
-	return *value.variantExternalAgentConfigImportProgress, true
 }
 
 func (value ServerNotification) AsExternalAgentConfigImportCompleted() (ServerNotificationExternalAgentConfigImportCompleted, bool) {
@@ -38911,17 +38527,6 @@ func (value ServerNotification) MarshalJSON() ([]byte, error) {
 		}{
 			Method: "remoteControl/status/changed",
 			Params: value.variantRemoteControlStatusChanged.Params,
-		})
-	case ServerNotificationKindExternalAgentConfigImportProgress:
-		if value.variantExternalAgentConfigImportProgress == nil {
-			return nil, invalidUnionVariant("ServerNotification", "externalAgentConfig/import/progress")
-		}
-		return json.Marshal(struct {
-			Method string                                        `json:"method"`
-			Params ExternalAgentConfigImportProgressNotification `json:"params"`
-		}{
-			Method: "externalAgentConfig/import/progress",
-			Params: value.variantExternalAgentConfigImportProgress.Params,
 		})
 	case ServerNotificationKindExternalAgentConfigImportCompleted:
 		if value.variantExternalAgentConfigImportCompleted == nil {
@@ -39784,20 +39389,6 @@ func (value *ServerNotification) UnmarshalJSON(data []byte) error {
 		}
 		*value = ServerNotification{kind: ServerNotificationKindRemoteControlStatusChanged, variantRemoteControlStatusChanged: &decoded}
 		return nil
-	case "externalAgentConfig/import/progress":
-		var decoded ServerNotificationExternalAgentConfigImportProgress
-		seenParams, err := decodeJSONField(fields, "params", "ServerNotification.params", false, &decoded.Params)
-		if err != nil {
-			return err
-		}
-		if !seenParams {
-			return missingRequiredField("ServerNotification.params")
-		}
-		if err := rejectUnexpectedFields(fields, "ServerNotification.externalAgentConfig/import/progress"); err != nil {
-			return err
-		}
-		*value = ServerNotification{kind: ServerNotificationKindExternalAgentConfigImportProgress, variantExternalAgentConfigImportProgress: &decoded}
-		return nil
 	case "externalAgentConfig/import/completed":
 		var decoded ServerNotificationExternalAgentConfigImportCompleted
 		seenParams, err := decodeJSONField(fields, "params", "ServerNotification.params", false, &decoded.Params)
@@ -40178,7 +39769,6 @@ const (
 	ServerRequestKindItemToolCall                        ServerRequestKind = "item/tool/call"
 	ServerRequestKindAccountChatGPTAuthTokensRefresh     ServerRequestKind = "account/chatgptAuthTokens/refresh"
 	ServerRequestKindAttestationGenerate                 ServerRequestKind = "attestation/generate"
-	ServerRequestKindCurrentTimeRead                     ServerRequestKind = "currentTime/read"
 	ServerRequestKindApplyPatchApproval                  ServerRequestKind = "applyPatchApproval"
 	ServerRequestKindExecCommandApproval                 ServerRequestKind = "execCommandApproval"
 )
@@ -40193,7 +39783,6 @@ type ServerRequest struct {
 	variantItemToolCall                        *ServerRequestItemToolCall
 	variantAccountChatGPTAuthTokensRefresh     *ServerRequestAccountChatGPTAuthTokensRefresh
 	variantAttestationGenerate                 *ServerRequestAttestationGenerate
-	variantCurrentTimeRead                     *ServerRequestCurrentTimeRead
 	variantApplyPatchApproval                  *ServerRequestApplyPatchApproval
 	variantExecCommandApproval                 *ServerRequestExecCommandApproval
 }
@@ -40238,11 +39827,6 @@ type ServerRequestAttestationGenerate struct {
 	Params AttestationGenerateParams `json:"params"`
 }
 
-type ServerRequestCurrentTimeRead struct {
-	ID     RequestId             `json:"id"`
-	Params CurrentTimeReadParams `json:"params"`
-}
-
 type ServerRequestApplyPatchApproval struct {
 	ID     RequestId                `json:"id"`
 	Params ApplyPatchApprovalParams `json:"params"`
@@ -40285,10 +39869,6 @@ func NewServerRequestAttestationGenerate(payload ServerRequestAttestationGenerat
 	return ServerRequest{kind: ServerRequestKindAttestationGenerate, variantAttestationGenerate: &payload}
 }
 
-func NewServerRequestCurrentTimeRead(payload ServerRequestCurrentTimeRead) ServerRequest {
-	return ServerRequest{kind: ServerRequestKindCurrentTimeRead, variantCurrentTimeRead: &payload}
-}
-
 func NewServerRequestApplyPatchApproval(payload ServerRequestApplyPatchApproval) ServerRequest {
 	return ServerRequest{kind: ServerRequestKindApplyPatchApproval, variantApplyPatchApproval: &payload}
 }
@@ -40319,8 +39899,6 @@ func (value ServerRequest) IsValid() bool {
 		return value.variantAccountChatGPTAuthTokensRefresh != nil
 	case ServerRequestKindAttestationGenerate:
 		return value.variantAttestationGenerate != nil
-	case ServerRequestKindCurrentTimeRead:
-		return value.variantCurrentTimeRead != nil
 	case ServerRequestKindApplyPatchApproval:
 		return value.variantApplyPatchApproval != nil
 	case ServerRequestKindExecCommandApproval:
@@ -40384,13 +39962,6 @@ func (value ServerRequest) AsAttestationGenerate() (ServerRequestAttestationGene
 		return ServerRequestAttestationGenerate{}, false
 	}
 	return *value.variantAttestationGenerate, true
-}
-
-func (value ServerRequest) AsCurrentTimeRead() (ServerRequestCurrentTimeRead, bool) {
-	if value.kind != ServerRequestKindCurrentTimeRead || value.variantCurrentTimeRead == nil {
-		return ServerRequestCurrentTimeRead{}, false
-	}
-	return *value.variantCurrentTimeRead, true
 }
 
 func (value ServerRequest) AsApplyPatchApproval() (ServerRequestApplyPatchApproval, bool) {
@@ -40512,19 +40083,6 @@ func (value ServerRequest) MarshalJSON() ([]byte, error) {
 			ID:     value.variantAttestationGenerate.ID,
 			Method: "attestation/generate",
 			Params: value.variantAttestationGenerate.Params,
-		})
-	case ServerRequestKindCurrentTimeRead:
-		if value.variantCurrentTimeRead == nil {
-			return nil, invalidUnionVariant("ServerRequest", "currentTime/read")
-		}
-		return json.Marshal(struct {
-			ID     RequestId             `json:"id"`
-			Method string                `json:"method"`
-			Params CurrentTimeReadParams `json:"params"`
-		}{
-			ID:     value.variantCurrentTimeRead.ID,
-			Method: "currentTime/read",
-			Params: value.variantCurrentTimeRead.Params,
 		})
 	case ServerRequestKindApplyPatchApproval:
 		if value.variantApplyPatchApproval == nil {
@@ -40735,27 +40293,6 @@ func (value *ServerRequest) UnmarshalJSON(data []byte) error {
 		}
 		*value = ServerRequest{kind: ServerRequestKindAttestationGenerate, variantAttestationGenerate: &decoded}
 		return nil
-	case "currentTime/read":
-		var decoded ServerRequestCurrentTimeRead
-		seenID, err := decodeJSONField(fields, "id", "ServerRequest.id", false, &decoded.ID)
-		if err != nil {
-			return err
-		}
-		if !seenID {
-			return missingRequiredField("ServerRequest.id")
-		}
-		seenParams, err := decodeJSONField(fields, "params", "ServerRequest.params", false, &decoded.Params)
-		if err != nil {
-			return err
-		}
-		if !seenParams {
-			return missingRequiredField("ServerRequest.params")
-		}
-		if err := rejectUnexpectedFields(fields, "ServerRequest.currentTime/read"); err != nil {
-			return err
-		}
-		*value = ServerRequest{kind: ServerRequestKindCurrentTimeRead, variantCurrentTimeRead: &decoded}
-		return nil
 	case "applyPatchApproval":
 		var decoded ServerRequestApplyPatchApproval
 		seenID, err := decodeJSONField(fields, "id", "ServerRequest.id", false, &decoded.ID)
@@ -40881,7 +40418,7 @@ type ThreadItemCommandExecution struct {
 	AggregatedOutput *Nullable[string]       `json:"aggregatedOutput,omitempty"`
 	Command          string                  `json:"command"`
 	CommandActions   []CommandAction         `json:"commandActions"`
-	CWD              LegacyAppPathString     `json:"cwd"`
+	CWD              string                  `json:"cwd"`
 	DurationMS       *Nullable[int64]        `json:"durationMs,omitempty"`
 	ExitCode         *Nullable[int32]        `json:"exitCode,omitempty"`
 	ID               string                  `json:"id"`
@@ -40897,17 +40434,16 @@ type ThreadItemFileChange struct {
 }
 
 type ThreadItemMCPToolCall struct {
-	AppContext        *Nullable[McpToolCallAppContext] `json:"appContext,omitempty"`
-	Arguments         JSONValue                        `json:"arguments"`
-	DurationMS        *Nullable[int64]                 `json:"durationMs,omitempty"`
-	Error             *Nullable[McpToolCallError]      `json:"error,omitempty"`
-	ID                string                           `json:"id"`
-	MCPAppResourceURI *Nullable[string]                `json:"mcpAppResourceUri,omitempty"`
-	PluginID          *Nullable[string]                `json:"pluginId,omitempty"`
-	Result            *Nullable[McpToolCallResult]     `json:"result,omitempty"`
-	Server            string                           `json:"server"`
-	Status            McpToolCallStatus                `json:"status"`
-	Tool              string                           `json:"tool"`
+	Arguments         JSONValue                    `json:"arguments"`
+	DurationMS        *Nullable[int64]             `json:"durationMs,omitempty"`
+	Error             *Nullable[McpToolCallError]  `json:"error,omitempty"`
+	ID                string                       `json:"id"`
+	MCPAppResourceURI *Nullable[string]            `json:"mcpAppResourceUri,omitempty"`
+	PluginID          *Nullable[string]            `json:"pluginId,omitempty"`
+	Result            *Nullable[McpToolCallResult] `json:"result,omitempty"`
+	Server            string                       `json:"server"`
+	Status            McpToolCallStatus            `json:"status"`
+	Tool              string                       `json:"tool"`
 }
 
 type ThreadItemDynamicToolCall struct {
@@ -41315,7 +40851,7 @@ func (value ThreadItem) MarshalJSON() ([]byte, error) {
 			AggregatedOutput *Nullable[string]       `json:"aggregatedOutput,omitempty"`
 			Command          string                  `json:"command"`
 			CommandActions   []CommandAction         `json:"commandActions"`
-			CWD              LegacyAppPathString     `json:"cwd"`
+			CWD              string                  `json:"cwd"`
 			DurationMS       *Nullable[int64]        `json:"durationMs,omitempty"`
 			ExitCode         *Nullable[int32]        `json:"exitCode,omitempty"`
 			ID               string                  `json:"id"`
@@ -41359,20 +40895,18 @@ func (value ThreadItem) MarshalJSON() ([]byte, error) {
 			return nil, invalidUnionVariant("ThreadItem", "mcpToolCall")
 		}
 		return json.Marshal(struct {
-			AppContext        *Nullable[McpToolCallAppContext] `json:"appContext,omitempty"`
-			Arguments         JSONValue                        `json:"arguments"`
-			DurationMS        *Nullable[int64]                 `json:"durationMs,omitempty"`
-			Error             *Nullable[McpToolCallError]      `json:"error,omitempty"`
-			ID                string                           `json:"id"`
-			MCPAppResourceURI *Nullable[string]                `json:"mcpAppResourceUri,omitempty"`
-			PluginID          *Nullable[string]                `json:"pluginId,omitempty"`
-			Result            *Nullable[McpToolCallResult]     `json:"result,omitempty"`
-			Server            string                           `json:"server"`
-			Status            McpToolCallStatus                `json:"status"`
-			Tool              string                           `json:"tool"`
-			Type              string                           `json:"type"`
+			Arguments         JSONValue                    `json:"arguments"`
+			DurationMS        *Nullable[int64]             `json:"durationMs,omitempty"`
+			Error             *Nullable[McpToolCallError]  `json:"error,omitempty"`
+			ID                string                       `json:"id"`
+			MCPAppResourceURI *Nullable[string]            `json:"mcpAppResourceUri,omitempty"`
+			PluginID          *Nullable[string]            `json:"pluginId,omitempty"`
+			Result            *Nullable[McpToolCallResult] `json:"result,omitempty"`
+			Server            string                       `json:"server"`
+			Status            McpToolCallStatus            `json:"status"`
+			Tool              string                       `json:"tool"`
+			Type              string                       `json:"type"`
 		}{
-			AppContext:        value.variantMCPToolCall.AppContext,
 			Arguments:         value.variantMCPToolCall.Arguments,
 			DurationMS:        value.variantMCPToolCall.DurationMS,
 			Error:             value.variantMCPToolCall.Error,
@@ -41782,10 +41316,6 @@ func (value *ThreadItem) UnmarshalJSON(data []byte) error {
 		return nil
 	case "mcpToolCall":
 		var decoded ThreadItemMCPToolCall
-		_, err = decodeNullableJSONField[McpToolCallAppContext](fields, "appContext", "ThreadItem.appContext", &decoded.AppContext)
-		if err != nil {
-			return err
-		}
 		seenArguments, err := decodeJSONValueField(fields, "arguments", "ThreadItem.arguments", &decoded.Arguments)
 		if err != nil {
 			return err

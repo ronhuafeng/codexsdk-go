@@ -446,32 +446,6 @@
         "original"
       ]
     },
-    "LegacyAppPathString": {
-      "type": "string"
-    },
-    "McpToolCallAppContext": {
-      "type": "object",
-      "required": [
-        "connectorId"
-      ],
-      "properties": {
-        "connectorId": {
-          "type": "string"
-        },
-        "linkId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "resourceUri": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      }
-    },
     "McpToolCallError": {
       "type": "object",
       "required": [
@@ -882,7 +856,7 @@
               "description": "The command's working directory.",
               "allOf": [
                 {
-                  "$ref": "#/definitions/LegacyAppPathString"
+                  "$ref": "#/definitions/AbsolutePathBuf"
                 }
               ]
             },
@@ -975,16 +949,6 @@
             "type"
           ],
           "properties": {
-            "appContext": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/McpToolCallAppContext"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "arguments": true,
             "durationMs": {
               "description": "The duration of the MCP tool call in milliseconds.",
@@ -1008,7 +972,6 @@
               "type": "string"
             },
             "mcpAppResourceUri": {
-              "description": "Deprecated: use `appContext.resourceUri` instead.",
               "type": [
                 "string",
                 "null"

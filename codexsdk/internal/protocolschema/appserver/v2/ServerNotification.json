@@ -819,26 +819,6 @@
         "method": {
           "type": "string",
           "enum": [
-            "externalAgentConfig/import/progress"
-          ],
-          "title": "ExternalAgentConfig/import/progressNotificationMethod"
-        },
-        "params": {
-          "$ref": "#/definitions/ExternalAgentConfigImportProgressNotification"
-        }
-      },
-      "title": "ExternalAgentConfig/import/progressNotification"
-    },
-    {
-      "type": "object",
-      "required": [
-        "method",
-        "params"
-      ],
-      "properties": {
-        "method": {
-          "type": "string",
-          "enum": [
             "externalAgentConfig/import/completed"
           ],
           "title": "ExternalAgentConfig/import/completedNotificationMethod"
@@ -1464,7 +1444,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/ApiPathString"
           }
         },
         "write": {
@@ -1474,7 +1454,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/ApiPathString"
           }
         }
       }
@@ -1514,6 +1494,9 @@
       }
     },
     "AgentPath": {
+      "type": "string"
+    },
+    "ApiPathString": {
       "type": "string"
     },
     "AppBranding": {
@@ -2522,12 +2505,6 @@
             "null"
           ]
         },
-        "errorType": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "failureStage": {
           "type": "string"
         },
@@ -2571,24 +2548,6 @@
             "string",
             "null"
           ]
-        }
-      }
-    },
-    "ExternalAgentConfigImportProgressNotification": {
-      "type": "object",
-      "required": [
-        "importId",
-        "itemTypeResults"
-      ],
-      "properties": {
-        "importId": {
-          "type": "string"
-        },
-        "itemTypeResults": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ExternalAgentConfigImportTypeResult"
-          }
         }
       }
     },
@@ -2699,7 +2658,7 @@
           ],
           "properties": {
             "path": {
-              "$ref": "#/definitions/LegacyAppPathString"
+              "$ref": "#/definitions/ApiPathString"
             },
             "type": {
               "type": "string",
@@ -3688,9 +3647,6 @@
         }
       }
     },
-    "LegacyAppPathString": {
-      "type": "string"
-    },
     "McpServerOauthLoginCompletedNotification": {
       "type": "object",
       "required": [
@@ -3741,29 +3697,6 @@
           "$ref": "#/definitions/McpServerStartupState"
         },
         "threadId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      }
-    },
-    "McpToolCallAppContext": {
-      "type": "object",
-      "required": [
-        "connectorId"
-      ],
-      "properties": {
-        "connectorId": {
-          "type": "string"
-        },
-        "linkId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "resourceUri": {
           "type": [
             "string",
             "null"
@@ -4972,14 +4905,6 @@
           "description": "Usually the first user message in the thread, if available.",
           "type": "string"
         },
-        "recencyAt": {
-          "description": "Unix timestamp (in seconds) used for thread recency ordering.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
         "sessionId": {
           "description": "Session id shared by threads that belong to the same session tree.",
           "type": "string"
@@ -5357,7 +5282,7 @@
               "description": "The command's working directory.",
               "allOf": [
                 {
-                  "$ref": "#/definitions/LegacyAppPathString"
+                  "$ref": "#/definitions/AbsolutePathBuf"
                 }
               ]
             },
@@ -5450,16 +5375,6 @@
             "type"
           ],
           "properties": {
-            "appContext": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/McpToolCallAppContext"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "arguments": true,
             "durationMs": {
               "description": "The duration of the MCP tool call in milliseconds.",
@@ -5483,7 +5398,6 @@
               "type": "string"
             },
             "mcpAppResourceUri": {
-              "description": "Deprecated: use `appContext.resourceUri` instead.",
               "type": [
                 "string",
                 "null"

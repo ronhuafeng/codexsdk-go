@@ -589,7 +589,7 @@ func TestGeneratedReviewStartParamsProtocolMarshalAndUnmarshal(t *testing.T) {
 
 func TestGeneratedThreadLifecycleResponsesProtocolMarshalAndUnmarshal(t *testing.T) {
 	thread := sampleGeneratedThread()
-	instructionSources := []LegacyAppPathString{"AGENTS.md"}
+	instructionSources := []string{"AGENTS.md"}
 	response := ThreadStartResponse{
 		ActivePermissionProfile: Value(ActivePermissionProfile{
 			Extends: Null[string](),
@@ -1800,7 +1800,7 @@ func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 }
 
 func TestGeneratedAccountUnionMarshalAndAccessors(t *testing.T) {
-	account := NewAccountAmazonBedrock(AccountAmazonBedrock{})
+	account := NewAccountAmazonBedrock()
 	if account.Kind() != AccountKindAmazonBedrock {
 		t.Fatalf("Account kind = %s, want %s", account.Kind(), AccountKindAmazonBedrock)
 	}
@@ -7291,8 +7291,8 @@ func TestGeneratedCommandExecutionRequestApprovalParamsMarshalNestedTypedFields(
 					}),
 				}}),
 				GlobScanMaxDepth: Value(uint64(1)),
-				Read:             Null[[]LegacyAppPathString](),
-				Write:            Value([]LegacyAppPathString{"/repo"}),
+				Read:             Null[[]string](),
+				Write:            Value([]string{"/repo"}),
 			}),
 			Network: Value(AdditionalNetworkPermissions{
 				Enabled: Value(true),
@@ -7321,7 +7321,7 @@ func TestGeneratedCommandExecutionRequestApprovalParamsMarshalNestedTypedFields(
 				Query:   Value("needle"),
 			}),
 		}),
-		CWD:    Value(LegacyAppPathString("/repo")),
+		CWD:    Value("/repo"),
 		ItemID: "item-1",
 		NetworkApprovalContext: Value(NetworkApprovalContext{
 			Host:     "example.test",
@@ -7486,7 +7486,7 @@ func TestGeneratedPermissionsRequestApprovalParamsMarshalNestedProfiles(t *testi
 					}),
 				}}),
 				GlobScanMaxDepth: Value(uint64(1)),
-				Read:             Null[[]LegacyAppPathString](),
+				Read:             Null[[]string](),
 			}),
 			Network: Value(AdditionalNetworkPermissions{
 				Enabled: Value(false),
