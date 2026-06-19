@@ -1,13 +1,13 @@
 name: Protocol update
 description: Track an upstream Codex app-server protocol baseline update.
-title: "protocol: update baseline to <commit>"
+title: "protocol: update baseline to <tag-or-ref>"
 labels: ["protocol", "maintenance"]
 body:
   - type: input
-    id: upstream_commit
+    id: upstream_ref
     attributes:
-      label: Upstream Codex commit
-      placeholder: 3da89d4831251b704ac40d1357d26ad518abaf1d
+      label: Upstream Codex tag, ref, or commit
+      placeholder: rust-v0.140.0
     validations:
       required: true
   - type: textarea

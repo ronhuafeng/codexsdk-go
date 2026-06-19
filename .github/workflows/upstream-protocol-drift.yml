@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 10 * * 1-5"
   workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: "Optional openai/codex tag, ref, or full SHA. Defaults to the latest stable rust-vX.Y.Z tag."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -41,10 +46,63 @@ jobs:
 
       - name: Resolve upstream baseline
         id: refs
+        env:
+          REQUESTED_UPSTREAM_REF: ${{ github.event.inputs.upstream_ref || '' }}
         run: |
           set -euo pipefail
 
-          upstream_sha="$(git ls-remote https://github.com/openai/codex.git refs/heads/main | awk '{print $1}')"
+          remote="https://github.com/openai/codex.git"
+          requested_ref="${REQUESTED_UPSTREAM_REF}"
+          requested_ref="${requested_ref#"${requested_ref%%[![:space:]]*}"}"
+          requested_ref="${requested_ref%"${requested_ref##*[![:space:]]}"}"
+
+          if [[ -n "${requested_ref}" ]]; then
+            upstream_ref="${requested_ref}"
+            upstream_ref_kind="manual"
+          else
+            upstream_ref="$(
+              git ls-remote --tags --refs "${remote}" 'refs/tags/rust-v*' \
+                | awk '{print $2}' \
+                | sed 's#refs/tags/##' \
+                | grep -E '^rust-v[0-9]+[.][0-9]+[.][0-9]+$' \
+                | sort -V \
+                | tail -n 1
+            )"
+            upstream_ref_kind="latest_stable_rust_tag"
+          fi
+
+          if [[ -z "${upstream_ref}" ]]; then
+            echo "Unable to resolve an upstream rust-vX.Y.Z tag." >&2
+            exit 1
+          fi
+
+          resolve_remote_ref() {
+            local ref="$1"
+            local sha=""
+            if [[ "${ref}" =~ ^[0-9a-f]{40}$ ]]; then
+              printf '%s\n' "${ref}"
+              return 0
+            fi
+            for candidate in \
+              "refs/tags/${ref}^{}" \
+              "${ref}^{}" \
+              "refs/tags/${ref}" \
+              "refs/heads/${ref}" \
+              "${ref}"
+            do
+              sha="$(git ls-remote "${remote}" "${candidate}" | awk 'NR == 1 {print $1}')"
+              if [[ -n "${sha}" ]]; then
+                printf '%s\n' "${sha}"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          if ! upstream_sha="$(resolve_remote_ref "${upstream_ref}")"; then
+            echo "Unable to resolve upstream ref in openai/codex: ${upstream_ref}" >&2
+            exit 1
+          fi
           baseline_sha="$(python3 - <<'PY'
           import json
           from pathlib import Path
@@ -54,6 +112,8 @@ jobs:
           PY
           )"
 
+          echo "upstream_ref=${upstream_ref}" >> "$GITHUB_OUTPUT"
+          echo "upstream_ref_kind=${upstream_ref_kind}" >> "$GITHUB_OUTPUT"
           echo "upstream_sha=${upstream_sha}" >> "$GITHUB_OUTPUT"
           echo "baseline_sha=${baseline_sha}" >> "$GITHUB_OUTPUT"
 
@@ -61,13 +121,14 @@ jobs:
             echo "## Codex upstream protocol drift"
             echo
             echo "- Baseline: \`${baseline_sha}\`"
-            echo "- Upstream: \`${upstream_sha}\`"
+            echo "- Upstream target: \`${upstream_ref}\` (${upstream_ref_kind})"
+            echo "- Upstream commit: \`${upstream_sha}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Skip when baseline is current
         if: steps.refs.outputs.upstream_sha == steps.refs.outputs.baseline_sha
         run: |
-          echo "Baseline already points at the latest openai/codex main commit." >> "$GITHUB_STEP_SUMMARY"
+          echo "Baseline already points at the selected openai/codex upstream target: ${{ steps.refs.outputs.upstream_ref }}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close drift issue when baseline is current
         if: steps.refs.outputs.upstream_sha == steps.refs.outputs.baseline_sha
@@ -86,7 +147,7 @@ jobs:
           if [[ -n "$issue_number" ]]; then
             gh issue close "$issue_number" \
               --reason completed \
-              --comment "Closing because the checked-in baseline already points at the latest upstream Codex commit: \`${{ steps.refs.outputs.upstream_sha }}\`."
+              --comment "Closing because the checked-in baseline already points at the selected upstream Codex target: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_sha }}\`)."
             echo "Closed resolved drift issue #${issue_number}." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
@@ -126,6 +187,8 @@ jobs:
           drift_sha = hashlib.sha256(drift_path.read_bytes()).hexdigest()
 
           baseline = os.environ["BASELINE_SHA"]
+          upstream_ref = os.environ["UPSTREAM_REF"]
+          upstream_ref_kind = os.environ["UPSTREAM_REF_KIND"]
           upstream = os.environ["UPSTREAM_SHA"]
           run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
           status = drift["status"]
@@ -154,9 +217,12 @@ jobs:
           if not method_lines:
               method_lines.append("_No aggregate method additions or removals._")
 
-          title = f"Protocol drift detected against openai/codex@{upstream[:7]}"
+          upstream_display = f"`{upstream_ref}` (`{upstream}`)"
+          title = f"Protocol drift detected against openai/codex {upstream_ref}"
           body = f"""<!-- codexsdk-upstream-sync
           baseline_commit: {baseline}
+          upstream_ref: {upstream_ref}
+          upstream_ref_kind: {upstream_ref_kind}
           upstream_commit: {upstream}
           drift_sha256: {drift_sha}
           -->
@@ -166,7 +232,8 @@ jobs:
           The checked-in Codex app-server schema baseline no longer matches upstream `openai/codex`.
 
           - Baseline: `openai/codex@{baseline}`
-          - Upstream: `openai/codex@{upstream}`
+          - Upstream target: {upstream_display}
+          - Upstream target kind: `{upstream_ref_kind}`
           - Drift status: `{status}`
           - Drift fingerprint: `{drift_sha}`
           - Workflow run: {run_url}
@@ -198,7 +265,7 @@ jobs:
           ```sh
           scripts/codexsdk_track_upstream.sh \\
             --codex-repo /path/to/openai/codex \\
-            --commit {upstream} \\
+            --commit {upstream_ref} \\
             --out /tmp/codexsdk-upstream
           ```
 
@@ -208,7 +275,8 @@ jobs:
           comment = f"""Protocol drift is still present.
 
           - Baseline: `openai/codex@{baseline}`
-          - Upstream: `openai/codex@{upstream}`
+          - Upstream target: {upstream_display}
+          - Upstream target kind: `{upstream_ref_kind}`
           - Drift status: `{status}`
           - Drift fingerprint: `{drift_sha}`
           - Workflow run: {run_url}
@@ -224,6 +292,8 @@ jobs:
           PY
         env:
           BASELINE_SHA: ${{ steps.refs.outputs.baseline_sha }}
+          UPSTREAM_REF: ${{ steps.refs.outputs.upstream_ref }}
+          UPSTREAM_REF_KIND: ${{ steps.refs.outputs.upstream_ref_kind }}
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
 
       - name: Upload drift reports
@@ -263,7 +333,7 @@ jobs:
           if [[ -n "$issue_number" ]]; then
             gh issue close "$issue_number" \
               --reason completed \
-              --comment "Closing because the latest checked upstream commit has no schema drift. Upstream: \`${{ steps.refs.outputs.upstream_sha }}\`; fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`."
+              --comment "Closing because the selected upstream target has no schema drift. Upstream: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_sha }}\`); fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`."
             echo "Closed resolved drift issue #${issue_number}." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"

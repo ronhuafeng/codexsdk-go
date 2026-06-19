@@ -1,6 +1,6 @@
 ---
 name: codexsdk-sync-upstream
-description: Sync this codexsdk-go repository with a specific upstream OpenAI Codex commit. Use when asked to update the checked-in Codex app-server schema baseline, compare protocol drift, refresh protocolv2 generated Go files, reconcile manifest/coverage metadata, or prepare a Codex SDK baseline update from an upstream commit.
+description: Sync this codexsdk-go repository with a specific upstream OpenAI Codex tag, ref, or commit. Use when asked to update the checked-in Codex app-server schema baseline, compare protocol drift, refresh protocolv2 generated Go files, reconcile manifest/coverage metadata, or prepare a Codex SDK baseline update from an upstream tag/ref/commit.
 ---
 
 # Codex SDK Upstream Sync
@@ -155,13 +155,18 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    GOWORK=off go test ./codexsdk -run TestRealAppServerSmokeStartResumeFork -count=1
    ```
 
-8. Before committing, check whether upstream `main` moved.
+8. Before committing, check whether the selected upstream target moved.
 
    ```sh
-   git ls-remote https://github.com/openai/codex.git refs/heads/main
+   git ls-remote --tags --refs https://github.com/openai/codex.git 'refs/tags/rust-v*' \
+     | awk '{print $2}' \
+     | sed 's#refs/tags/##' \
+     | grep -E '^rust-v[0-9]+[.][0-9]+[.][0-9]+$' \
+     | sort -V \
+     | tail -n 1
    ```
 
-   If upstream moved after the selected target, run the tracking script against the new commit without changing checked-in files first. If the new commit is drift-clean relative to the updated baseline, do not chase it with a provenance-only commit unless the user asked for exact latest provenance. If it has real protocol drift, stop and explain the new target so the user can choose whether to continue. Do not enter an unbounded loop chasing a moving upstream branch.
+   For the default scheduled workflow, compare against the latest stable `rust-vX.Y.Z` tag, not `main`. If the latest stable tag changed after the selected target, run the tracking script against the new tag without changing checked-in files first. If the new tag is drift-clean relative to the updated baseline, do not chase it with a provenance-only commit unless the user asked for exact latest provenance. If it has real protocol drift, stop and explain the new target so the user can choose whether to continue. Do not enter an unbounded loop chasing moving upstream refs.
 
 9. After pushing, monitor repository automation when the task is to solve a drift issue.
 
@@ -171,7 +176,7 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 
    - if drift is clean, the workflow should close the existing drift issue
    - if drift remains, the workflow should update the existing drift issue rather than creating duplicates
-   - if upstream moved again, report the exact latest commit and whether the remaining drift is real or clean
+   - if the selected upstream tag/ref moved or a newer stable tag exists, report the exact tag/ref and commit and whether the remaining drift is real or clean
 
 ## Decision Rules
 
