@@ -23,7 +23,6 @@ type ThreadClient interface {
 	StartThreadStream(ctx context.Context, req StartThreadRequest) (*ThreadStream, error)
 	ResumeThreadStream(ctx context.Context, req ResumeThreadRequest) (*ThreadStream, error)
 	ForkThread(ctx context.Context, req ForkThreadRequest) (ThreadForkResult, error)
-	Close() error
 }
 
 type Client interface {

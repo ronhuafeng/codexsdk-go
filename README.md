@@ -186,10 +186,10 @@ go run ./codexsdk/internal/cmd/protocolv2gen
 Check generated code reproducibility without modifying the tree:
 
 ```sh
-tmp="$(mktemp -d)"
-go run ./codexsdk/internal/cmd/protocolv2gen -out "$tmp"
-diff -u codexsdk/protocolv2/method_registry.gen.go "$tmp/method_registry.gen.go"
-diff -u codexsdk/protocolv2/protocol_types.gen.go "$tmp/protocol_types.gen.go"
+go run ./codexsdk/internal/cmd/protocolv2gen -stdout method-registry |
+  diff -u codexsdk/protocolv2/method_registry.gen.go -
+go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
+  diff -u codexsdk/protocolv2/protocol_types.gen.go -
 ```
 
 ## Maintenance
@@ -209,7 +209,8 @@ python3 scripts/codexsdk_target_policy.py \
   --target-kind stable_rust_tag \
   --target-sha <peeled-target-commit> \
   --target-explicit true \
-  --mode manual
+  --mode manual \
+  --json
 ```
 
 ```sh
@@ -233,7 +234,7 @@ release namespace.
 
 ```sh
 python3 scripts/codexsdk_sync_tag.py --json
-python3 scripts/codexsdk_sync_tag.py --create --push origin
+python3 scripts/codexsdk_sync_tag.py --create --push origin --json
 ```
 
 Stable upstream Codex tags use `upstream-codex-rust-vX.Y.Z`. Existing upstream

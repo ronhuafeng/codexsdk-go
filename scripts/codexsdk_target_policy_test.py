@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
 import os
+import json
+import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -119,6 +123,55 @@ class TargetPolicyTest(unittest.TestCase):
         )
         self.assertEqual(decision["decision"], "block")
         self.assertIn("not a rust-vX.Y.Z tag", decision["reason"])
+
+    def test_cli_is_quiet_without_json(self):
+        completed = run_policy_cli(json_output=False)
+        self.assertEqual(completed.stdout, "")
+        self.assertEqual(completed.stderr, "")
+
+    def test_cli_json_prints_machine_decision(self):
+        completed = run_policy_cli(json_output=True)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["decision"], "allow")
+        self.assertEqual(completed.stderr, "")
+
+
+def run_policy_cli(json_output: bool) -> subprocess.CompletedProcess[str]:
+    script = Path(__file__).with_name("codexsdk_target_policy.py")
+    with tempfile.TemporaryDirectory() as tmp:
+        metadata = Path(tmp) / "baseline_metadata.json"
+        metadata.write_text(
+            json.dumps(
+                {
+                    "source_commit": OLD_SHA,
+                    "source_ref_kind": "stable_rust_tag",
+                    "source_ref_name": "rust-v0.140.0",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        args = [
+            sys.executable,
+            str(script),
+            "--baseline",
+            str(metadata),
+            "--target-ref",
+            "rust-v0.141.0",
+            "--target-kind",
+            "stable_rust_tag",
+            "--target-sha",
+            NEW_SHA,
+        ]
+        if json_output:
+            args.append("--json")
+        return subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
 
 if __name__ == "__main__":

@@ -173,13 +173,6 @@ func (c *client) ThreadClient(options ThreadClientOptions) ThreadClient {
 	return &threadClient{client: c, options: options}
 }
 
-func (tc *threadClient) Close() error {
-	if tc == nil || tc.client == nil {
-		return nil
-	}
-	return tc.client.Close()
-}
-
 func (tc *threadClient) StartThread(ctx context.Context, req StartThreadRequest) (ThreadRunResult, error) {
 	stream, err := tc.StartThreadStream(ctx, req)
 	if err != nil {
@@ -440,7 +433,7 @@ func protocolUserInput(input []InputItem) ([]protocolv2.UserInput, error) {
 			}))
 		case InputItemFile:
 			if strings.TrimSpace(item.Path) == "" {
-				continue
+				return nil, fmt.Errorf("codexsdk: InputItem[%d].Path is required for file input", i)
 			}
 			out = append(out, protocolv2.NewUserInputMention(protocolv2.UserInputMention{
 				Name: filepath.Base(item.Path),

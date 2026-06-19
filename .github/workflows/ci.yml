@@ -45,7 +45,7 @@ jobs:
 
       - name: Check generated protocol code
         run: |
-          tmp="$(mktemp -d)"
-          go run ./codexsdk/internal/cmd/protocolv2gen -out "$tmp"
-          diff -u codexsdk/protocolv2/method_registry.gen.go "$tmp/method_registry.gen.go"
-          diff -u codexsdk/protocolv2/protocol_types.gen.go "$tmp/protocol_types.gen.go"
+          go run ./codexsdk/internal/cmd/protocolv2gen -stdout method-registry |
+            diff -u codexsdk/protocolv2/method_registry.gen.go -
+          go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
+            diff -u codexsdk/protocolv2/protocol_types.gen.go -

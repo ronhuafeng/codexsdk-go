@@ -22,7 +22,7 @@ body:
     attributes:
       label: Checklist
       value: |
-        - [ ] Ran `scripts/codexsdk_target_policy.py` and confirmed the target is allowed.
+        - [ ] Ran `scripts/codexsdk_target_policy.py --json` and confirmed the target is allowed.
         - [ ] Generated schema with `scripts/codexsdk_track_upstream.sh`.
         - [ ] Recorded upstream tag/ref provenance and peeled commit.
         - [ ] Classified drift as metadata-only, generated-only, public-facade-required, or ignored-internal.
@@ -32,4 +32,4 @@ body:
         - [ ] Updated NOTICE if needed.
         - [ ] Audited `git diff --name-status` for unrelated files and stale entries.
         - [ ] Ran tests and generated-code reproducibility checks.
-        - [ ] Created or intentionally skipped the annotated upstream sync tag with `scripts/codexsdk_sync_tag.py`.
+        - [ ] Created or intentionally skipped the annotated upstream sync tag with `scripts/codexsdk_sync_tag.py --json`.
