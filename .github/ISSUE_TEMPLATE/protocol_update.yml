@@ -32,3 +32,4 @@ body:
         - [ ] Updated NOTICE if needed.
         - [ ] Audited `git diff --name-status` for unrelated files and stale entries.
         - [ ] Ran tests and generated-code reproducibility checks.
+        - [ ] Created or intentionally skipped the annotated upstream sync tag with `scripts/codexsdk_sync_tag.py`.

@@ -227,6 +227,21 @@ generated Go code. Keep handwritten SDK changes limited to reviewed public
 surface or compatibility fixes. See `docs/release.md` for the release and
 schema baseline checklists.
 
+After committing a successful baseline sync, tag the codexsdk-go commit with an
+annotated upstream sync tag. These tags intentionally live outside the Go module
+release namespace.
+
+```sh
+python3 scripts/codexsdk_sync_tag.py --json
+python3 scripts/codexsdk_sync_tag.py --create --push origin
+```
+
+Stable upstream Codex tags use `upstream-codex-rust-vX.Y.Z`. Existing upstream
+sync tags are never moved; use `--next-suffix` to create
+`upstream-codex-rust-vX.Y.Z-sync.N` for follow-up SDK fixes against the same
+upstream tag. Manual upstream commits and refs intentionally do not get fallback
+sync tags.
+
 ## Compatibility Policy
 
 Before v1.0, minor releases may include breaking changes when the upstream

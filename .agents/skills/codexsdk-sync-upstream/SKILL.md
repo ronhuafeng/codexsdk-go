@@ -230,7 +230,24 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 
    Do not enter an unbounded loop chasing moving upstream refs.
 
-10. After pushing, monitor repository automation when the task is to solve a drift issue.
+10. Tag the codexsdk-go sync commit when a baseline sync was committed.
+
+   Do this only after a successful baseline sync commit exists. Do not tag drift-check-only work, failed sync attempts, or uncommitted changes.
+
+   ```sh
+   python3 scripts/codexsdk_sync_tag.py --json
+   python3 scripts/codexsdk_sync_tag.py --create --push origin
+   ```
+
+   Tag rules:
+
+   - stable upstream tags use `upstream-codex-rust-vX.Y.Z`
+   - manual upstream commits and manual refs do not get upstream sync tags
+   - do not create Go module-style `vX.Y.Z` tags for upstream sync markers
+   - do not move existing upstream sync tags
+   - if the same upstream tag needs a follow-up codexsdk-go fix, use `python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin` to create `-sync.N`
+
+11. After pushing, monitor repository automation when the task is to solve a drift issue.
 
    Watch the push CI run and the Codex Upstream Protocol Drift workflow run. Cold GitHub runners may spend several minutes compiling Rust before the drift report step advances.
 
@@ -245,6 +262,7 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 - If drift is clean and the user only asked to check a tag/ref/commit, report that no SDK update is needed.
 - If drift is clean but the user explicitly asked to move the baseline provenance to that tag/ref/commit, update provenance and clean drift artifacts without changing schema-derived Go output.
 - If the target policy gate returns `block`, stop before generating drift; do not create or update a protocol drift issue.
+- If a baseline sync commit was created, create an annotated upstream sync tag with `scripts/codexsdk_sync_tag.py`; never move or overwrite an existing upstream sync tag.
 - If generated Go fails because a new schema shape is unsupported, update `codexsdk/internal/protocolgen` with a reviewed generation rule and focused tests before regenerating.
 - If a method disappears upstream, preserve compatibility only when it is safe and intentional; otherwise document the breaking change.
 - If upstream adds experimental surface, mark it experimental unless it appears in the non-experimental schema comparison and the existing manifest rules say otherwise.
