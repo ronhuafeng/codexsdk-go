@@ -1,6 +1,6 @@
 ---
 name: codexsdk-sync-upstream
-description: Sync this codexsdk-go repository with a specific upstream OpenAI Codex tag, ref, or commit. Use when asked to update the checked-in Codex app-server schema baseline, compare protocol drift, refresh protocolv2 generated Go files, reconcile manifest/coverage metadata, or prepare a Codex SDK baseline update from an upstream tag/ref/commit.
+description: Sync codexsdk-go's checked-in Codex app-server protocol baseline to a selected upstream openai/codex tag, ref, or commit. Use for protocol drift issues, baseline metadata/report refresh, protocolv2 regeneration, validation, upstream sync tagging, and drift issue closure.
 ---
 
 # Codex SDK Upstream Sync
@@ -9,7 +9,26 @@ description: Sync this codexsdk-go repository with a specific upstream OpenAI Co
 
 Update the SDK by treating the checked-in app-server schema baseline as the source for generated Go code. Do not make the SDK follow the local `codex` binary implicitly during normal builds.
 
-Use the repository's existing tracking script first, then review protocol drift before copying anything into the tree.
+Use the repository's tracking script first, then review protocol drift before copying anything into the tree. The helper scripts are report-only by default; they expose inconsistencies and do not auto-update schemas, manifest, coverage, or SDK files.
+
+Tool output contract:
+
+- successful commands are quiet by default
+- use `--verbose` for human-readable paths, progress, and counts on stderr
+- use `--json` when another command or workflow needs machine-readable stdout
+- treat exit code as the success/failure signal
+
+## Completion Contract
+
+A baseline sync is complete only when:
+
+- checked-in schemas match the selected upstream target
+- baseline metadata and checked-in drift reports are sanitized and clean
+- manifest and coverage no longer reference removed methods, schemas, or fields
+- `protocolv2` generated files reproduce exactly
+- `go vet`, `go test`, generated-output diff, `git diff --check`, and path scan pass
+- if solving a drift issue, pushed CI and the drift workflow pass and the issue closes
+- if a baseline sync commit is pushed, the upstream sync tag is created and pushed
 
 ## Required Inputs
 
@@ -99,7 +118,7 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
      --out "$PWD/.cache/codexsdk-upstream-<short-sha>"
    ```
 
-   The script is intentionally read-only for the checked-in baseline. It writes candidate schemas under `schema/` and review reports under `reports/`.
+   The script is intentionally read-only for the checked-in baseline. It writes candidate schemas under `schema/` and review reports under `reports/`, delegating the schema comparison to `scripts/codexsdk_schema_diff.py`. Add `--verbose` during interactive runs if you want it to print artifact paths.
 
 4. Review the generated reports before editing.
 
@@ -120,6 +139,15 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 
    For example, an optional nullable field added to an existing response type normally requires generated Go and focused tests, but no facade change unless handwritten SDK code exposes or interprets that field.
 
+   Tracking reports may not capture every field-level consequence. If generator output, coverage, or manifest validation points at a stale field, inspect the changed object schema properties and requiredness before adding code.
+
+   Keep the implementation minimal:
+
+   - prefer removing stale entries over preserving removed upstream surface
+   - add focused generator support and focused tests only for schema shapes required by the selected target
+   - let existing tools expose inconsistencies; do not build broad auto-rewriters into this workflow
+   - keep `codexsdk_schema_diff.py` and `codexsdk_sync_state.py` report-only unless the user explicitly asks for a separate automated updater design
+
    Keep the public SDK minimal:
 
    - do not add a new public facade for experimental or internal upstream surface unless the user explicitly asks for it or the existing manifest rules classify it as supported public SDK surface
@@ -135,7 +163,23 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    - update `baseline_metadata.json` with public provenance only: upstream URL, `source_ref_name`, `source_ref_kind`, peeled full `source_commit`, Codex version, source license, repo-relative source paths, schema count, and schema bundle checksum
    - update `manifest.json` according to `manifest_generation.json` rules and response mappings
    - update `coverage_matrix.json` with explicit support status, owner, reason, revisit trigger, and exit condition for new or changed surface
-   - update `drift_report.json` and `matrix_update_skeleton.json` by rerunning the tracking script after the baseline matches the target schema and copying the clean reports
+   - update `drift_report.json` and `matrix_update_skeleton.json` by comparing the updated baseline with the trusted candidate schema and copying the clean reports
+
+   Use compare-only for the final clean report only when the candidate schema was generated from the resolved target in this workflow:
+
+   ```sh
+   scripts/codexsdk_track_upstream.sh \
+     --compare-only \
+     --baseline codexsdk/internal/protocolschema/appserver/v2 \
+     --candidate "$PWD/.cache/codexsdk-upstream-<short-sha>/schema" \
+     --commit <target_sha> \
+     --source-ref <target_ref> \
+     --source-ref-kind <target_ref_kind> \
+     --out "$PWD/.cache/codexsdk-upstream-<short-sha>-clean" \
+     --verbose
+   ```
+
+   Run the full tracking script instead of compare-only if the candidate provenance is uncertain, the generator changed, the selected target moved, or sync-state reports metadata mismatch.
 
    Sanitize checked-in reports before staging:
 
@@ -186,6 +230,9 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    git diff --check
    git diff --name-status
 
+   python3 scripts/codexsdk_sync_state.py \
+     --baseline codexsdk/internal/protocolschema/appserver/v2
+
    rg -n "/Users/|/home/|\\.cache/codexsdk-upstream|\\.cache/openai-codex" \
      codexsdk/internal/protocolschema/appserver/v2 \
      .agents/skills/codexsdk-sync-upstream/SKILL.md \
@@ -193,6 +240,10 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    ```
 
    The path scan may match intentional relative `.cache/...` instructions in this skill or `.gitignore`; it must not find local absolute paths in checked-in schema metadata or reports.
+
+   `codexsdk_sync_state.py` prints nothing when the checked-in baseline is valid. On failure, read stderr findings or rerun with `--json` for structured output.
+
+   If validation fails on missing coverage fields or generated constants, first check for stale manifest, coverage, or handwritten references to removed upstream methods, schemas, or fields before adding new abstractions.
 
    Review `git diff --name-status` against the drift classification before staging:
 
@@ -249,7 +300,14 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 
 11. After pushing, monitor repository automation when the task is to solve a drift issue.
 
-   Watch the push CI run and the Codex Upstream Protocol Drift workflow run. Cold GitHub runners may spend several minutes compiling Rust before the drift report step advances.
+   Watch the push CI run first. The Codex Upstream Protocol Drift workflow runs on schedule or `workflow_dispatch`, not ordinary pushes. After push CI passes, dispatch it for the selected upstream ref and watch the run:
+
+   ```sh
+   gh workflow run upstream-protocol-drift.yml --ref <branch> -f upstream_ref=<target_ref>
+   gh run watch <run-id> --exit-status
+   ```
+
+   Cold GitHub runners may spend several minutes compiling Rust before the drift report step advances.
 
    Confirm the drift issue outcome:
 
@@ -266,4 +324,6 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 - If generated Go fails because a new schema shape is unsupported, update `codexsdk/internal/protocolgen` with a reviewed generation rule and focused tests before regenerating.
 - If a method disappears upstream, preserve compatibility only when it is safe and intentional; otherwise document the breaking change.
 - If upstream adds experimental surface, mark it experimental unless it appears in the non-experimental schema comparison and the existing manifest rules say otherwise.
+- If compare-only and full tracking disagree, trust the full tracking output and investigate candidate provenance before editing checked-in files.
+- If a workflow closes drift issues by label, verify the existing issue has the required drift label before dispatching the workflow.
 - If a scheduled or manual drift issue already exists, update or close that issue; do not create a new issue for each upstream target while the old one is unresolved.

@@ -40,6 +40,9 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Test scripts
+        run: python3 -m unittest discover -s scripts -p '*_test.py'
+
       - name: Check generated protocol code
         run: |
           tmp="$(mktemp -d)"
