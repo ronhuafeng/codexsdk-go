@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/codexsdk_track_upstream.sh --commit <codex-commit> [options]
+  scripts/codexsdk_track_upstream.sh --commit <codex-tag-ref-or-commit> [options]
 
 Options:
   --codex-repo <path>   Codex source repo. Defaults to CODEXSDK_CODEX_REPO.
@@ -12,13 +12,16 @@ Options:
   --baseline <path>     Checked-in SDK schema baseline.
   --generator <mode>    cargo or binary. Defaults to cargo.
   --out <path>          Output workdir for generated schema and reports.
+  --source-ref <name>   Original upstream tag/ref name used for provenance.
+  --source-ref-kind <k> Upstream target kind, such as stable_rust_tag.
   --no-fetch            Do not fetch the target commit before resolving it.
 
 The workflow is read-only for the checked-in baseline. It fetches the requested
-Codex commit when needed, generates an app-server schema snapshot, and writes
-review artifacts under --out. In binary mode, --codex-bin must point to a Codex
-binary built from the target commit. In cargo mode, the script creates a
-temporary worktree at the target commit and runs cargo from that worktree.
+Codex tag, ref, or commit when needed, generates an app-server schema snapshot,
+and writes review artifacts under --out. In binary mode, --codex-bin must point
+to a Codex binary built from the target commit. In cargo mode, the script
+creates a temporary worktree at the target commit and runs cargo from that
+worktree.
 EOF
 }
 
@@ -28,6 +31,8 @@ baseline="codexsdk/internal/protocolschema/appserver/v2"
 generator="cargo"
 out=""
 commit=""
+source_ref=""
+source_ref_kind=""
 fetch=1
 worktree=""
 
@@ -62,6 +67,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --commit)
       commit="$2"
+      shift 2
+      ;;
+    --source-ref)
+      source_ref="$2"
+      shift 2
+      ;;
+    --source-ref-kind)
+      source_ref_kind="$2"
       shift 2
       ;;
     --no-fetch)
@@ -106,10 +119,73 @@ if [[ -z "${out}" ]]; then
   out="$(mktemp -d "${TMPDIR:-/tmp}/codexsdk-upstream.XXXXXX")"
 fi
 
-if [[ "${fetch}" -eq 1 ]] && ! git -C "${codex_repo}" cat-file -e "${commit}^{commit}" 2>/dev/null; then
-  git -C "${codex_repo}" fetch origin "${commit}"
+resolve_target_ref() {
+  local ref="$1"
+  local candidate=""
+  local candidates=("${ref}")
+
+  case "${ref}" in
+    refs/tags/*)
+      candidates+=("${ref}")
+      ;;
+    refs/heads/*)
+      candidates+=("refs/remotes/origin/${ref#refs/heads/}")
+      ;;
+    *)
+      candidates+=("refs/tags/${ref}" "refs/remotes/origin/${ref}")
+      ;;
+  esac
+
+  for candidate in "${candidates[@]}"; do
+    if git -C "${codex_repo}" rev-parse --verify -q "${candidate}^{commit}"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+fetch_target_ref() {
+  local ref="$1"
+
+  if [[ "${ref}" =~ ^[0-9a-f]{40}$ ]]; then
+    git -C "${codex_repo}" fetch origin "${ref}"
+    return
+  fi
+
+  case "${ref}" in
+    refs/tags/*)
+      git -C "${codex_repo}" fetch origin "${ref}:${ref}"
+      ;;
+    refs/heads/*)
+      git -C "${codex_repo}" fetch origin "${ref}:refs/remotes/origin/${ref#refs/heads/}"
+      ;;
+    *)
+      git -C "${codex_repo}" fetch origin "refs/tags/${ref}:refs/tags/${ref}" 2>/dev/null \
+        || git -C "${codex_repo}" fetch origin "refs/heads/${ref}:refs/remotes/origin/${ref}" 2>/dev/null \
+        || git -C "${codex_repo}" fetch origin "${ref}"
+      ;;
+  esac
+}
+
+if [[ "${fetch}" -eq 1 ]] && ! resolve_target_ref "${commit}" >/dev/null; then
+  fetch_target_ref "${commit}"
 fi
-resolved_commit="$(git -C "${codex_repo}" rev-parse "${commit}^{commit}")"
+if ! resolved_commit="$(resolve_target_ref "${commit}")"; then
+  echo "unable to resolve Codex target as a commit: ${commit}" >&2
+  exit 1
+fi
+if [[ -z "${source_ref}" ]]; then
+  source_ref="${commit}"
+fi
+if [[ -z "${source_ref_kind}" ]]; then
+  if [[ "${source_ref}" =~ ^rust-v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+    source_ref_kind="stable_rust_tag"
+  elif [[ "${source_ref}" =~ ^[0-9a-f]{40}$ ]]; then
+    source_ref_kind="manual_commit"
+  else
+    source_ref_kind="manual_ref"
+  fi
+fi
 generated="${out}/schema"
 reports="${out}/reports"
 if [[ "${generated}" == "/" || "${reports}" == "/" ]]; then
@@ -140,7 +216,7 @@ case "${generator}" in
     ;;
 esac
 
-python3 - "${baseline}" "${generated}" "${reports}" "${resolved_commit}" "${codex_repo}" "${codex_version}" "${generator}" "${generator_detail}" <<'PY'
+python3 - "${baseline}" "${generated}" "${reports}" "${resolved_commit}" "${codex_repo}" "${codex_version}" "${generator}" "${generator_detail}" "${source_ref}" "${source_ref_kind}" <<'PY'
 import hashlib
 import json
 import pathlib
@@ -154,6 +230,8 @@ repo = sys.argv[5]
 codex_version = sys.argv[6]
 generator = sys.argv[7]
 generator_detail = sys.argv[8]
+source_ref = sys.argv[9]
+source_ref_kind = sys.argv[10]
 metadata = {
     "baseline_metadata.json",
     "coverage_matrix.json",
@@ -209,6 +287,8 @@ drift = {
     "comparison_mode": "canonical-json",
     "target": {
         "source_repo": repo,
+        "source_ref_name": source_ref,
+        "source_ref_kind": source_ref_kind,
         "source_commit": commit,
         "codex_version": codex_version,
         "generator": generator,
@@ -253,6 +333,8 @@ reports.mkdir(parents=True, exist_ok=True)
         "",
         f"- status: `{status}`",
         f"- source repo: `{repo}`",
+        f"- source ref: `{source_ref}`",
+        f"- source ref kind: `{source_ref_kind}`",
         f"- source commit: `{commit}`",
         f"- codex version: `{codex_version}`",
         f"- generated schema: `{generated}`",

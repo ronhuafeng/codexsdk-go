@@ -9,6 +9,11 @@ on:
         description: "Optional openai/codex tag, ref, or full SHA. Defaults to the latest stable rust-vX.Y.Z tag."
         required: false
         type: string
+      allow_downgrade:
+        description: "Allow an explicit stable rust-vX.Y.Z target older than the current stable-tag baseline."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -58,7 +63,14 @@ jobs:
 
           if [[ -n "${requested_ref}" ]]; then
             upstream_ref="${requested_ref}"
-            upstream_ref_kind="manual"
+            target_explicit="true"
+            if [[ "${requested_ref}" =~ ^rust-v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+              upstream_ref_kind="stable_rust_tag"
+            elif [[ "${requested_ref}" =~ ^[0-9a-f]{40}$ ]]; then
+              upstream_ref_kind="manual_commit"
+            else
+              upstream_ref_kind="manual_ref"
+            fi
           else
             upstream_ref="$(
               git ls-remote --tags --refs "${remote}" 'refs/tags/rust-v*' \
@@ -68,7 +80,8 @@ jobs:
                 | sort -V \
                 | tail -n 1
             )"
-            upstream_ref_kind="latest_stable_rust_tag"
+            target_explicit="false"
+            upstream_ref_kind="stable_rust_tag"
           fi
 
           if [[ -z "${upstream_ref}" ]]; then
@@ -116,6 +129,7 @@ jobs:
           echo "upstream_ref_kind=${upstream_ref_kind}" >> "$GITHUB_OUTPUT"
           echo "upstream_sha=${upstream_sha}" >> "$GITHUB_OUTPUT"
           echo "baseline_sha=${baseline_sha}" >> "$GITHUB_OUTPUT"
+          echo "target_explicit=${target_explicit}" >> "$GITHUB_OUTPUT"
 
           {
             echo "## Codex upstream protocol drift"
@@ -123,15 +137,82 @@ jobs:
             echo "- Baseline: \`${baseline_sha}\`"
             echo "- Upstream target: \`${upstream_ref}\` (${upstream_ref_kind})"
             echo "- Upstream commit: \`${upstream_sha}\`"
+            echo "- Explicit target: \`${target_explicit}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Skip when baseline is current
-        if: steps.refs.outputs.upstream_sha == steps.refs.outputs.baseline_sha
+      - name: Evaluate target policy
+        id: target_policy
+        env:
+          ALLOW_DOWNGRADE: ${{ github.event.inputs.allow_downgrade || 'false' }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          mode="manual"
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            mode="scheduled"
+          fi
+
+          policy_json="$(
+            python3 scripts/codexsdk_target_policy.py \
+              --baseline codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json \
+              --target-ref "${{ steps.refs.outputs.upstream_ref }}" \
+              --target-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
+              --target-sha "${{ steps.refs.outputs.upstream_sha }}" \
+              --target-explicit "${{ steps.refs.outputs.target_explicit }}" \
+              --mode "${mode}" \
+              --allow-downgrade "${ALLOW_DOWNGRADE}"
+          )"
+          printf '%s\n' "${policy_json}" | tee /tmp/codexsdk-target-policy.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          policy = json.loads(Path("/tmp/codexsdk-target-policy.json").read_text())
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              for key in (
+                  "decision",
+                  "reason",
+                  "baseline_ref_name",
+                  "baseline_ref_kind",
+                  "baseline_commit",
+                  "target_ref_name",
+                  "target_ref_kind",
+                  "target_commit",
+                  "target_explicit",
+                  "mode",
+              ):
+                  output.write(f"{key}={policy[key]}\n")
+          PY
+
+          {
+            echo
+            echo "## Target policy"
+            echo
+            echo "- Decision: \`$(python3 -c 'import json; print(json.load(open("/tmp/codexsdk-target-policy.json"))["decision"])')\`"
+            echo "- Reason: $(python3 -c 'import json; print(json.load(open("/tmp/codexsdk-target-policy.json"))["reason"])')"
+            echo "- Baseline target: \`${{ steps.refs.outputs.baseline_sha }}\`"
+            echo "- Requested target: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_ref_kind }}\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Skip when target policy is current
+        if: steps.target_policy.outputs.decision == 'skip'
         run: |
           echo "Baseline already points at the selected openai/codex upstream target: ${{ steps.refs.outputs.upstream_ref }}." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Stop when target policy blocks drift detection
+        if: steps.target_policy.outputs.decision == 'block'
+        run: |
+          {
+            echo "Protocol drift generation was skipped by target policy."
+            echo
+            echo "Reason: ${{ steps.target_policy.outputs.reason }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Close drift issue when baseline is current
-        if: steps.refs.outputs.upstream_sha == steps.refs.outputs.baseline_sha
+        if: steps.target_policy.outputs.decision == 'skip'
         run: |
           set -euo pipefail
 
@@ -156,22 +237,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clone upstream Codex
-        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        if: steps.target_policy.outputs.decision == 'allow'
         run: |
           set -euo pipefail
           git clone --filter=blob:none --no-checkout https://github.com/openai/codex.git /tmp/openai-codex
 
       - name: Generate drift report
-        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        if: steps.target_policy.outputs.decision == 'allow'
         run: |
           set -euo pipefail
           scripts/codexsdk_track_upstream.sh \
             --codex-repo /tmp/openai-codex \
             --commit "${{ steps.refs.outputs.upstream_sha }}" \
+            --source-ref "${{ steps.refs.outputs.upstream_ref }}" \
+            --source-ref-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
             --out /tmp/codexsdk-upstream
 
       - name: Prepare drift issue
-        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        if: steps.target_policy.outputs.decision == 'allow'
         id: drift
         run: |
           set -euo pipefail
@@ -265,7 +348,9 @@ jobs:
           ```sh
           scripts/codexsdk_track_upstream.sh \\
             --codex-repo /path/to/openai/codex \\
-            --commit {upstream_ref} \\
+            --commit {upstream} \\
+            --source-ref {upstream_ref} \\
+            --source-ref-kind {upstream_ref_kind} \\
             --out /tmp/codexsdk-upstream
           ```
 
@@ -297,7 +382,7 @@ jobs:
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
 
       - name: Upload drift reports
-        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        if: steps.target_policy.outputs.decision == 'allow'
         uses: actions/upload-artifact@v6
         with:
           name: codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}
@@ -305,7 +390,7 @@ jobs:
           if-no-files-found: error
 
       - name: Update workflow summary
-        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha
+        if: steps.target_policy.outputs.decision == 'allow'
         run: |
           set -euo pipefail
           {
@@ -317,7 +402,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close drift issue when drift is clean
-        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha && steps.drift.outputs.status == 'clean'
+        if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'clean'
         run: |
           set -euo pipefail
 
@@ -342,7 +427,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create or update drift issue
-        if: steps.refs.outputs.upstream_sha != steps.refs.outputs.baseline_sha && steps.drift.outputs.status == 'review-required'
+        if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
         run: |
           set -euo pipefail
 

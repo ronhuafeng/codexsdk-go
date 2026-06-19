@@ -100,6 +100,8 @@ func TestBaselineMetadataIsTraceable(t *testing.T) {
 		SchemaFileCount      int      `json:"schema_file_count"`
 		SourceCommit         string   `json:"source_commit"`
 		SourceLicense        string   `json:"source_license"`
+		SourceRefKind        string   `json:"source_ref_kind"`
+		SourceRefName        string   `json:"source_ref_name"`
 		SourceRefURL         string   `json:"source_ref_url"`
 		SourceRepo           string   `json:"source_repo"`
 		SourceSubdir         string   `json:"source_subdir"`
@@ -117,6 +119,22 @@ func TestBaselineMetadataIsTraceable(t *testing.T) {
 	}
 	if metadata.CodexBinary == "" || metadata.CodexVersion == "" || metadata.GeneratedAt == "" || metadata.SourceRepo == "" {
 		t.Fatalf("metadata missing traceability fields: %#v", metadata)
+	}
+	if metadata.SourceRefName == "" || metadata.SourceRefKind == "" {
+		t.Fatalf("metadata missing upstream tag/ref provenance: %#v", metadata)
+	}
+	switch metadata.SourceRefKind {
+	case "stable_rust_tag":
+		if !regexp.MustCompile(`^rust-v[0-9]+[.][0-9]+[.][0-9]+$`).MatchString(metadata.SourceRefName) {
+			t.Fatalf("stable source_ref_name is not a rust-vX.Y.Z tag: %#v", metadata)
+		}
+	case "manual_commit":
+		if metadata.SourceRefName != metadata.SourceCommit {
+			t.Fatalf("manual_commit source_ref_name must match source_commit: %#v", metadata)
+		}
+	case "manual_ref":
+	default:
+		t.Fatalf("unsupported source_ref_kind %q", metadata.SourceRefKind)
 	}
 	if filepath.IsAbs(metadata.CodexBinary) || filepath.IsAbs(metadata.SourceRepo) {
 		t.Fatalf("metadata must use public provenance, not local absolute paths: %#v", metadata)

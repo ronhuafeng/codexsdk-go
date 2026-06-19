@@ -19,6 +19,8 @@
   "source_commit_subject": "[2/3] core: track starting environments in snapshots (#28683)",
   "source_dirty": false,
   "source_license": "Apache-2.0",
+  "source_ref_kind": "manual_commit",
+  "source_ref_name": "45a133bae0ec14584aba62919bc86307e9f10088",
   "source_ref_url": "https://github.com/openai/codex/tree/45a133bae0ec14584aba62919bc86307e9f10088",
   "source_repo": "https://github.com/openai/codex",
   "source_schema_command_ref": "codex app-server generate-json-schema",

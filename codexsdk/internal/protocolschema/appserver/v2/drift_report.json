@@ -3,6 +3,8 @@
   "comparison_mode": "canonical-json",
   "target": {
     "source_repo": "https://github.com/openai/codex",
+    "source_ref_name": "45a133bae0ec14584aba62919bc86307e9f10088",
+    "source_ref_kind": "manual_commit",
     "source_commit": "45a133bae0ec14584aba62919bc86307e9f10088",
     "codex_version": "codex-cli 0.0.0",
     "generator": "cargo",
