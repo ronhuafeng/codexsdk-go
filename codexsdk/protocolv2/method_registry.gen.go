@@ -47,6 +47,7 @@ const (
 	MethodAccountLoginCompleted                   = "account/login/completed"
 	MethodAccountLoginStart                       = "account/login/start"
 	MethodAccountLogout                           = "account/logout"
+	MethodAccountRateLimitResetCreditConsume      = "account/rateLimitResetCredit/consume"
 	MethodAccountRateLimitsRead                   = "account/rateLimits/read"
 	MethodAccountRateLimitsUpdated                = "account/rateLimits/updated"
 	MethodAccountRead                             = "account/read"
@@ -69,6 +70,7 @@ const (
 	MethodConfigValueWrite                        = "config/value/write"
 	MethodConfigRequirementsRead                  = "configRequirements/read"
 	MethodConfigWarning                           = "configWarning"
+	MethodCurrentTimeRead                         = "currentTime/read"
 	MethodDeprecationNotice                       = "deprecationNotice"
 	MethodEnvironmentAdd                          = "environment/add"
 	MethodError                                   = "error"
@@ -78,6 +80,8 @@ const (
 	MethodExternalAgentConfigDetect               = "externalAgentConfig/detect"
 	MethodExternalAgentConfigImport               = "externalAgentConfig/import"
 	MethodExternalAgentConfigImportCompleted      = "externalAgentConfig/import/completed"
+	MethodExternalAgentConfigImportProgress       = "externalAgentConfig/import/progress"
+	MethodExternalAgentConfigImportReadHistories  = "externalAgentConfig/import/readHistories"
 	MethodFeedbackUpload                          = "feedback/upload"
 	MethodFSChanged                               = "fs/changed"
 	MethodFSCopy                                  = "fs/copy"
@@ -196,6 +200,7 @@ const (
 	MethodThreadNameUpdated                       = "thread/name/updated"
 	MethodThreadRead                              = "thread/read"
 	MethodThreadRealtimeAppendAudio               = "thread/realtime/appendAudio"
+	MethodThreadRealtimeAppendSpeech              = "thread/realtime/appendSpeech"
 	MethodThreadRealtimeAppendText                = "thread/realtime/appendText"
 	MethodThreadRealtimeClosed                    = "thread/realtime/closed"
 	MethodThreadRealtimeError                     = "thread/realtime/error"
@@ -292,6 +297,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/LogoutAccountResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Accounts().Logout",
+		Stability:             MethodStabilityStable,
+	},
+	MethodAccountRateLimitResetCreditConsume: {
+		Method:                MethodAccountRateLimitResetCreditConsume,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "account",
+		ParamsOrPayloadSchema: "ConsumeAccountRateLimitResetCreditParams",
+		ResponseSchema:        "v2/ConsumeAccountRateLimitResetCreditResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Accounts().RateLimitResetCreditConsume",
 		Stability:             MethodStabilityStable,
 	},
 	MethodAccountRateLimitsRead: {
@@ -536,6 +552,17 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "ServerNotifications().ConfigWarning",
 		Stability:             MethodStabilityStable,
 	},
+	MethodCurrentTimeRead: {
+		Method:                MethodCurrentTimeRead,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindRequest,
+		Family:                "currentTime",
+		ParamsOrPayloadSchema: "CurrentTimeReadParams",
+		ResponseSchema:        "CurrentTimeReadResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "ServerRequests().CurrentTimeRead",
+		Stability:             MethodStabilityExperimental,
+	},
 	MethodDeprecationNotice: {
 		Method:                MethodDeprecationNotice,
 		Direction:             MethodDirectionServerToClient,
@@ -633,6 +660,28 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "",
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportCompleted",
+		Stability:             MethodStabilityStable,
+	},
+	MethodExternalAgentConfigImportProgress: {
+		Method:                MethodExternalAgentConfigImportProgress,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindNotification,
+		Family:                "externalAgentConfig",
+		ParamsOrPayloadSchema: "ExternalAgentConfigImportProgressNotification",
+		ResponseSchema:        "",
+		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
+		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportProgress",
+		Stability:             MethodStabilityStable,
+	},
+	MethodExternalAgentConfigImportReadHistories: {
+		Method:                MethodExternalAgentConfigImportReadHistories,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "externalAgentConfig",
+		ParamsOrPayloadSchema: "",
+		ResponseSchema:        "v2/ExternalAgentConfigImportHistoriesReadResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "ExternalAgentConfigs().ImportReadHistories",
 		Stability:             MethodStabilityStable,
 	},
 	MethodFeedbackUpload: {
@@ -1931,6 +1980,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/ThreadRealtimeAppendAudioResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Threads().RealtimeAppendAudio",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodThreadRealtimeAppendSpeech: {
+		Method:                MethodThreadRealtimeAppendSpeech,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadRealtimeAppendSpeechParams",
+		ResponseSchema:        "v2/ThreadRealtimeAppendSpeechResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().RealtimeAppendSpeech",
 		Stability:             MethodStabilityExperimental,
 	},
 	MethodThreadRealtimeAppendText: {

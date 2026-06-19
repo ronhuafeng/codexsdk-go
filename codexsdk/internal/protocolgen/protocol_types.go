@@ -1710,6 +1710,9 @@ func isGeneratedDefinitionScalarUnionCheckpoint(schemaPath string, name string) 
 }
 
 func isGeneratedDefinitionScalarAliasCheckpoint(schemaPath string, name string) bool {
+	if name == "LegacyAppPathString" {
+		return true
+	}
 	switch schemaPath {
 	case "v2/ConfigReadResponse.json",
 		"v2/ThreadSettingsUpdateParams.json",
@@ -1738,6 +1741,8 @@ func isGeneratedDefinitionStringEnumCheckpoint(schemaPath string, name string) b
 		default:
 			return false
 		}
+	case "v2/ConsumeAccountRateLimitResetCreditResponse.json":
+		return name == "ConsumeAccountRateLimitResetCreditOutcome"
 	case "FileChangeRequestApprovalResponse.json":
 		return name == "FileChangeApprovalDecision"
 	case "v2/ModelListResponse.json":
@@ -1908,11 +1913,26 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		default:
 			return false
 		}
+	case "v2/ExternalAgentConfigImportCompletedNotification.json":
+		return name == "ExternalAgentConfigImportTypeResult"
+	case "v2/ExternalAgentConfigImportHistoriesReadResponse.json":
+		switch name {
+		case "ExternalAgentConfigImportHistory",
+			"ExternalAgentConfigImportItemTypeFailure",
+			"ExternalAgentConfigImportItemTypeSuccess":
+			return true
+		default:
+			return false
+		}
 	case "v2/FsReadDirectoryResponse.json":
 		return name == "FsReadDirectoryEntry"
 	case "v2/GetAccountRateLimitsResponse.json":
 		switch name {
-		case "CreditsSnapshot", "RateLimitSnapshot", "RateLimitWindow", "SpendControlLimitSnapshot":
+		case "CreditsSnapshot",
+			"RateLimitResetCreditsSummary",
+			"RateLimitSnapshot",
+			"RateLimitWindow",
+			"SpendControlLimitSnapshot":
 			return true
 		default:
 			return false
@@ -2024,6 +2044,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		case "CollabAgentState",
 			"FileUpdateChange",
 			"HookPromptFragment",
+			"McpToolCallAppContext",
 			"McpToolCallError",
 			"McpToolCallResult",
 			"MemoryCitation",
@@ -2045,14 +2066,14 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		}
 	case "v2/ThreadStartParams.json":
 		switch name {
-		case "DynamicToolSpec", "SelectedCapabilityRoot", "TurnEnvironmentParams":
+		case "SelectedCapabilityRoot", "TurnEnvironmentParams":
 			return true
 		default:
 			return false
 		}
 	case "v2/ThreadResumeParams.json":
 		switch name {
-		case "ThreadResumeInitialTurnsPageParams":
+		case "ResponseItemMetadata", "ThreadResumeInitialTurnsPageParams":
 			return true
 		default:
 			return false
@@ -2175,7 +2196,7 @@ func isGeneratedDefinitionTaggedUnionCheckpoint(schemaPath string, name string) 
 		return name == "ConfiguredHookHandler"
 	case "v2/ThreadStartParams.json":
 		switch name {
-		case "CapabilityRootLocation", "PermissionProfileModificationParams", "PermissionProfileSelectionParams":
+		case "CapabilityRootLocation", "DynamicToolNamespaceTool", "DynamicToolSpec", "PermissionProfileModificationParams", "PermissionProfileSelectionParams":
 			return true
 		default:
 			return false

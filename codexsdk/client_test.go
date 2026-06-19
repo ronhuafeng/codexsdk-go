@@ -296,8 +296,9 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 
 	externalAgentConfigs := reflect.TypeOf((*ExternalAgentConfigs)(nil)).Elem()
 	wantExternalAgentConfigMethods := map[string]struct{}{
-		"Detect": {},
-		"Import": {},
+		"Detect":              {},
+		"Import":              {},
+		"ImportReadHistories": {},
 	}
 	if externalAgentConfigs.NumMethod() != len(wantExternalAgentConfigMethods) {
 		t.Fatalf("ExternalAgentConfigs method count = %d, want %d", externalAgentConfigs.NumMethod(), len(wantExternalAgentConfigMethods))
@@ -515,6 +516,7 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 		"NameSet":                     {},
 		"Read":                        {},
 		"RealtimeAppendAudio":         {},
+		"RealtimeAppendSpeech":        {},
 		"RealtimeAppendText":          {},
 		"RealtimeListVoices":          {},
 		"RealtimeStart":               {},
@@ -1333,7 +1335,7 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 		detect.Items[0].Details.Value.Commands == nil || len(*detect.Items[0].Details.Value.Commands) != 1 {
 		t.Fatalf("externalAgentConfig/detect response = %#v", detect)
 	}
-	_, err = externalAgentConfigs.Import(context.Background(), protocolv2.ExternalAgentConfigImportParams{
+	importResponse, err := externalAgentConfigs.Import(context.Background(), protocolv2.ExternalAgentConfigImportParams{
 		MigrationItems: []protocolv2.ExternalAgentConfigMigrationItem{{
 			CWD:         protocolv2.Null[string](),
 			Description: "Import plugins",
@@ -1348,6 +1350,16 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 	})
 	if err != nil {
 		t.Fatalf("ExternalAgentConfigs().Import returned error: %v", err)
+	}
+	if importResponse.ImportID != "import-1" {
+		t.Fatalf("externalAgentConfig/import response = %#v", importResponse)
+	}
+	histories, err := externalAgentConfigs.ImportReadHistories(context.Background())
+	if err != nil {
+		t.Fatalf("ExternalAgentConfigs().ImportReadHistories returned error: %v", err)
+	}
+	if len(histories.Data) != 1 || histories.Data[0].ImportID != "import-1" {
+		t.Fatalf("externalAgentConfig/import/readHistories response = %#v", histories)
 	}
 
 	records := readRecords(t, record)
@@ -1365,6 +1377,9 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 	if migrationItem["cwd"] != nil || migrationItem["description"] != "Import plugins" ||
 		migrationItem["itemType"] != "PLUGINS" || plugin["marketplaceName"] != "local" {
 		t.Fatalf("externalAgentConfig/import params = %#v", importParams)
+	}
+	if params := firstRecord(records, "recv", protocolv2.MethodExternalAgentConfigImportReadHistories)["params"]; params != nil {
+		t.Fatalf("externalAgentConfig/import/readHistories params = %#v, want omitted", params)
 	}
 }
 
@@ -2235,6 +2250,13 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	if rateLimits.RateLimits.PlanType == nil || rateLimits.RateLimits.PlanType.Value == nil || *rateLimits.RateLimits.PlanType.Value != protocolv2.PlanTypePlus {
 		t.Fatalf("account/rateLimits/read response = %#v", rateLimits)
 	}
+	resetCredit, err := accounts.RateLimitResetCreditConsume(context.Background(), protocolv2.ConsumeAccountRateLimitResetCreditParams{IdempotencyKey: "reset-1"})
+	if err != nil {
+		t.Fatalf("Accounts().RateLimitResetCreditConsume returned error: %v", err)
+	}
+	if resetCredit.Outcome != protocolv2.ConsumeAccountRateLimitResetCreditOutcomeReset {
+		t.Fatalf("account/rateLimitResetCredit/consume response = %#v", resetCredit)
+	}
 	account, err := accounts.Read(context.Background(), protocolv2.GetAccountParams{RefreshToken: Bool(true)})
 	if err != nil {
 		t.Fatalf("Accounts().Read returned error: %v", err)
@@ -2262,6 +2284,7 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		protocolv2.MethodAccountLoginStart,
 		protocolv2.MethodAccountLogout,
 		protocolv2.MethodAccountRateLimitsRead,
+		protocolv2.MethodAccountRateLimitResetCreditConsume,
 		protocolv2.MethodAccountRead,
 		protocolv2.MethodAccountSendAddCreditsNudgeEmail,
 	}
@@ -2283,6 +2306,10 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	}
 	if params := firstRecord(records, "recv", protocolv2.MethodAccountRateLimitsRead)["params"]; params != nil {
 		t.Fatalf("account/rateLimits/read params = %#v, want omitted", params)
+	}
+	resetCreditParams := firstRecord(records, "recv", protocolv2.MethodAccountRateLimitResetCreditConsume)["params"].(map[string]any)
+	if resetCreditParams["idempotencyKey"] != "reset-1" {
+		t.Fatalf("account/rateLimitResetCredit/consume params = %#v", resetCreditParams)
 	}
 	readParams := firstRecord(records, "recv", protocolv2.MethodAccountRead)["params"].(map[string]any)
 	if readParams["refreshToken"] != true {
@@ -3349,6 +3376,12 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 	}); err != nil {
 		t.Fatalf("Threads().RealtimeAppendAudio returned error after experimental opt-in: %v", err)
 	}
+	if _, err := threads.RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
+		Text:     "voice",
+		ThreadID: "thread-1",
+	}); err != nil {
+		t.Fatalf("Threads().RealtimeAppendSpeech returned error after experimental opt-in: %v", err)
+	}
 	if _, err := threads.RealtimeAppendText(context.Background(), protocolv2.ThreadRealtimeAppendTextParams{
 		Text:     "hello",
 		ThreadID: "thread-1",
@@ -3372,6 +3405,7 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 	for _, method := range []string{
 		protocolv2.MethodThreadRealtimeStart,
 		protocolv2.MethodThreadRealtimeAppendAudio,
+		protocolv2.MethodThreadRealtimeAppendSpeech,
 		protocolv2.MethodThreadRealtimeAppendText,
 		protocolv2.MethodThreadRealtimeListVoices,
 		protocolv2.MethodThreadRealtimeStop,
@@ -3393,6 +3427,10 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 		audio["numChannels"] != float64(2) || audio["sampleRate"] != float64(24000) ||
 		audio["samplesPerChannel"] != float64(480) {
 		t.Fatalf("thread/realtime/appendAudio params = %#v", audioParams)
+	}
+	speechParams := firstRecord(records, "recv", protocolv2.MethodThreadRealtimeAppendSpeech)["params"].(map[string]any)
+	if speechParams["threadId"] != "thread-1" || speechParams["text"] != "voice" {
+		t.Fatalf("thread/realtime/appendSpeech params = %#v", speechParams)
 	}
 	textParams := firstRecord(records, "recv", protocolv2.MethodThreadRealtimeAppendText)["params"].(map[string]any)
 	if textParams["threadId"] != "thread-1" || textParams["text"] != "hello" {
@@ -3450,6 +3488,17 @@ func TestThreadRealtimeProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWrite
 			call: func() error {
 				_, err := root.Threads().RealtimeAppendText(context.Background(), protocolv2.ThreadRealtimeAppendTextParams{
 					Text:     "hello",
+					ThreadID: "thread-1",
+				})
+				return err
+			},
+		},
+		{
+			name:   "appendSpeech",
+			method: protocolv2.MethodThreadRealtimeAppendSpeech,
+			call: func() error {
+				_, err := root.Threads().RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
+					Text:     "voice",
 					ThreadID: "thread-1",
 				})
 				return err
@@ -3568,6 +3617,18 @@ func TestThreadRealtimeProtocolFamilyFacadeRejectsMalformedTypedResponses(t *tes
 				return err
 			},
 			wantSub: `ThreadRealtimeAppendTextResponse: unknown field "extra"`,
+		},
+		{
+			name:   "appendSpeech",
+			method: protocolv2.MethodThreadRealtimeAppendSpeech,
+			call: func(threads Threads) error {
+				_, err := threads.RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
+					Text:     "voice",
+					ThreadID: "thread-1",
+				})
+				return err
+			},
+			wantSub: `ThreadRealtimeAppendSpeechResponse: unknown field "extra"`,
 		},
 		{
 			name:   "listVoices",
@@ -5102,6 +5163,23 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 			},
 		},
 		{
+			name:   "current time read",
+			method: protocolv2.MethodCurrentTimeRead,
+			params: map[string]any{"threadId": "thread-1"},
+			response: ServerRequestResponse{
+				CurrentTimeRead: &protocolv2.CurrentTimeReadResponse{CurrentTimeAt: 1781717655},
+			},
+			assert: func(t *testing.T, req ServerRequest, result map[string]any) {
+				if req.Kind != ServerRequestCurrentTimeRead || req.CurrentTimeRead == nil ||
+					req.ThreadID != "thread-1" || req.CurrentTimeRead.ThreadID != "thread-1" {
+					t.Fatalf("current time request = %#v", req)
+				}
+				if result["currentTimeAt"] != float64(1781717655) {
+					t.Fatalf("current time response = %#v", result)
+				}
+			},
+		},
+		{
 			name:   "tool call",
 			method: protocolv2.MethodItemToolCall,
 			params: fakeDynamicToolCallParams("thread-1", "turn-tool"),
@@ -5271,6 +5349,12 @@ func TestTypedServerRequestsRejectMalformedBeforeHandler(t *testing.T) {
 			method:  protocolv2.MethodAccountChatGPTAuthTokensRefresh,
 			params:  map[string]any{"reason": "expired"},
 			message: "ChatgptAuthTokensRefreshReason",
+		},
+		{
+			name:    "current time read missing threadId",
+			method:  protocolv2.MethodCurrentTimeRead,
+			params:  map[string]any{},
+			message: "CurrentTimeReadParams.threadId",
 		},
 		{
 			name:    "tool call missing arguments",
@@ -6072,6 +6156,14 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			send(map[string]any{"id": id, "result": map[string]any{"rateLimits": map[string]any{"planType": "plus"}}})
+		case "account/rateLimitResetCredit/consume":
+			if mode == "facade" {
+				sendProtocolResult(id, protocolv2.ConsumeAccountRateLimitResetCreditResponse{
+					Outcome: protocolv2.ConsumeAccountRateLimitResetCreditOutcomeReset,
+				})
+				continue
+			}
+			send(map[string]any{"id": id, "result": map[string]any{"outcome": "reset"}})
 		case "account/read":
 			if mode == "facade" {
 				sendProtocolResult(id, protocolv2.GetAccountResponse{
@@ -6213,10 +6305,23 @@ func runFakeAppServer(mode string, extra []string) {
 			send(map[string]any{"id": id, "result": map[string]any{"items": []map[string]any{}}})
 		case "externalAgentConfig/import":
 			if mode == "facade" {
-				sendProtocolResult(id, protocolv2.ExternalAgentConfigImportResponse{})
+				sendProtocolResult(id, protocolv2.ExternalAgentConfigImportResponse{ImportID: "import-1"})
 				continue
 			}
-			send(map[string]any{"id": id, "result": map[string]any{}})
+			send(map[string]any{"id": id, "result": map[string]any{"importId": "import-1"}})
+		case "externalAgentConfig/import/readHistories":
+			if mode == "facade" {
+				sendProtocolResult(id, protocolv2.ExternalAgentConfigImportHistoriesReadResponse{
+					Data: []protocolv2.ExternalAgentConfigImportHistory{{
+						CompletedAtMS: 123,
+						Failures:      []protocolv2.ExternalAgentConfigImportItemTypeFailure{},
+						ImportID:      "import-1",
+						Successes:     []protocolv2.ExternalAgentConfigImportItemTypeSuccess{},
+					}},
+				})
+				continue
+			}
+			send(map[string]any{"id": id, "result": map[string]any{"data": []map[string]any{}}})
 		case "feedback/upload":
 			if mode == "feedback-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{}})
@@ -6771,6 +6876,12 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			sendProtocolResult(id, protocolv2.ThreadRealtimeAppendAudioResponse{})
+		case "thread/realtime/appendSpeech":
+			if mode == "thread-realtime-malformed-response" {
+				send(map[string]any{"id": id, "result": map[string]any{"extra": true}})
+				continue
+			}
+			sendProtocolResult(id, protocolv2.ThreadRealtimeAppendSpeechResponse{})
 		case "thread/realtime/appendText":
 			if mode == "thread-realtime-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{"extra": true}})

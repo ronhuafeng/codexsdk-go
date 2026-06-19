@@ -169,16 +169,16 @@ func TestGeneratedThreadTurnLifecycleParamsProtocolMarshalAndUnmarshal(t *testin
 	})
 	threadRaw, err := json.Marshal(ThreadStartParams{
 		Config: Null[map[string]JSONValue](),
-		DynamicTools: Value([]DynamicToolSpec{{
+		DynamicTools: Value([]DynamicToolSpec{NewDynamicToolSpecFunction(DynamicToolSpecFunction{
 			Description: "Search docs",
 			InputSchema: toolInputSchema,
 			Name:        "docs.search",
-		}}),
+		})}),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantThread := `{"config":null,"dynamicTools":[{"description":"Search docs","inputSchema":{"type":"object"},"name":"docs.search"}]}`
+	wantThread := `{"config":null,"dynamicTools":[{"description":"Search docs","inputSchema":{"type":"object"},"name":"docs.search","type":"function"}]}`
 	if got := string(threadRaw); got != wantThread {
 		t.Fatalf("ThreadStartParams JSON = %s, want %s", got, wantThread)
 	}
@@ -193,8 +193,12 @@ func TestGeneratedThreadTurnLifecycleParamsProtocolMarshalAndUnmarshal(t *testin
 	if decodedThread.DynamicTools == nil || decodedThread.DynamicTools.Value == nil || len(*decodedThread.DynamicTools.Value) != 1 {
 		t.Fatalf("decoded dynamic tools = %#v", decodedThread.DynamicTools)
 	}
-	if (*decodedThread.DynamicTools.Value)[0].InputSchema.Kind() != JSONKindObject {
-		t.Fatalf("decoded dynamic tool inputSchema = %#v", (*decodedThread.DynamicTools.Value)[0].InputSchema)
+	decodedTool, ok := (*decodedThread.DynamicTools.Value)[0].AsFunction()
+	if !ok {
+		t.Fatalf("decoded dynamic tool = %#v, want function", (*decodedThread.DynamicTools.Value)[0])
+	}
+	if decodedTool.InputSchema.Kind() != JSONKindObject {
+		t.Fatalf("decoded dynamic tool inputSchema = %#v", decodedTool.InputSchema)
 	}
 
 	forkRaw, err := json.Marshal(ThreadForkParams{
@@ -585,7 +589,7 @@ func TestGeneratedReviewStartParamsProtocolMarshalAndUnmarshal(t *testing.T) {
 
 func TestGeneratedThreadLifecycleResponsesProtocolMarshalAndUnmarshal(t *testing.T) {
 	thread := sampleGeneratedThread()
-	instructionSources := []string{"AGENTS.md"}
+	instructionSources := []LegacyAppPathString{"AGENTS.md"}
 	response := ThreadStartResponse{
 		ActivePermissionProfile: Value(ActivePermissionProfile{
 			Extends: Null[string](),
@@ -979,14 +983,13 @@ func TestGeneratedThreadRealtimePayloadsProtocolMarshalAndUnmarshal(t *testing.T
 		{name: "output audio delta notification", value: ThreadRealtimeOutputAudioDeltaNotification{Audio: audio, ThreadID: "thread-1"}, target: &ThreadRealtimeOutputAudioDeltaNotification{}, want: `{"audio":` + audioJSON + `,"threadId":"thread-1"}`},
 		{name: "sdp notification", value: ThreadRealtimeSdpNotification{SDP: "offer", ThreadID: "thread-1"}, target: &ThreadRealtimeSdpNotification{}, want: `{"sdp":"offer","threadId":"thread-1"}`},
 		{name: "start params", value: ThreadRealtimeStartParams{
-			Architecture:      Value(RealtimeConversationArchitectureAvas),
 			OutputModality:    RealtimeOutputModalityAudio,
 			Prompt:            Null[string](),
 			RealtimeSessionID: Value("session-1"),
 			ThreadID:          "thread-1",
 			Transport:         Value(NewThreadRealtimeStartTransportWebrtc(ThreadRealtimeStartTransportWebrtc{SDP: "offer"})),
 			Voice:             Value(RealtimeVoiceMarin),
-		}, target: &ThreadRealtimeStartParams{}, want: `{"architecture":"avas","outputModality":"audio","prompt":null,"realtimeSessionId":"session-1","threadId":"thread-1","transport":{"sdp":"offer","type":"webrtc"},"voice":"marin"}`},
+		}, target: &ThreadRealtimeStartParams{}, want: `{"outputModality":"audio","prompt":null,"realtimeSessionId":"session-1","threadId":"thread-1","transport":{"sdp":"offer","type":"webrtc"},"voice":"marin"}`},
 		{name: "start response", value: ThreadRealtimeStartResponse{}, target: &ThreadRealtimeStartResponse{}, want: `{}`},
 		{name: "started notification", value: ThreadRealtimeStartedNotification{RealtimeSessionID: Value("session-1"), ThreadID: "thread-1", Version: RealtimeConversationVersionV2}, target: &ThreadRealtimeStartedNotification{}, want: `{"realtimeSessionId":"session-1","threadId":"thread-1","version":"v2"}`},
 		{name: "stop params", value: ThreadRealtimeStopParams{ThreadID: "thread-1"}, target: &ThreadRealtimeStopParams{}, want: `{"threadId":"thread-1"}`},
@@ -1175,7 +1178,14 @@ func TestGeneratedStableNotificationPayloadsProtocolMarshalAndUnmarshal(t *testi
 		{name: "agent message delta", value: AgentMessageDeltaNotification{Delta: "hello", ItemID: "item-1", ThreadID: "thread-1", TurnID: "turn-1"}, target: &AgentMessageDeltaNotification{}, want: `{"delta":"hello","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "context compacted", value: ContextCompactedNotification{ThreadID: "thread-1", TurnID: "turn-1"}, target: &ContextCompactedNotification{}, want: `{"threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "deprecation notice", value: DeprecationNoticeNotification{Details: Null[string](), Summary: "deprecated"}, target: &DeprecationNoticeNotification{}, want: `{"details":null,"summary":"deprecated"}`},
-		{name: "external agent config import completed", value: ExternalAgentConfigImportCompletedNotification{}, target: &ExternalAgentConfigImportCompletedNotification{}, want: `{}`},
+		{name: "external agent config import completed", value: ExternalAgentConfigImportCompletedNotification{
+			ImportID: "import-1",
+			ItemTypeResults: []ExternalAgentConfigImportTypeResult{{
+				Failures:  []ExternalAgentConfigImportItemTypeFailure{},
+				ItemType:  ExternalAgentConfigMigrationItemTypePLUGINS,
+				Successes: []ExternalAgentConfigImportItemTypeSuccess{},
+			}},
+		}, target: &ExternalAgentConfigImportCompletedNotification{}, want: `{"importId":"import-1","itemTypeResults":[{"failures":[],"itemType":"PLUGINS","successes":[]}]}`},
 		{name: "file change output delta", value: FileChangeOutputDeltaNotification{Delta: "patch", ItemID: "item-1", ThreadID: "thread-1", TurnID: "turn-1"}, target: &FileChangeOutputDeltaNotification{}, want: `{"delta":"patch","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "guardian warning", value: GuardianWarningNotification{Message: "guardian warning", ThreadID: "thread-1"}, target: &GuardianWarningNotification{}, want: `{"message":"guardian warning","threadId":"thread-1"}`},
 		{name: "hook started", value: HookStartedNotification{Run: hookRun, ThreadID: "thread-1", TurnID: Value("turn-1")}, target: &HookStartedNotification{}, want: `{"run":` + hookRunJSON + `,"threadId":"thread-1","turnId":"turn-1"}`},
@@ -1567,10 +1577,10 @@ func TestGeneratedThreadTurnLifecycleParamsRejectMalformedProtocol(t *testing.T)
 		t.Fatalf("unexpected unknown user input field error: %v", err)
 	}
 
-	_, err = json.Marshal(DynamicToolSpec{
+	_, err = json.Marshal(NewDynamicToolSpecFunction(DynamicToolSpecFunction{
 		Description: "Search docs",
 		Name:        "docs.search",
-	})
+	}))
 	if err == nil {
 		t.Fatal("expected invalid dynamic tool inputSchema to fail")
 	}
@@ -1790,7 +1800,7 @@ func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 }
 
 func TestGeneratedAccountUnionMarshalAndAccessors(t *testing.T) {
-	account := NewAccountAmazonBedrock()
+	account := NewAccountAmazonBedrock(AccountAmazonBedrock{})
 	if account.Kind() != AccountKindAmazonBedrock {
 		t.Fatalf("Account kind = %s, want %s", account.Kind(), AccountKindAmazonBedrock)
 	}
@@ -5301,7 +5311,7 @@ func TestGeneratedSmallUtilityPayloadsProtocolMarshalAndUnmarshal(t *testing.T) 
 		{name: "external agent config detect params", value: ExternalAgentConfigDetectParams{CWDs: Value([]string{"/repo"}), IncludeHome: boolPtr(true)}, target: &ExternalAgentConfigDetectParams{}, want: `{"cwds":["/repo"],"includeHome":true}`},
 		{name: "external agent config detect response", value: ExternalAgentConfigDetectResponse{Items: []ExternalAgentConfigMigrationItem{{CWD: Value("/repo"), Description: "Import command", Details: Value(MigrationDetails{Commands: &[]CommandMigration{{Name: "build"}}}), ItemType: ExternalAgentConfigMigrationItemTypeCOMMANDS}}}, target: &ExternalAgentConfigDetectResponse{}, want: `{"items":[{"cwd":"/repo","description":"Import command","details":{"commands":[{"name":"build"}]},"itemType":"COMMANDS"}]}`},
 		{name: "external agent config import params", value: ExternalAgentConfigImportParams{MigrationItems: []ExternalAgentConfigMigrationItem{{CWD: Null[string](), Description: "Import plugins", Details: Value(MigrationDetails{Plugins: &[]PluginsMigration{{MarketplaceName: "local", PluginNames: []string{"plugin-a"}}}}), ItemType: ExternalAgentConfigMigrationItemTypePLUGINS}}}, target: &ExternalAgentConfigImportParams{}, want: `{"migrationItems":[{"cwd":null,"description":"Import plugins","details":{"plugins":[{"marketplaceName":"local","pluginNames":["plugin-a"]}]},"itemType":"PLUGINS"}]}`},
-		{name: "external agent config import response", value: ExternalAgentConfigImportResponse{}, target: &ExternalAgentConfigImportResponse{}, want: `{}`},
+		{name: "external agent config import response", value: ExternalAgentConfigImportResponse{ImportID: "import-1"}, target: &ExternalAgentConfigImportResponse{}, want: `{"importId":"import-1"}`},
 		{name: "hooks list params", value: HooksListParams{CWDs: &[]string{"/repo"}}, target: &HooksListParams{}, want: `{"cwds":["/repo"]}`},
 		{name: "hooks list response", value: HooksListResponse{Data: []HooksListEntry{{
 			CWD:    "/repo",
@@ -7281,8 +7291,8 @@ func TestGeneratedCommandExecutionRequestApprovalParamsMarshalNestedTypedFields(
 					}),
 				}}),
 				GlobScanMaxDepth: Value(uint64(1)),
-				Read:             Null[[]string](),
-				Write:            Value([]string{"/repo"}),
+				Read:             Null[[]LegacyAppPathString](),
+				Write:            Value([]LegacyAppPathString{"/repo"}),
 			}),
 			Network: Value(AdditionalNetworkPermissions{
 				Enabled: Value(true),
@@ -7311,7 +7321,7 @@ func TestGeneratedCommandExecutionRequestApprovalParamsMarshalNestedTypedFields(
 				Query:   Value("needle"),
 			}),
 		}),
-		CWD:    Value("/repo"),
+		CWD:    Value(LegacyAppPathString("/repo")),
 		ItemID: "item-1",
 		NetworkApprovalContext: Value(NetworkApprovalContext{
 			Host:     "example.test",
@@ -7476,7 +7486,7 @@ func TestGeneratedPermissionsRequestApprovalParamsMarshalNestedProfiles(t *testi
 					}),
 				}}),
 				GlobScanMaxDepth: Value(uint64(1)),
-				Read:             Null[[]string](),
+				Read:             Null[[]LegacyAppPathString](),
 			}),
 			Network: Value(AdditionalNetworkPermissions{
 				Enabled: Value(false),

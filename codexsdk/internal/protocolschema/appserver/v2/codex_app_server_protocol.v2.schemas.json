@@ -96,31 +96,105 @@
         }
       ]
     },
-    "DynamicToolSpec": {
-      "type": "object",
-      "required": [
-        "description",
-        "inputSchema",
-        "name"
-      ],
-      "properties": {
-        "deferLoading": {
-          "type": "boolean"
-        },
-        "description": {
-          "type": "string"
-        },
-        "inputSchema": true,
-        "name": {
-          "type": "string"
-        },
-        "namespace": {
-          "type": [
-            "string",
-            "null"
-          ]
+    "DynamicToolNamespaceTool": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "description",
+            "inputSchema",
+            "name",
+            "type"
+          ],
+          "properties": {
+            "deferLoading": {
+              "type": "boolean"
+            },
+            "description": {
+              "type": "string"
+            },
+            "inputSchema": true,
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "function"
+              ],
+              "title": "FunctionDynamicToolNamespaceToolType"
+            }
+          },
+          "title": "FunctionDynamicToolNamespaceTool"
         }
-      }
+      ]
+    },
+    "DynamicToolSpec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "description",
+            "inputSchema",
+            "name",
+            "type"
+          ],
+          "properties": {
+            "deferLoading": {
+              "type": "boolean"
+            },
+            "description": {
+              "type": "string"
+            },
+            "inputSchema": true,
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "function"
+              ],
+              "title": "FunctionDynamicToolSpecType"
+            }
+          },
+          "title": "FunctionDynamicToolSpec"
+        },
+        {
+          "type": "object",
+          "required": [
+            "description",
+            "name",
+            "tools",
+            "type"
+          ],
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "tools": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/DynamicToolNamespaceTool"
+              }
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "namespace"
+              ],
+              "title": "NamespaceDynamicToolSpecType"
+            }
+          },
+          "title": "NamespaceDynamicToolSpec"
+        }
+      ]
+    },
+    "LegacyAppPathString": {
+      "type": "string"
     },
     "Personality": {
       "type": "string",
@@ -178,7 +252,7 @@
       ],
       "properties": {
         "cwd": {
-          "$ref": "#/definitions/AbsolutePathBuf"
+          "$ref": "#/definitions/LegacyAppPathString"
         },
         "environmentId": {
           "type": "string"
@@ -237,6 +311,7 @@
           ]
         },
         "dynamicTools": {
+          "default": null,
           "type": [
             "array",
             "null"
@@ -368,6 +443,26 @@
     },
     "AgentMessageInputContent": {
       "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "text",
+            "type"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "input_text"
+              ],
+              "title": "InputTextAgentMessageInputContentType"
+            }
+          },
+          "title": "InputTextAgentMessageInputContent"
+        },
         {
           "type": "object",
           "required": [
@@ -729,10 +824,19 @@
               }
             },
             "id": {
-              "writeOnly": true,
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "phase": {
@@ -776,6 +880,22 @@
                 "$ref": "#/definitions/AgentMessageInputContent"
               }
             },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "recipient": {
               "type": "string"
             },
@@ -810,6 +930,22 @@
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "summary": {
@@ -848,10 +984,19 @@
             },
             "id": {
               "description": "Legacy id field retained for compatibility with older payloads.",
-              "writeOnly": true,
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "status": {
@@ -883,10 +1028,19 @@
               "type": "string"
             },
             "id": {
-              "writeOnly": true,
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "name": {
@@ -927,10 +1081,19 @@
               "type": "string"
             },
             "id": {
-              "writeOnly": true,
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "status": {
@@ -960,6 +1123,22 @@
             "call_id": {
               "type": "string"
             },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "output": {
               "$ref": "#/definitions/FunctionCallOutputBody"
             },
@@ -986,7 +1165,6 @@
               "type": "string"
             },
             "id": {
-              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -994,6 +1172,16 @@
             },
             "input": {
               "type": "string"
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "name": {
               "type": "string"
@@ -1024,6 +1212,22 @@
           "properties": {
             "call_id": {
               "type": "string"
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "name": {
               "type": [
@@ -1062,6 +1266,22 @@
             "execution": {
               "type": "string"
             },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "status": {
               "type": "string"
             },
@@ -1096,10 +1316,19 @@
               ]
             },
             "id": {
-              "writeOnly": true,
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "status": {
@@ -1121,14 +1350,26 @@
         {
           "type": "object",
           "required": [
-            "id",
             "result",
             "status",
             "type"
           ],
           "properties": {
             "id": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "result": {
               "type": "string"
@@ -1162,6 +1403,22 @@
             "encrypted_content": {
               "type": "string"
             },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "type": {
               "type": "string",
               "enum": [
@@ -1178,6 +1435,16 @@
             "type"
           ],
           "properties": {
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "type": {
               "type": "string",
               "enum": [
@@ -1198,6 +1465,22 @@
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ResponseItemMetadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "type": {
@@ -1227,6 +1510,23 @@
           "title": "OtherResponseItem"
         }
       ]
+    },
+    "ResponseItemMetadata": {
+      "type": "object",
+      "properties": {
+        "source_call_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "turn_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
     },
     "ResponsesApiWebSearchAction": {
       "oneOf": [
@@ -2369,7 +2669,8 @@
       "type": "string",
       "enum": [
         "created_at",
-        "updated_at"
+        "updated_at",
+        "recency_at"
       ]
     },
     "ThreadSourceKind": {
@@ -2435,6 +2736,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "parentThreadId": {
+          "description": "Optional direct parent thread filter.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "searchTerm": {
           "description": "Optional substring filter for the extracted thread title.",
@@ -2812,7 +3120,8 @@
         "local",
         "vertical",
         "workspace-directory",
-        "shared-with-me"
+        "shared-with-me",
+        "created-by-me-remote"
       ]
     },
     "PluginListParams": {
@@ -3828,13 +4137,6 @@
         }
       }
     },
-    "RealtimeConversationArchitecture": {
-      "type": "string",
-      "enum": [
-        "realtimeapi",
-        "avas"
-      ]
-    },
     "RealtimeConversationVersion": {
       "type": "string",
       "enum": [
@@ -3925,15 +4227,39 @@
         "threadId"
       ],
       "properties": {
-        "architecture": {
-          "description": "Overrides the configured realtime architecture for this session only.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/RealtimeConversationArchitecture"
-            },
-            {
-              "type": "null"
-            }
+        "clientManagedHandoffs": {
+          "description": "Leaves Codex response handoffs to the client's explicit append calls instead of forwarding them automatically. Defaults to false.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "codexResponseHandoffPrefix": {
+          "description": "Optional prefix added to automatic V1 Codex commentary sent with `conversation.handoff.append` when `codexResponsesAsItems` is not true. Final answers are sent without the prefix.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "codexResponseItemPrefix": {
+          "description": "Optional prefix added to automatic Codex response items when `codexResponsesAsItems` is true.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "codexResponsesAsItems": {
+          "description": "Sends automatic Codex responses as realtime conversation items instead of handoff appends.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "includeStartupContext": {
+          "description": "Set to false to start without Codex's startup context. Omitted or null includes it.",
+          "type": [
+            "boolean",
+            "null"
           ]
         },
         "model": {
@@ -4055,10 +4381,44 @@
         }
       }
     },
+    "ConversationTextRole": {
+      "type": "string",
+      "enum": [
+        "user",
+        "developer",
+        "assistant"
+      ]
+    },
     "ThreadRealtimeAppendTextParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ThreadRealtimeAppendTextParams",
       "description": "EXPERIMENTAL - append text input to thread realtime.",
+      "type": "object",
+      "required": [
+        "text",
+        "threadId"
+      ],
+      "properties": {
+        "role": {
+          "default": "user",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConversationTextRole"
+            }
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        }
+      }
+    },
+    "ThreadRealtimeAppendSpeechParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ThreadRealtimeAppendSpeechParams",
+      "description": "EXPERIMENTAL - append speakable text to thread realtime.",
       "type": "object",
       "required": [
         "text",
@@ -4759,6 +5119,20 @@
         }
       }
     },
+    "ConsumeAccountRateLimitResetCreditParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ConsumeAccountRateLimitResetCreditParams",
+      "type": "object",
+      "required": [
+        "idempotencyKey"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "description": "Identifies one logical reset attempt. A UUID is recommended; reuse the same value when retrying that attempt.",
+          "type": "string"
+        }
+      }
+    },
     "AddCreditsNudgeCreditType": {
       "type": "string",
       "enum": [
@@ -5228,7 +5602,7 @@
           }
         },
         "includeHome": {
-          "description": "If true, include detection under the user's home (~/.claude, ~/.codex, etc.).",
+          "description": "If true, include detection under the user's home directory.",
           "type": "boolean"
         }
       }
@@ -5422,6 +5796,13 @@
           "items": {
             "$ref": "#/definitions/ExternalAgentConfigMigrationItem"
           }
+        },
+        "source": {
+          "description": "Source product that produced the migration items. Missing means unspecified.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -5969,6 +6350,29 @@
         }
       }
     },
+    "McpToolCallAppContext": {
+      "type": "object",
+      "required": [
+        "connectorId"
+      ],
+      "properties": {
+        "connectorId": {
+          "type": "string"
+        },
+        "linkId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resourceUri": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
     "McpToolCallError": {
       "type": "object",
       "required": [
@@ -6350,6 +6754,14 @@
           "description": "Usually the first user message in the thread, if available.",
           "type": "string"
         },
+        "recencyAt": {
+          "description": "Unix timestamp (in seconds) used for thread recency ordering.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
         "sessionId": {
           "description": "Session id shared by threads that belong to the same session tree.",
           "type": "string"
@@ -6605,7 +7017,7 @@
               "description": "The command's working directory.",
               "allOf": [
                 {
-                  "$ref": "#/definitions/AbsolutePathBuf"
+                  "$ref": "#/definitions/LegacyAppPathString"
                 }
               ]
             },
@@ -6698,6 +7110,16 @@
             "type"
           ],
           "properties": {
+            "appContext": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/McpToolCallAppContext"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "arguments": true,
             "durationMs": {
               "description": "The duration of the MCP tool call in milliseconds.",
@@ -6721,6 +7143,7 @@
               "type": "string"
             },
             "mcpAppResourceUri": {
+              "description": "Deprecated: use `appContext.resourceUri` instead.",
               "type": [
                 "string",
                 "null"
@@ -6994,6 +7417,32 @@
             }
           },
           "title": "ImageViewThreadItem"
+        },
+        {
+          "type": "object",
+          "required": [
+            "durationMs",
+            "id",
+            "type"
+          ],
+          "properties": {
+            "durationMs": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "sleep"
+              ],
+              "title": "SleepThreadItemType"
+            }
+          },
+          "title": "SleepThreadItem"
         },
         {
           "type": "object",
@@ -7430,11 +7879,11 @@
           "$ref": "#/definitions/AbsolutePathBuf"
         },
         "instructionSources": {
-          "description": "Instruction source files currently loaded for this thread.",
+          "description": "Environment-native paths to instruction source files currently loaded for this thread.",
           "default": [],
           "type": "array",
           "items": {
-            "$ref": "#/definitions/AbsolutePathBuf"
+            "$ref": "#/definitions/LegacyAppPathString"
           }
         },
         "model": {
@@ -7559,11 +8008,11 @@
           ]
         },
         "instructionSources": {
-          "description": "Instruction source files currently loaded for this thread.",
+          "description": "Environment-native paths to instruction source files currently loaded for this thread.",
           "default": [],
           "type": "array",
           "items": {
-            "$ref": "#/definitions/AbsolutePathBuf"
+            "$ref": "#/definitions/LegacyAppPathString"
           }
         },
         "model": {
@@ -7650,11 +8099,11 @@
           "$ref": "#/definitions/AbsolutePathBuf"
         },
         "instructionSources": {
-          "description": "Instruction source files currently loaded for this thread.",
+          "description": "Environment-native paths to instruction source files currently loaded for this thread.",
           "default": [],
           "type": "array",
           "items": {
-            "$ref": "#/definitions/AbsolutePathBuf"
+            "$ref": "#/definitions/LegacyAppPathString"
           }
         },
         "model": {
@@ -10133,6 +10582,12 @@
       "description": "EXPERIMENTAL - response for appending realtime text input.",
       "type": "object"
     },
+    "ThreadRealtimeAppendSpeechResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ThreadRealtimeAppendSpeechResponse",
+      "description": "EXPERIMENTAL - response for appending realtime speech.",
+      "type": "object"
+    },
     "ThreadRealtimeStopResponse": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ThreadRealtimeStopResponse",
@@ -11455,6 +11910,18 @@
         "workspace_member_usage_limit_reached"
       ]
     },
+    "RateLimitResetCreditsSummary": {
+      "type": "object",
+      "required": [
+        "availableCount"
+      ],
+      "properties": {
+        "availableCount": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
     "RateLimitSnapshot": {
       "type": "object",
       "properties": {
@@ -11591,6 +12058,16 @@
         "rateLimits"
       ],
       "properties": {
+        "rateLimitResetCredits": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RateLimitResetCreditsSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "rateLimits": {
           "description": "Backward-compatible single-bucket view; mirrors the historical payload.",
           "allOf": [
@@ -11608,6 +12085,51 @@
           "additionalProperties": {
             "$ref": "#/definitions/RateLimitSnapshot"
           }
+        }
+      }
+    },
+    "ConsumeAccountRateLimitResetCreditOutcome": {
+      "oneOf": [
+        {
+          "description": "A reset credit was consumed and the eligible rate-limit windows were reset.",
+          "type": "string",
+          "enum": [
+            "reset"
+          ]
+        },
+        {
+          "description": "No current rate-limit window is eligible for a reset.",
+          "type": "string",
+          "enum": [
+            "nothingToReset"
+          ]
+        },
+        {
+          "description": "The account has no earned reset credits available.",
+          "type": "string",
+          "enum": [
+            "noCredit"
+          ]
+        },
+        {
+          "description": "The same idempotency key already completed a reset successfully.",
+          "type": "string",
+          "enum": [
+            "alreadyRedeemed"
+          ]
+        }
+      ]
+    },
+    "ConsumeAccountRateLimitResetCreditResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ConsumeAccountRateLimitResetCreditResponse",
+      "type": "object",
+      "required": [
+        "outcome"
+      ],
+      "properties": {
+        "outcome": {
+          "$ref": "#/definitions/ConsumeAccountRateLimitResetCreditOutcome"
         }
       }
     },
@@ -11914,6 +12436,16 @@
           "anyOf": [
             {
               "$ref": "#/definitions/ApprovalsReviewer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_tools_approval_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AppToolApproval"
             },
             {
               "type": "null"
@@ -12590,7 +13122,127 @@
     "ExternalAgentConfigImportResponse": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ExternalAgentConfigImportResponse",
-      "type": "object"
+      "type": "object",
+      "required": [
+        "importId"
+      ],
+      "properties": {
+        "importId": {
+          "type": "string"
+        }
+      }
+    },
+    "ExternalAgentConfigImportHistory": {
+      "type": "object",
+      "required": [
+        "completedAtMs",
+        "failures",
+        "importId",
+        "successes"
+      ],
+      "properties": {
+        "completedAtMs": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalAgentConfigImportItemTypeFailure"
+          }
+        },
+        "importId": {
+          "type": "string"
+        },
+        "successes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalAgentConfigImportItemTypeSuccess"
+          }
+        }
+      }
+    },
+    "ExternalAgentConfigImportItemTypeFailure": {
+      "type": "object",
+      "required": [
+        "failureStage",
+        "itemType",
+        "message"
+      ],
+      "properties": {
+        "cwd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "errorType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "failureStage": {
+          "type": "string"
+        },
+        "itemType": {
+          "$ref": "#/definitions/ExternalAgentConfigMigrationItemType"
+        },
+        "message": {
+          "type": "string"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ExternalAgentConfigImportItemTypeSuccess": {
+      "type": "object",
+      "required": [
+        "itemType"
+      ],
+      "properties": {
+        "cwd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "itemType": {
+          "$ref": "#/definitions/ExternalAgentConfigMigrationItemType"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ExternalAgentConfigImportHistoriesReadResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExternalAgentConfigImportHistoriesReadResponse",
+      "type": "object",
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalAgentConfigImportHistory"
+          }
+        }
+      }
     },
     "OverriddenMetadata": {
       "type": "object",
@@ -12673,6 +13325,12 @@
           ]
         },
         "allowManagedHooksOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allowRemoteControl": {
           "type": [
             "boolean",
             "null"
@@ -13172,6 +13830,14 @@
             "type"
           ],
           "properties": {
+            "credentialSource": {
+              "default": "awsManaged",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AmazonBedrockCredentialSource"
+                }
+              ]
+            },
             "type": {
               "type": "string",
               "enum": [
@@ -13182,6 +13848,13 @@
           },
           "title": "AmazonBedrockAccount"
         }
+      ]
+    },
+    "AmazonBedrockCredentialSource": {
+      "type": "string",
+      "enum": [
+        "codexManaged",
+        "awsManaged"
       ]
     },
     "GetAccountResponse": {
@@ -13886,7 +14559,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/AbsolutePathBuf"
+            "$ref": "#/definitions/LegacyAppPathString"
           }
         },
         "write": {
@@ -13896,7 +14569,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/AbsolutePathBuf"
+            "$ref": "#/definitions/LegacyAppPathString"
           }
         }
       }
@@ -13930,7 +14603,7 @@
           ],
           "properties": {
             "path": {
-              "$ref": "#/definitions/AbsolutePathBuf"
+              "$ref": "#/definitions/LegacyAppPathString"
             },
             "type": {
               "type": "string",
@@ -15121,10 +15794,70 @@
         }
       }
     },
+    "ExternalAgentConfigImportTypeResult": {
+      "type": "object",
+      "required": [
+        "failures",
+        "itemType",
+        "successes"
+      ],
+      "properties": {
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalAgentConfigImportItemTypeFailure"
+          }
+        },
+        "itemType": {
+          "$ref": "#/definitions/ExternalAgentConfigMigrationItemType"
+        },
+        "successes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalAgentConfigImportItemTypeSuccess"
+          }
+        }
+      }
+    },
+    "ExternalAgentConfigImportProgressNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExternalAgentConfigImportProgressNotification",
+      "type": "object",
+      "required": [
+        "importId",
+        "itemTypeResults"
+      ],
+      "properties": {
+        "importId": {
+          "type": "string"
+        },
+        "itemTypeResults": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalAgentConfigImportTypeResult"
+          }
+        }
+      }
+    },
     "ExternalAgentConfigImportCompletedNotification": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ExternalAgentConfigImportCompletedNotification",
-      "type": "object"
+      "type": "object",
+      "required": [
+        "importId",
+        "itemTypeResults"
+      ],
+      "properties": {
+        "importId": {
+          "type": "string"
+        },
+        "itemTypeResults": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalAgentConfigImportTypeResult"
+          }
+        }
+      }
     },
     "FsChangedNotification": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -15707,6 +16440,30 @@
         }
       }
     },
+    "FuzzyFileSearchSessionUpdatedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionUpdatedNotification",
+      "type": "object",
+      "required": [
+        "files",
+        "query",
+        "sessionId"
+      ],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FuzzyFileSearchResult"
+          }
+        },
+        "query": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        }
+      }
+    },
     "InitializeCapabilities": {
       "description": "Client-declared capabilities negotiated during initialize.",
       "type": "object",
@@ -15714,6 +16471,10 @@
         "experimentalApi": {
           "description": "Opt into receiving experimental API methods and fields.",
           "default": false,
+          "type": "boolean"
+        },
+        "mcpServerOpenaiFormElicitation": {
+          "description": "Allow downstream MCP servers to request OpenAI extended form elicitations.",
           "type": "boolean"
         },
         "optOutNotificationMethods": {
@@ -15733,35 +16494,18 @@
         }
       }
     },
-    "ClientInfo": {
-      "type": "object",
-      "required": [
-        "name",
-        "version"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "version": {
-          "type": "string"
-        }
-      }
-    },
-    "FuzzyFileSearchSessionCompletedNotification": {
+    "FuzzyFileSearchSessionUpdateParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionCompletedNotification",
+      "title": "FuzzyFileSearchSessionUpdateParams",
       "type": "object",
       "required": [
+        "query",
         "sessionId"
       ],
       "properties": {
+        "query": {
+          "type": "string"
+        },
         "sessionId": {
           "type": "string"
         }
@@ -15808,6 +16552,19 @@
         }
       }
     },
+    "FuzzyFileSearchSessionStopParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionStopParams",
+      "type": "object",
+      "required": [
+        "sessionId"
+      ],
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        }
+      }
+    },
     "FuzzyFileSearchMatchType": {
       "type": "string",
       "enum": [
@@ -15838,43 +16595,23 @@
         }
       }
     },
-    "FuzzyFileSearchSessionUpdatedNotification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionUpdatedNotification",
+    "ClientInfo": {
       "type": "object",
       "required": [
-        "files",
-        "query",
-        "sessionId"
+        "name",
+        "version"
       ],
       "properties": {
-        "files": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/FuzzyFileSearchResult"
-          }
-        },
-        "query": {
+        "name": {
           "type": "string"
         },
-        "sessionId": {
-          "type": "string"
-        }
-      }
-    },
-    "FuzzyFileSearchSessionUpdateParams": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionUpdateParams",
-      "type": "object",
-      "required": [
-        "query",
-        "sessionId"
-      ],
-      "properties": {
-        "query": {
-          "type": "string"
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
-        "sessionId": {
+        "version": {
           "type": "string"
         }
       }
@@ -15905,19 +16642,6 @@
         }
       }
     },
-    "FuzzyFileSearchSessionStopParams": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FuzzyFileSearchSessionStopParams",
-      "type": "object",
-      "required": [
-        "sessionId"
-      ],
-      "properties": {
-        "sessionId": {
-          "type": "string"
-        }
-      }
-    },
     "FuzzyFileSearchSessionStartParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "FuzzyFileSearchSessionStartParams",
@@ -15933,6 +16657,19 @@
             "type": "string"
           }
         },
+        "sessionId": {
+          "type": "string"
+        }
+      }
+    },
+    "FuzzyFileSearchSessionCompletedNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FuzzyFileSearchSessionCompletedNotification",
+      "type": "object",
+      "required": [
+        "sessionId"
+      ],
+      "properties": {
         "sessionId": {
           "type": "string"
         }
@@ -17544,6 +18281,30 @@
             "method": {
               "type": "string",
               "enum": [
+                "thread/realtime/appendSpeech"
+              ],
+              "title": "Thread/realtime/appendSpeechRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/ThreadRealtimeAppendSpeechParams"
+            }
+          },
+          "title": "Thread/realtime/appendSpeechRequest"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": [
                 "thread/realtime/stop"
               ],
               "title": "Thread/realtime/stopRequestMethod"
@@ -18240,6 +19001,30 @@
           "type": "object",
           "required": [
             "id",
+            "method",
+            "params"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "account/rateLimitResetCredit/consume"
+              ],
+              "title": "Account/rateLimitResetCredit/consumeRequestMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/ConsumeAccountRateLimitResetCreditParams"
+            }
+          },
+          "title": "Account/rateLimitResetCredit/consumeRequest"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
             "method"
           ],
           "properties": {
@@ -18578,6 +19363,29 @@
             }
           },
           "title": "ExternalAgentConfig/importRequest"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "method"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "externalAgentConfig/import/readHistories"
+              ],
+              "title": "ExternalAgentConfig/import/readHistoriesRequestMethod"
+            },
+            "params": {
+              "type": "null"
+            }
+          },
+          "title": "ExternalAgentConfig/import/readHistoriesRequest"
         },
         {
           "type": "object",
@@ -19582,6 +20390,26 @@
             }
           },
           "title": "RemoteControl/status/changedNotification"
+        },
+        {
+          "type": "object",
+          "required": [
+            "method",
+            "params"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "externalAgentConfig/import/progress"
+              ],
+              "title": "ExternalAgentConfig/import/progressNotificationMethod"
+            },
+            "params": {
+              "$ref": "#/definitions/ExternalAgentConfigImportProgressNotification"
+            }
+          },
+          "title": "ExternalAgentConfig/import/progressNotification"
         },
         {
           "type": "object",

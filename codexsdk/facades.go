@@ -257,6 +257,14 @@ func (f accountsFacade) RateLimitsRead(ctx context.Context) (protocolv2.GetAccou
 	return response, nil
 }
 
+func (f accountsFacade) RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error) {
+	var response protocolv2.ConsumeAccountRateLimitResetCreditResponse
+	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountRateLimitResetCreditConsume, params, &response); err != nil {
+		return protocolv2.ConsumeAccountRateLimitResetCreditResponse{}, err
+	}
+	return response, nil
+}
+
 func (f accountsFacade) Read(ctx context.Context, params protocolv2.GetAccountParams) (protocolv2.GetAccountResponse, error) {
 	var response protocolv2.GetAccountResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountRead, params, &response); err != nil {
@@ -381,6 +389,14 @@ func (f externalAgentConfigsFacade) Import(ctx context.Context, params protocolv
 	var response protocolv2.ExternalAgentConfigImportResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodExternalAgentConfigImport, params, &response); err != nil {
 		return protocolv2.ExternalAgentConfigImportResponse{}, err
+	}
+	return response, nil
+}
+
+func (f externalAgentConfigsFacade) ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error) {
+	var response protocolv2.ExternalAgentConfigImportHistoriesReadResponse
+	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodExternalAgentConfigImportReadHistories, &response); err != nil {
+		return protocolv2.ExternalAgentConfigImportHistoriesReadResponse{}, err
 	}
 	return response, nil
 }
@@ -829,6 +845,14 @@ func (f threadsFacade) RealtimeAppendAudio(ctx context.Context, params protocolv
 	var response protocolv2.ThreadRealtimeAppendAudioResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeAppendAudio, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeAppendAudioResponse{}, err
+	}
+	return response, nil
+}
+
+func (f threadsFacade) RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error) {
+	var response protocolv2.ThreadRealtimeAppendSpeechResponse
+	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeAppendSpeech, params, &response); err != nil {
+		return protocolv2.ThreadRealtimeAppendSpeechResponse{}, err
 	}
 	return response, nil
 }

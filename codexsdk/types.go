@@ -62,6 +62,7 @@ type Accounts interface {
 	LoginStart(ctx context.Context, params protocolv2.LoginAccountParams) (protocolv2.LoginAccountResponse, error)
 	Logout(ctx context.Context) (protocolv2.LogoutAccountResponse, error)
 	RateLimitsRead(ctx context.Context) (protocolv2.GetAccountRateLimitsResponse, error)
+	RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error)
 	Read(ctx context.Context, params protocolv2.GetAccountParams) (protocolv2.GetAccountResponse, error)
 	SendAddCreditsNudgeEmail(ctx context.Context, params protocolv2.SendAddCreditsNudgeEmailParams) (protocolv2.SendAddCreditsNudgeEmailResponse, error)
 }
@@ -100,6 +101,7 @@ type ExperimentalFeatures interface {
 type ExternalAgentConfigs interface {
 	Detect(ctx context.Context, params protocolv2.ExternalAgentConfigDetectParams) (protocolv2.ExternalAgentConfigDetectResponse, error)
 	Import(ctx context.Context, params protocolv2.ExternalAgentConfigImportParams) (protocolv2.ExternalAgentConfigImportResponse, error)
+	ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error)
 }
 
 type Feedback interface {
@@ -208,6 +210,7 @@ type Threads interface {
 	NameSet(ctx context.Context, params protocolv2.ThreadSetNameParams) (protocolv2.ThreadSetNameResponse, error)
 	Read(ctx context.Context, params protocolv2.ThreadReadParams) (protocolv2.ThreadReadResponse, error)
 	RealtimeAppendAudio(ctx context.Context, params protocolv2.ThreadRealtimeAppendAudioParams) (protocolv2.ThreadRealtimeAppendAudioResponse, error)
+	RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error)
 	RealtimeAppendText(ctx context.Context, params protocolv2.ThreadRealtimeAppendTextParams) (protocolv2.ThreadRealtimeAppendTextResponse, error)
 	RealtimeListVoices(ctx context.Context, params protocolv2.ThreadRealtimeListVoicesParams) (protocolv2.ThreadRealtimeListVoicesResponse, error)
 	RealtimeStart(ctx context.Context, params protocolv2.ThreadRealtimeStartParams) (protocolv2.ThreadRealtimeStartResponse, error)
@@ -355,6 +358,7 @@ const (
 	ServerRequestMCPElicitation      ServerRequestKind = "mcp_elicitation"
 	ServerRequestToolCall            ServerRequestKind = "tool_call"
 	ServerRequestChatGPTAuthRefresh  ServerRequestKind = "chatgpt_auth_refresh"
+	ServerRequestCurrentTimeRead     ServerRequestKind = "current_time_read"
 	ServerRequestAttestation         ServerRequestKind = "attestation"
 	ServerRequestUnsupported         ServerRequestKind = "unsupported"
 )
@@ -373,6 +377,7 @@ type ServerRequest struct {
 	FileChangeApproval       *protocolv2.FileChangeRequestApprovalParams
 	PermissionsApproval      *protocolv2.PermissionsRequestApprovalParams
 	ChatGPTAuthTokensRefresh *protocolv2.ChatgptAuthTokensRefreshParams
+	CurrentTimeRead          *protocolv2.CurrentTimeReadParams
 	DynamicToolCall          *protocolv2.DynamicToolCallParams
 	ToolRequestUserInput     *protocolv2.ToolRequestUserInputParams
 	MCPElicitation           *protocolv2.McpServerElicitationRequestParams
@@ -387,6 +392,7 @@ type ServerRequestResponse struct {
 	FileChangeApproval       *protocolv2.FileChangeRequestApprovalResponse
 	PermissionsApproval      *protocolv2.PermissionsRequestApprovalResponse
 	ChatGPTAuthTokensRefresh *protocolv2.ChatgptAuthTokensRefreshResponse
+	CurrentTimeRead          *protocolv2.CurrentTimeReadResponse
 	DynamicToolCall          *protocolv2.DynamicToolCallResponse
 	ToolRequestUserInput     *protocolv2.ToolRequestUserInputResponse
 	MCPElicitation           *protocolv2.McpServerElicitationRequestResponse

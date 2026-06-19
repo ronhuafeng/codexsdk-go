@@ -16,10 +16,10 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(plan.Types), 325; got != want {
+	if got, want := len(plan.Types), 333; got != want {
 		t.Fatalf("type count = %d, want %d", got, want)
 	}
-	if got, want := len(plan.Fields), 803; got != want {
+	if got, want := len(plan.Fields), 824; got != want {
 		t.Fatalf("field count = %d, want %d", got, want)
 	}
 
@@ -27,8 +27,8 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	wantCounts := map[TypePlanKind]int{
 		TypePlanAggregateBundle:       2,
 		TypePlanAnyOfDeferred:         3,
-		TypePlanEmptyStructCandidate:  46,
-		TypePlanObjectStructCandidate: 267,
+		TypePlanEmptyStructCandidate:  45,
+		TypePlanObjectStructCandidate: 276,
 		TypePlanScalarUnionCandidate:  1,
 		TypePlanTaggedUnionCandidate:  6,
 	}
@@ -414,7 +414,7 @@ func TestBuildProtocolTypePlanNormalizesCommandApprovalNullableRefs(t *testing.T
 		t.Fatalf("additionalPermissions = kind %s GoType %q", field.Kind, field.GoType)
 	}
 	field = mustField(t, plan, "CommandExecutionRequestApprovalParams.json#/properties/cwd")
-	if field.Kind != FieldPlanNullableScalar || field.GoType != "*protocolv2.Nullable[string]" {
+	if field.Kind != FieldPlanNullableRef || field.GoType != "*protocolv2.Nullable[LegacyAppPathString]" {
 		t.Fatalf("cwd = kind %s GoType %q", field.Kind, field.GoType)
 	}
 }

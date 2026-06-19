@@ -1016,6 +1016,8 @@ func isJSONValueFieldPath(path string) bool {
 		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/4/properties/arguments",
 		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/5/properties/arguments",
 		"v2/ThreadStartParams.json#/definitions/DynamicToolSpec/properties/inputSchema",
+		"v2/ThreadStartParams.json#/definitions/DynamicToolSpec#/oneOf/0/properties/inputSchema",
+		"v2/ThreadStartParams.json#/definitions/DynamicToolNamespaceTool#/oneOf/0/properties/inputSchema",
 		"v2/ThreadRealtimeItemAddedNotification.json#/properties/item",
 		"v2/TurnModerationMetadataNotification.json#/properties/metadata",
 		"v2/TurnStartResponse.json#/definitions/McpToolCallResult/properties/_meta",
