@@ -52,7 +52,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			}
 		}
 	}
-	if got, want := len(selected), 439; got != want {
+	if got, want := len(selected), 448; got != want {
 		t.Fatalf("selected generated type count = %d, want %d", got, want)
 	}
 	for _, name := range []string{
@@ -117,6 +117,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ConsumeAccountRateLimitResetCreditParams",
 		"ConsumeAccountRateLimitResetCreditResponse",
 		"CreditsSnapshot",
+		"CurrentTimeReadParams",
+		"CurrentTimeReadResponse",
 		"DynamicToolCallResponse",
 		"DynamicToolCallParams",
 		"ErrorNotification",
@@ -131,7 +133,10 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ExternalAgentConfigDetectResponse",
 		"ExternalAgentConfigImportItemTypeFailure",
 		"ExternalAgentConfigImportItemTypeSuccess",
+		"ExternalAgentConfigImportHistoriesReadResponse",
+		"ExternalAgentConfigImportHistory",
 		"ExternalAgentConfigImportParams",
+		"ExternalAgentConfigImportProgressNotification",
 		"ExternalAgentConfigImportResponse",
 		"ExternalAgentConfigImportTypeResult",
 		"ExternalAgentConfigMigrationItem",
@@ -165,6 +170,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"GetAccountParams",
 		"GetAccountRateLimitsResponse",
 		"GetAccountResponse",
+		"GetWorkspaceMessagesResponse",
 		"GuardianApprovalReview",
 		"HookErrorInfo",
 		"HookMetadata",
@@ -185,6 +191,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"MarketplaceUpgradeResponse",
 		"McpResourceReadParams",
 		"McpResourceReadResponse",
+		"McpToolCallAppContext",
 		"McpServerElicitationRequestParams",
 		"McpServerElicitationRequestResponse",
 		"McpServerOauthLoginParams",
@@ -200,6 +207,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ModelProviderCapabilitiesReadParams",
 		"ModelProviderCapabilitiesReadResponse",
 		"ModelReroutedNotification",
+		"ModelSafetyBufferingUpdatedNotification",
 		"ModelServiceTier",
 		"ModelUpgradeInfo",
 		"ModelVerificationNotification",
@@ -218,6 +226,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"HookOutputEntry",
 		"HookRunSummary",
 		"HookStartedNotification",
+		"InternalChatMessageMetadataPassthrough",
 		"PermissionsRequestApprovalParams",
 		"PermissionsRequestApprovalResponse",
 		"PluginDetail",
@@ -264,7 +273,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"RateLimitWindow",
 		"RawResponseItemCompletedNotification",
 		"ReasoningEffortOption",
-		"ResponseItemMetadata",
 		"RequestPermissionProfile",
 		"ReviewStartParams",
 		"Resource",
@@ -405,6 +413,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"W3cTraceContext",
 		"WebSearchLocation",
 		"WebSearchToolConfig",
+		"WorkspaceMessage",
 		"WindowsSandboxReadinessResponse",
 		"WindowsSandboxSetupStartParams",
 		"AgentMessageDeltaNotification",
@@ -1431,8 +1440,10 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		t.Fatalf("ThreadRealtimeSdpNotification.sdp field = %#v", threadRealtimeSdpFields["sdp"])
 	}
 	threadRealtimeStartFields := generatedFields("ThreadRealtimeStartParams")
-	if threadRealtimeStartFields["architecture"].GoType != "*protocolv2.Nullable[RealtimeConversationArchitecture]" ||
-		threadRealtimeStartFields["architecture"].Required ||
+	if threadRealtimeStartFields["clientManagedHandoffs"].GoType != "*protocolv2.Nullable[bool]" ||
+		threadRealtimeStartFields["clientManagedHandoffs"].Required ||
+		threadRealtimeStartFields["codexResponseHandoffPrefix"].GoType != "*protocolv2.Nullable[string]" ||
+		threadRealtimeStartFields["codexResponseHandoffPrefix"].Required ||
 		threadRealtimeStartFields["codexResponseItemPrefix"].GoType != "*protocolv2.Nullable[string]" ||
 		threadRealtimeStartFields["codexResponseItemPrefix"].Required ||
 		threadRealtimeStartFields["codexResponsesAsItems"].GoType != "*protocolv2.Nullable[bool]" ||
@@ -2662,7 +2673,7 @@ func TestSelectGeneratedEnums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(enums), 105; got != want {
+	if got, want := len(enums), 107; got != want {
 		t.Fatalf("selected generated enum count = %d, want %d", got, want)
 	}
 	enumByName := map[string]EnumPlan{}
@@ -2699,6 +2710,7 @@ func TestSelectGeneratedEnums(t *testing.T) {
 		"ThreadMemoryMode",
 		"ThreadStartSource",
 		"ThreadUnsubscribeStatus",
+		"WorkspaceMessageType",
 		"WindowsSandboxReadiness",
 	} {
 		if _, ok := enumByName[name]; !ok {
@@ -3317,7 +3329,7 @@ func TestPermissionApprovalDefinitionsStayShared(t *testing.T) {
 	for _, name := range []string{
 		"AdditionalFileSystemPermissions",
 		"AdditionalNetworkPermissions",
-		"ApiPathString",
+		"LegacyAppPathString",
 		"FileSystemAccessMode",
 		"FileSystemPath",
 		"FileSystemSandboxEntry",
@@ -3598,7 +3610,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if clientRequest.Discriminator != "method" {
 		t.Fatalf("ClientRequest discriminator = %q, want method", clientRequest.Discriminator)
 	}
-	if got, want := len(clientRequest.Variants), 119; got != want {
+	if got, want := len(clientRequest.Variants), 121; got != want {
 		t.Fatalf("ClientRequest variant count = %d, want %d", got, want)
 	}
 	var threadStartRequest TaggedUnionVariantPlan
@@ -3639,7 +3651,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverNotification.Discriminator != "method" {
 		t.Fatalf("ServerNotification discriminator = %q, want method", serverNotification.Discriminator)
 	}
-	if got, want := len(serverNotification.Variants), 66; got != want {
+	if got, want := len(serverNotification.Variants), 68; got != want {
 		t.Fatalf("ServerNotification variant count = %d, want %d", got, want)
 	}
 	var errorNotification TaggedUnionVariantPlan
@@ -3681,7 +3693,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverRequest.Discriminator != "method" {
 		t.Fatalf("ServerRequest discriminator = %q, want method", serverRequest.Discriminator)
 	}
-	if got, want := len(serverRequest.Variants), 10; got != want {
+	if got, want := len(serverRequest.Variants), 11; got != want {
 		t.Fatalf("ServerRequest variant count = %d, want %d", got, want)
 	}
 	var commandApprovalRequest TaggedUnionVariantPlan
@@ -3780,7 +3792,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	for _, field := range chatGPTAccount.Fields {
 		accountFields[field.FieldName] = field
 	}
-	if accountFields["email"].GoType != "string" || accountFields["planType"].GoType != "PlanType" {
+	if accountFields["email"].GoType != "protocolv2.Nullable[string]" || accountFields["planType"].GoType != "PlanType" {
 		t.Fatalf("chatgpt account fields = %#v", accountFields)
 	}
 

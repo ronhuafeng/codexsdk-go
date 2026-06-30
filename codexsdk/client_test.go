@@ -2273,7 +2273,7 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		t.Fatalf("account/read response = %#v", account)
 	}
 	accountChatGPT, ok := account.Account.Value.AsChatGPT()
-	if !ok || accountChatGPT.Email != "user@example.test" || accountChatGPT.PlanType != protocolv2.PlanTypePlus {
+	if !ok || accountChatGPT.Email.Value == nil || *accountChatGPT.Email.Value != "user@example.test" || accountChatGPT.PlanType != protocolv2.PlanTypePlus {
 		t.Fatalf("account/read account variant = %#v", account.Account.Value)
 	}
 	nudge, err := accounts.SendAddCreditsNudgeEmail(context.Background(), protocolv2.SendAddCreditsNudgeEmailParams{
@@ -6192,7 +6192,7 @@ func runFakeAppServer(mode string, extra []string) {
 			if mode == "facade" {
 				sendProtocolResult(id, protocolv2.GetAccountResponse{
 					Account: protocolv2.Value(protocolv2.NewAccountChatGPT(protocolv2.AccountChatGPT{
-						Email:    "user@example.test",
+						Email:    *protocolv2.Value("user@example.test"),
 						PlanType: protocolv2.PlanTypePlus,
 					})),
 					RequiresOpenaiAuth: false,

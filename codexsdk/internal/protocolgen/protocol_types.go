@@ -1919,8 +1919,12 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		default:
 			return false
 		}
+	case "v2/ExternalAgentConfigImportHistoriesReadResponse.json":
+		return name == "ExternalAgentConfigImportHistory"
 	case "v2/FsReadDirectoryResponse.json":
 		return name == "FsReadDirectoryEntry"
+	case "v2/GetWorkspaceMessagesResponse.json":
+		return name == "WorkspaceMessage"
 	case "v2/GetAccountRateLimitsResponse.json":
 		switch name {
 		case "CreditsSnapshot",
@@ -2041,6 +2045,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 			"HookPromptFragment",
 			"McpToolCallError",
 			"McpToolCallResult",
+			"McpToolCallAppContext",
 			"MemoryCitation",
 			"MemoryCitationEntry",
 			"Turn",
@@ -2067,7 +2072,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		}
 	case "v2/ThreadResumeParams.json":
 		switch name {
-		case "ResponseItemMetadata", "ThreadResumeInitialTurnsPageParams":
+		case "InternalChatMessageMetadataPassthrough", "ThreadResumeInitialTurnsPageParams":
 			return true
 		default:
 			return false
@@ -2150,6 +2155,8 @@ func reviewedMixedUnionStructDependencyNames() []string {
 func reviewedTaggedUnionStructDependencyNames() []string {
 	return []string{
 		"FileSystemSandboxEntry",
+		"InternalChatMessageMetadataPassthrough",
+		"McpToolCallAppContext",
 		"PermissionProfileNetworkPermissions",
 		"ReasoningEffort",
 		"TextElement",

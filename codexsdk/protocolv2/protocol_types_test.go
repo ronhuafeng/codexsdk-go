@@ -1776,7 +1776,7 @@ func TestGeneratedGetAccountParamsOmitOptionalFields(t *testing.T) {
 func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 	response := GetAccountResponse{
 		Account: Value(NewAccountChatGPT(AccountChatGPT{
-			Email:    "user@example.test",
+			Email:    *Value("user@example.test"),
 			PlanType: PlanTypePlus,
 		})),
 		RequiresOpenaiAuth: false,
@@ -1800,7 +1800,7 @@ func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 }
 
 func TestGeneratedAccountUnionMarshalAndAccessors(t *testing.T) {
-	account := NewAccountAmazonBedrock()
+	account := NewAccountAmazonBedrock(AccountAmazonBedrock{})
 	if account.Kind() != AccountKindAmazonBedrock {
 		t.Fatalf("Account kind = %s, want %s", account.Kind(), AccountKindAmazonBedrock)
 	}
@@ -1832,7 +1832,7 @@ func TestGeneratedAccountUnionRejectsMalformedProtocol(t *testing.T) {
 	}
 
 	_, err = json.Marshal(NewAccountChatGPT(AccountChatGPT{
-		Email:    "user@example.test",
+		Email:    *Value("user@example.test"),
 		PlanType: PlanType("bogus"),
 	}))
 	if err == nil {
