@@ -257,6 +257,14 @@ jobs:
               --source-ref-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
               --out /tmp/codexsdk-upstream
 
+      - name: Capture upstream response mappings
+        if: steps.target_policy.outputs.decision == 'allow'
+        run: |
+          set -euo pipefail
+          git -C /tmp/openai-codex show \
+            "${{ steps.refs.outputs.upstream_sha }}:codex-rs/app-server-protocol/src/protocol/common.rs" \
+            > /tmp/codexsdk-upstream/common.rs
+
       - name: Prepare drift issue
         if: steps.target_policy.outputs.decision == 'allow'
         id: drift
@@ -554,6 +562,25 @@ jobs:
           echo "work_branch=${work_branch}" >> "$GITHUB_OUTPUT"
           echo "Temporary work branch: \`${work_branch}\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Apply sync candidate mechanically
+        env:
+          CANDIDATE_DIR: .cache/codexsdk-upstream-${{ needs.detect.outputs.upstream_short_sha }}
+          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
+          UPSTREAM_REF_KIND: ${{ needs.detect.outputs.upstream_ref_kind }}
+          UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/codexsdk-auto-sync
+          python3 scripts/codexsdk_apply_sync_candidate.py \
+            --candidate "${CANDIDATE_DIR}/schema" \
+            --reports "${CANDIDATE_DIR}/reports" \
+            --common-rs "${CANDIDATE_DIR}/common.rs" \
+            --target-ref "${UPSTREAM_REF}" \
+            --target-kind "${UPSTREAM_REF_KIND}" \
+            --target-sha "${UPSTREAM_SHA}" \
+            --json | tee .cache/codexsdk-auto-sync/apply-result.json
+          git diff --name-status > .cache/codexsdk-auto-sync/diff-name-status.txt
+
       - name: Build Codex sync prompt
         env:
           CANDIDATE_DIR: .cache/codexsdk-upstream-${{ needs.detect.outputs.upstream_short_sha }}
@@ -570,7 +597,7 @@ jobs:
 
           Read and follow .agents/skills/codexsdk-sync-upstream/SKILL.md completely before editing.
 
-          Sync the checked-in Codex app-server protocol baseline to this already-resolved upstream target:
+          This workflow has already applied the large mechanical sync with scripts/codexsdk_apply_sync_candidate.py. Perform a bounded maintainer review of the resulting worktree for this already-resolved upstream target:
 
           - upstream ref: ${UPSTREAM_REF}
           - upstream ref kind: ${UPSTREAM_REF_KIND}
@@ -582,10 +609,16 @@ jobs:
 
           - ${CANDIDATE_DIR}/schema
           - ${CANDIDATE_DIR}/reports
+          - ${CANDIDATE_DIR}/common.rs
 
-          Use those candidate artifacts if their provenance matches the target above. Regenerate only if the candidate provenance is uncertain.
+          Mechanical apply summary:
 
-          Apply the sync in the current worktree only. Do not commit, tag, push, create a PR, dispatch workflows, or close issues. The workflow will validate, commit, rebase, land, tag, and dispatch follow-up checks after you leave the file changes in the worktree.
+          - .cache/codexsdk-auto-sync/apply-result.json
+          - .cache/codexsdk-auto-sync/diff-name-status.txt
+
+          Inspect the apply summary, compact drift reports, and git diff name-status. Confirm there is no obvious provenance, sanitization, manifest, coverage, or generated-code issue. Do not re-copy schemas, re-run the full Rust schema generator, or print large files. Do not try to manually review every generated JSON or Go line.
+
+          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not commit, tag, push, create a PR, dispatch workflows, or close issues. The workflow will validate, commit, rebase, land, tag, and dispatch follow-up checks after you finish.
 
           Keep command output compact. Do not print full schema, report, manifest, coverage, or generated Go files. Avoid chained shell commands because the action sandbox may reject them; run separate focused commands instead.
 

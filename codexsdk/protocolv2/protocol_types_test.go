@@ -1775,17 +1775,14 @@ func TestGeneratedGetAccountParamsOmitOptionalFields(t *testing.T) {
 
 func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 	response := GetAccountResponse{
-		Account: Value(NewAccountChatGPT(AccountChatGPT{
-			Email:    "user@example.test",
-			PlanType: PlanTypePlus,
-		})),
+		Account:            Value(NewAccountAPIKey()),
 		RequiresOpenaiAuth: false,
 	}
 	raw, err := json.Marshal(response)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"account":{"email":"user@example.test","planType":"plus","type":"chatgpt"},"requiresOpenaiAuth":false}`
+	want := `{"account":{"type":"apiKey"},"requiresOpenaiAuth":false}`
 	if got := string(raw); got != want {
 		t.Fatalf("GetAccountResponse JSON = %s, want %s", got, want)
 	}
@@ -1800,24 +1797,24 @@ func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 }
 
 func TestGeneratedAccountUnionMarshalAndAccessors(t *testing.T) {
-	account := NewAccountAmazonBedrock()
-	if account.Kind() != AccountKindAmazonBedrock {
-		t.Fatalf("Account kind = %s, want %s", account.Kind(), AccountKindAmazonBedrock)
+	account := NewAccountAPIKey()
+	if account.Kind() != AccountKindAPIKey {
+		t.Fatalf("Account kind = %s, want %s", account.Kind(), AccountKindAPIKey)
 	}
 	if !account.IsValid() {
 		t.Fatal("constructed Account should be valid")
 	}
-	if _, ok := account.AsAmazonBedrock(); !ok {
-		t.Fatal("AsAmazonBedrock returned false for amazonBedrock variant")
+	if _, ok := account.AsAPIKey(); !ok {
+		t.Fatal("AsAPIKey returned false for apiKey variant")
 	}
 	if _, ok := account.AsChatGPT(); ok {
-		t.Fatal("AsChatGPT returned true for amazonBedrock variant")
+		t.Fatal("AsChatGPT returned true for apiKey variant")
 	}
 	raw, err := json.Marshal(account)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(raw), `{"type":"amazonBedrock"}`; got != want {
+	if got, want := string(raw), `{"type":"apiKey"}`; got != want {
 		t.Fatalf("Account JSON = %s, want %s", got, want)
 	}
 }
@@ -1831,18 +1828,15 @@ func TestGeneratedAccountUnionRejectsMalformedProtocol(t *testing.T) {
 		t.Fatalf("unexpected zero-value Account error: %v", err)
 	}
 
-	_, err = json.Marshal(NewAccountChatGPT(AccountChatGPT{
-		Email:    "user@example.test",
-		PlanType: PlanType("bogus"),
-	}))
+	var account Account
+	err = json.Unmarshal([]byte(`{"type":"chatgpt","email":"user@example.test","planType":"bogus"}`), &account)
 	if err == nil {
-		t.Fatal("expected invalid Account plan type marshal to fail")
+		t.Fatal("expected invalid Account plan type decode to fail")
 	}
 	if !strings.Contains(err.Error(), `invalid PlanType enum value "bogus"`) {
 		t.Fatalf("unexpected invalid Account plan type error: %v", err)
 	}
 
-	var account Account
 	err = json.Unmarshal([]byte(`{"type":"unknown"}`), &account)
 	if err == nil {
 		t.Fatal("expected unknown Account type to fail")

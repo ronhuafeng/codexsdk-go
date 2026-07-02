@@ -1767,6 +1767,8 @@ func isGeneratedDefinitionStringEnumCheckpoint(schemaPath string, name string) b
 		}
 	case "v2/ExperimentalFeatureListResponse.json":
 		return name == "ExperimentalFeatureStage"
+	case "v2/GetWorkspaceMessagesResponse.json":
+		return name == "WorkspaceMessageType"
 	case "v2/ListMcpServerStatusResponse.json":
 		return name == "McpAuthStatus"
 	case "v2/ProcessOutputDeltaNotification.json":
@@ -1814,15 +1816,6 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		default:
 			return false
 		}
-	case "ServerNotification.json":
-		switch name {
-		case "ExternalAgentConfigImportProgressNotification", "ModelSafetyBufferingUpdatedNotification":
-			return true
-		default:
-			return false
-		}
-	case "ServerRequest.json":
-		return name == "CurrentTimeReadParams"
 	case "CommandExecutionRequestApprovalParams.json":
 		switch name {
 		case "AdditionalFileSystemPermissions",
@@ -1919,6 +1912,8 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		default:
 			return false
 		}
+	case "v2/ExternalAgentConfigImportHistoriesReadResponse.json":
+		return name == "ExternalAgentConfigImportHistory"
 	case "v2/ExternalAgentConfigImportCompletedNotification.json":
 		switch name {
 		case "ExternalAgentConfigImportItemTypeFailure",
@@ -1928,6 +1923,8 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		default:
 			return false
 		}
+	case "v2/GetWorkspaceMessagesResponse.json":
+		return name == "WorkspaceMessage"
 	case "v2/FsReadDirectoryResponse.json":
 		return name == "FsReadDirectoryEntry"
 	case "v2/GetAccountRateLimitsResponse.json":

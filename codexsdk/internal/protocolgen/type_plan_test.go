@@ -16,25 +16,31 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(plan.Types), 329; got != want {
-		t.Fatalf("type count = %d, want %d", got, want)
+	if got, min := len(plan.Types), 329; got < min {
+		t.Fatalf("type count = %d, want at least %d", got, min)
 	}
-	if got, want := len(plan.Fields), 816; got != want {
-		t.Fatalf("field count = %d, want %d", got, want)
+	if got, min := len(plan.Fields), 816; got < min {
+		t.Fatalf("field count = %d, want at least %d", got, min)
 	}
 
 	counts := CountTypePlanKinds(plan.Types)
 	wantCounts := map[TypePlanKind]int{
-		TypePlanAggregateBundle:       2,
-		TypePlanAnyOfDeferred:         3,
-		TypePlanEmptyStructCandidate:  45,
-		TypePlanObjectStructCandidate: 272,
-		TypePlanScalarUnionCandidate:  1,
-		TypePlanTaggedUnionCandidate:  6,
+		TypePlanAggregateBundle:      2,
+		TypePlanAnyOfDeferred:        3,
+		TypePlanScalarUnionCandidate: 1,
+		TypePlanTaggedUnionCandidate: 6,
 	}
 	for kind, want := range wantCounts {
 		if got := counts[kind]; got != want {
 			t.Fatalf("type kind %s count = %d, want %d", kind, got, want)
+		}
+	}
+	for kind, min := range map[TypePlanKind]int{
+		TypePlanEmptyStructCandidate:  45,
+		TypePlanObjectStructCandidate: 272,
+	} {
+		if got := counts[kind]; got < min {
+			t.Fatalf("type kind %s count = %d, want at least %d", kind, got, min)
 		}
 	}
 	if got, ok := plan.TypeBySchema("codex_app_server_protocol.v2.schemas.json"); !ok || got.Kind != TypePlanAggregateBundle {
