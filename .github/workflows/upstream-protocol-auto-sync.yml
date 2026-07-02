@@ -232,6 +232,19 @@ jobs:
           set -euo pipefail
           git clone --filter=blob:none --no-checkout https://github.com/openai/codex.git /tmp/openai-codex
 
+      - name: Cache Codex Rust build
+        if: steps.target_policy.outputs.decision == 'allow'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            .cache/cargo-target/codex
+          key: codex-rust-${{ runner.os }}-${{ steps.refs.outputs.upstream_short_sha }}
+          restore-keys: |
+            codex-rust-${{ runner.os }}-
+
       - name: Generate drift report
         if: steps.target_policy.outputs.decision == 'allow'
         run: |
@@ -487,6 +500,18 @@ jobs:
           rustup default stable
           rustup show
 
+      - name: Cache Codex Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            .cache/cargo-target/codex
+          key: codex-rust-${{ runner.os }}-${{ needs.detect.outputs.upstream_short_sha }}
+          restore-keys: |
+            codex-rust-${{ runner.os }}-
+
       - name: Install system build dependencies
         run: |
           sudo apt-get update
@@ -567,6 +592,8 @@ jobs:
 
       - name: Run Codex upstream sync
         uses: openai/codex-action@v1
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/.cache/cargo-target/codex
         with:
           openai-api-key: ${{ secrets.AZURE_OPENAI_API_KEY }}
           responses-api-endpoint: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
