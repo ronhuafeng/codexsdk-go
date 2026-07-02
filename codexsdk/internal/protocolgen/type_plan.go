@@ -888,6 +888,8 @@ func scalarAliasRefGoType(ref string) (string, bool) {
 		return "string", true
 	case "ApiPathString":
 		return "string", true
+	case "LegacyAppPathString":
+		return "string", true
 	case "AbsolutePathBuf":
 		return "string", true
 	case "ThreadId":

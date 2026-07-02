@@ -587,6 +587,8 @@ jobs:
 
           Apply the sync in the current worktree only. Do not commit, tag, push, create a PR, dispatch workflows, or close issues. The workflow will validate, commit, rebase, land, tag, and dispatch follow-up checks after you leave the file changes in the worktree.
 
+          Keep command output compact. Do not print full schema, report, manifest, coverage, or generated Go files. Avoid chained shell commands because the action sandbox may reject them; run separate focused commands instead.
+
           Keep handwritten SDK changes minimal and justify them through reviewed drift. Leave newly discovered experimental or internal upstream surface in generated protocolv2 unless the manifest rules require public SDK exposure.
           EOF
 

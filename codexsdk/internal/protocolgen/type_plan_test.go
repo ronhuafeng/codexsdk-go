@@ -668,6 +668,13 @@ func TestProtocolTypePlanFailsClosedForUnreviewedShape(t *testing.T) {
 	}
 }
 
+func TestScalarAliasRefGoTypeRecognizesLegacyAppPathString(t *testing.T) {
+	goType, ok := scalarAliasRefGoType("#/definitions/LegacyAppPathString")
+	if !ok || goType != "string" {
+		t.Fatalf("LegacyAppPathString alias = (%q, %v), want (string, true)", goType, ok)
+	}
+}
+
 func mustField(t *testing.T, plan ProtocolTypePlan, path string) FieldPlan {
 	t.Helper()
 	field, ok := plan.FieldByPath(path)

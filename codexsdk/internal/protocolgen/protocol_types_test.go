@@ -4701,3 +4701,21 @@ func TestLeafGoTypePeelsNullableArrays(t *testing.T) {
 		t.Fatalf("leafGoType nullable array = %q, want %q", got, want)
 	}
 }
+
+func TestGeneratedDefinitionStructCheckpointsCoverRust0142Drift(t *testing.T) {
+	cases := []struct {
+		schemaPath string
+		name       string
+	}{
+		{"ServerNotification.json", "ExternalAgentConfigImportProgressNotification"},
+		{"ServerNotification.json", "ModelSafetyBufferingUpdatedNotification"},
+		{"ServerRequest.json", "CurrentTimeReadParams"},
+		{"v2/ThreadResumeParams.json", "InternalChatMessageMetadataPassthrough"},
+		{"v2/TurnStartResponse.json", "McpToolCallAppContext"},
+	}
+	for _, tc := range cases {
+		if !isGeneratedDefinitionStructCheckpoint(tc.schemaPath, tc.name) {
+			t.Fatalf("%s %s was not selected as a generated definition struct checkpoint", tc.schemaPath, tc.name)
+		}
+	}
+}

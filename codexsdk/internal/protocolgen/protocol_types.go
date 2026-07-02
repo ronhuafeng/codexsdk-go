@@ -1814,6 +1814,15 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		default:
 			return false
 		}
+	case "ServerNotification.json":
+		switch name {
+		case "ExternalAgentConfigImportProgressNotification", "ModelSafetyBufferingUpdatedNotification":
+			return true
+		default:
+			return false
+		}
+	case "ServerRequest.json":
+		return name == "CurrentTimeReadParams"
 	case "CommandExecutionRequestApprovalParams.json":
 		switch name {
 		case "AdditionalFileSystemPermissions",
@@ -2039,6 +2048,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		case "CollabAgentState",
 			"FileUpdateChange",
 			"HookPromptFragment",
+			"McpToolCallAppContext",
 			"McpToolCallError",
 			"McpToolCallResult",
 			"MemoryCitation",
@@ -2067,7 +2077,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		}
 	case "v2/ThreadResumeParams.json":
 		switch name {
-		case "ResponseItemMetadata", "ThreadResumeInitialTurnsPageParams":
+		case "InternalChatMessageMetadataPassthrough", "ResponseItemMetadata", "ThreadResumeInitialTurnsPageParams":
 			return true
 		default:
 			return false
