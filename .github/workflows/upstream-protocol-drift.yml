@@ -1,4 +1,5 @@
 name: Codex Upstream Protocol Drift
+run-name: Protocol drift ${{ inputs.upstream_ref || 'latest stable' }}
 
 on:
   schedule:
@@ -15,12 +16,22 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: read
-  issues: write
+defaults:
+  run:
+    shell: bash
+
+env:
+  CODEX_UPSTREAM_REPO: https://github.com/openai/codex.git
+  CODEXSDK_DRIFT_ARTIFACT_DIR: /tmp/codexsdk-upstream
+  CODEXSDK_DRIFT_LABEL: protocol-drift
+  CODEXSDK_RUST_TARGET_DIR: .cache/cargo-target/codex
+  CODEXSDK_SCHEMA_BASELINE: codexsdk/internal/protocolschema/appserver/v2
+  CODEXSDK_TARGET_POLICY_JSON: /tmp/codexsdk-target-policy.json
+  CODEXSDK_UPSTREAM_CLONE: /tmp/openai-codex
 
 concurrency:
   group: codex-upstream-protocol-drift
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -28,35 +39,22 @@ jobs:
     name: Detect protocol drift
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      issues: write
 
     steps:
       - name: Check out
         uses: actions/checkout@v7
 
-      - name: Set up Rust
-        run: |
-          rustup default stable
-          rustup show
-
-      - name: Install system build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang \
-            cmake \
-            libasound2-dev \
-            libssl-dev \
-            pkg-config \
-            protobuf-compiler
-
       - name: Resolve upstream baseline
         id: refs
         env:
-          REQUESTED_UPSTREAM_REF: ${{ github.event.inputs.upstream_ref || '' }}
+          REQUESTED_UPSTREAM_REF: ${{ inputs.upstream_ref || '' }}
         run: |
           set -euo pipefail
 
-          remote="https://github.com/openai/codex.git"
+          remote="${CODEX_UPSTREAM_REPO}"
           requested_ref="${REQUESTED_UPSTREAM_REF}"
           requested_ref="${requested_ref#"${requested_ref%%[![:space:]]*}"}"
           requested_ref="${requested_ref%"${requested_ref##*[![:space:]]}"}"
@@ -118,9 +116,10 @@ jobs:
           fi
           baseline_sha="$(python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
 
-          metadata = json.loads(Path("codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json").read_text())
+          metadata = json.loads(Path(os.environ["CODEXSDK_SCHEMA_BASELINE"], "baseline_metadata.json").read_text())
           print(metadata["source_commit"])
           PY
           )"
@@ -128,6 +127,7 @@ jobs:
           echo "upstream_ref=${upstream_ref}" >> "$GITHUB_OUTPUT"
           echo "upstream_ref_kind=${upstream_ref_kind}" >> "$GITHUB_OUTPUT"
           echo "upstream_sha=${upstream_sha}" >> "$GITHUB_OUTPUT"
+          echo "upstream_short_sha=${upstream_sha:0:12}" >> "$GITHUB_OUTPUT"
           echo "baseline_sha=${baseline_sha}" >> "$GITHUB_OUTPUT"
           echo "target_explicit=${target_explicit}" >> "$GITHUB_OUTPUT"
 
@@ -143,7 +143,7 @@ jobs:
       - name: Evaluate target policy
         id: target_policy
         env:
-          ALLOW_DOWNGRADE: ${{ github.event.inputs.allow_downgrade || 'false' }}
+          ALLOW_DOWNGRADE: ${{ inputs.allow_downgrade || false }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
@@ -155,7 +155,7 @@ jobs:
 
           policy_json="$(
             python3 scripts/codexsdk_target_policy.py \
-              --baseline codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json \
+              --baseline "${CODEXSDK_SCHEMA_BASELINE}/baseline_metadata.json" \
               --target-ref "${{ steps.refs.outputs.upstream_ref }}" \
               --target-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
               --target-sha "${{ steps.refs.outputs.upstream_sha }}" \
@@ -164,14 +164,14 @@ jobs:
               --allow-downgrade "${ALLOW_DOWNGRADE}" \
               --json
           )"
-          printf '%s\n' "${policy_json}" | tee /tmp/codexsdk-target-policy.json
+          printf '%s\n' "${policy_json}" | tee "${CODEXSDK_TARGET_POLICY_JSON}"
 
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          policy = json.loads(Path("/tmp/codexsdk-target-policy.json").read_text())
+          policy = json.loads(Path(os.environ["CODEXSDK_TARGET_POLICY_JSON"]).read_text())
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               for key in (
                   "decision",
@@ -192,8 +192,8 @@ jobs:
             echo
             echo "## Target policy"
             echo
-            echo "- Decision: \`$(python3 -c 'import json; print(json.load(open("/tmp/codexsdk-target-policy.json"))["decision"])')\`"
-            echo "- Reason: $(python3 -c 'import json; print(json.load(open("/tmp/codexsdk-target-policy.json"))["reason"])')"
+            echo "- Decision: \`$(jq -r '.decision' "${CODEXSDK_TARGET_POLICY_JSON}")\`"
+            echo "- Reason: $(jq -r '.reason' "${CODEXSDK_TARGET_POLICY_JSON}")"
             echo "- Baseline target: \`${{ steps.refs.outputs.baseline_sha }}\`"
             echo "- Requested target: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_ref_kind }}\`)"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -217,7 +217,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          label="protocol-drift"
+          label="${CODEXSDK_DRIFT_LABEL}"
           issue_number="$(
             gh issue list \
               --state open \
@@ -240,19 +240,25 @@ jobs:
       - name: Clone upstream Codex
         if: steps.target_policy.outputs.decision == 'allow'
         run: |
-          set -euo pipefail
-          git clone --filter=blob:none --no-checkout https://github.com/openai/codex.git /tmp/openai-codex
+          git clone --filter=blob:none --no-checkout "${CODEX_UPSTREAM_REPO}" "${CODEXSDK_UPSTREAM_CLONE}"
+
+      - name: Set up Codex Rust
+        if: steps.target_policy.outputs.decision == 'allow'
+        uses: ./.github/actions/setup-codex-rust
+        with:
+          cache-key-suffix: ${{ steps.refs.outputs.upstream_short_sha }}
+          target-dir: ${{ env.CODEXSDK_RUST_TARGET_DIR }}
 
       - name: Generate drift report
         if: steps.target_policy.outputs.decision == 'allow'
         run: |
-          set -euo pipefail
-          scripts/codexsdk_track_upstream.sh \
-            --codex-repo /tmp/openai-codex \
+          CARGO_TARGET_DIR="$PWD/${CODEXSDK_RUST_TARGET_DIR}" \
+            scripts/codexsdk_track_upstream.sh \
+            --codex-repo "${CODEXSDK_UPSTREAM_CLONE}" \
             --commit "${{ steps.refs.outputs.upstream_sha }}" \
             --source-ref "${{ steps.refs.outputs.upstream_ref }}" \
             --source-ref-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
-            --out /tmp/codexsdk-upstream
+            --out "${CODEXSDK_DRIFT_ARTIFACT_DIR}"
 
       - name: Prepare drift issue
         if: steps.target_policy.outputs.decision == 'allow'
@@ -265,7 +271,7 @@ jobs:
           import os
           from pathlib import Path
 
-          reports = Path("/tmp/codexsdk-upstream/reports")
+          reports = Path(os.environ["CODEXSDK_DRIFT_ARTIFACT_DIR"], "reports")
           drift_path = reports / "drift_summary.json"
           drift = json.loads(drift_path.read_text())
           drift_sha = hashlib.sha256(drift_path.read_bytes()).hexdigest()
@@ -368,9 +374,10 @@ jobs:
           - Workflow run: {run_url}
           """
 
-          Path("/tmp/codexsdk-upstream/issue-title.txt").write_text(title + "\n")
-          Path("/tmp/codexsdk-upstream/issue-body.md").write_text(body)
-          Path("/tmp/codexsdk-upstream/issue-comment.md").write_text(comment)
+          artifact_dir = Path(os.environ["CODEXSDK_DRIFT_ARTIFACT_DIR"])
+          Path(artifact_dir, "issue-title.txt").write_text(title + "\n")
+          Path(artifact_dir, "issue-body.md").write_text(body)
+          Path(artifact_dir, "issue-comment.md").write_text(comment)
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"status={status}\n")
@@ -387,7 +394,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}
-          path: /tmp/codexsdk-upstream/reports
+          path: ${{ env.CODEXSDK_DRIFT_ARTIFACT_DIR }}/reports
           if-no-files-found: error
 
       - name: Update workflow summary
@@ -399,7 +406,7 @@ jobs:
             echo "- Drift status: \`${{ steps.drift.outputs.status }}\`"
             echo "- Drift fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`"
             echo
-            cat /tmp/codexsdk-upstream/reports/SUMMARY.md
+            cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/reports/SUMMARY.md"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close drift issue when drift is clean
@@ -407,7 +414,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          label="protocol-drift"
+          label="${CODEXSDK_DRIFT_LABEL}"
           issue_number="$(
             gh issue list \
               --state open \
@@ -432,7 +439,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          label="protocol-drift"
+          label="${CODEXSDK_DRIFT_LABEL}"
           gh label create "$label" \
             --description "Upstream Codex app-server protocol drift needs review" \
             --color "BFDADC" \
@@ -455,24 +462,24 @@ jobs:
                 | head -n 1 \
                 | tr -d '\r'
             )"
-            title="$(cat /tmp/codexsdk-upstream/issue-title.txt)"
+            title="$(cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-title.txt")"
 
             gh issue edit "$issue_number" \
               --title "$title" \
-              --body-file /tmp/codexsdk-upstream/issue-body.md
+              --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-body.md"
 
             if [[ "$existing_drift_sha" == "${{ steps.drift.outputs.drift_sha }}" ]]; then
               echo "Updated existing drift issue #${issue_number}; fingerprint unchanged, so no comment was added." >> "$GITHUB_STEP_SUMMARY"
             else
-              gh issue comment "$issue_number" --body-file /tmp/codexsdk-upstream/issue-comment.md
+              gh issue comment "$issue_number" --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-comment.md"
               echo "Updated existing drift issue #${issue_number} and added a comment for the new fingerprint." >> "$GITHUB_STEP_SUMMARY"
             fi
           else
-            title="$(cat /tmp/codexsdk-upstream/issue-title.txt)"
+            title="$(cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-title.txt")"
             new_issue_url="$(
               gh issue create \
                 --title "$title" \
-                --body-file /tmp/codexsdk-upstream/issue-body.md \
+                --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-body.md" \
                 --label "$label"
             )"
             echo "Created drift issue: ${new_issue_url}" >> "$GITHUB_STEP_SUMMARY"
