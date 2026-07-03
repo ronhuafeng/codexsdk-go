@@ -1,6 +1,6 @@
 {
   "status": "empty",
-  "source": "drift_report.json",
+  "source": "drift_summary.json",
   "valid_statuses": [
     "supported",
     "supported-generated",
