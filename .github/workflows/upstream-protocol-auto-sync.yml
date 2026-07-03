@@ -3,7 +3,7 @@ run-name: Protocol sync ${{ inputs.upstream_ref || 'latest stable' }} -> ${{ inp
 
 on:
   schedule:
-    - cron: "30 10 * * 1-5"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       upstream_ref:

@@ -8,18 +8,15 @@
     "threadId"
   ],
   "properties": {
-    "clientManagedHandoffs": {
-      "description": "Leaves Codex response handoffs to the client's explicit append calls instead of forwarding them automatically. Defaults to false.",
-      "type": [
-        "boolean",
-        "null"
-      ]
-    },
-    "codexResponseHandoffPrefix": {
-      "description": "Optional prefix added to automatic V1 Codex commentary sent with `conversation.handoff.append` when `codexResponsesAsItems` is not true. Final answers are sent without the prefix.",
-      "type": [
-        "string",
-        "null"
+    "architecture": {
+      "description": "Overrides the configured realtime architecture for this session only.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RealtimeConversationArchitecture"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "codexResponseItemPrefix": {
@@ -106,6 +103,13 @@
     }
   },
   "definitions": {
+    "RealtimeConversationArchitecture": {
+      "type": "string",
+      "enum": [
+        "realtimeapi",
+        "avas"
+      ]
+    },
     "RealtimeConversationVersion": {
       "type": "string",
       "enum": [

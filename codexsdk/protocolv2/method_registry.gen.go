@@ -54,7 +54,6 @@ const (
 	MethodAccountSendAddCreditsNudgeEmail         = "account/sendAddCreditsNudgeEmail"
 	MethodAccountUpdated                          = "account/updated"
 	MethodAccountUsageRead                        = "account/usage/read"
-	MethodAccountWorkspaceMessagesRead            = "account/workspaceMessages/read"
 	MethodAppList                                 = "app/list"
 	MethodAppListUpdated                          = "app/list/updated"
 	MethodApplyPatchApproval                      = "applyPatchApproval"
@@ -71,7 +70,6 @@ const (
 	MethodConfigValueWrite                        = "config/value/write"
 	MethodConfigRequirementsRead                  = "configRequirements/read"
 	MethodConfigWarning                           = "configWarning"
-	MethodCurrentTimeRead                         = "currentTime/read"
 	MethodDeprecationNotice                       = "deprecationNotice"
 	MethodEnvironmentAdd                          = "environment/add"
 	MethodError                                   = "error"
@@ -81,8 +79,6 @@ const (
 	MethodExternalAgentConfigDetect               = "externalAgentConfig/detect"
 	MethodExternalAgentConfigImport               = "externalAgentConfig/import"
 	MethodExternalAgentConfigImportCompleted      = "externalAgentConfig/import/completed"
-	MethodExternalAgentConfigImportProgress       = "externalAgentConfig/import/progress"
-	MethodExternalAgentConfigImportReadHistories  = "externalAgentConfig/import/readHistories"
 	MethodFeedbackUpload                          = "feedback/upload"
 	MethodFSChanged                               = "fs/changed"
 	MethodFSCopy                                  = "fs/copy"
@@ -139,7 +135,6 @@ const (
 	MethodMockExperimentalMethod                  = "mock/experimentalMethod"
 	MethodModelList                               = "model/list"
 	MethodModelRerouted                           = "model/rerouted"
-	MethodModelSafetyBufferingUpdated             = "model/safetyBuffering/updated"
 	MethodModelVerification                       = "model/verification"
 	MethodModelProviderCapabilitiesRead           = "modelProvider/capabilities/read"
 	MethodPermissionProfileList                   = "permissionProfile/list"
@@ -378,17 +373,6 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Accounts().UsageRead",
 		Stability:             MethodStabilityStable,
 	},
-	MethodAccountWorkspaceMessagesRead: {
-		Method:                MethodAccountWorkspaceMessagesRead,
-		Direction:             MethodDirectionClientToServer,
-		Kind:                  MethodKindRequest,
-		Family:                "account",
-		ParamsOrPayloadSchema: "",
-		ResponseSchema:        "v2/GetWorkspaceMessagesResponse.json",
-		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
-		FacadeTarget:          "Accounts().WorkspaceMessagesRead",
-		Stability:             MethodStabilityStable,
-	},
 	MethodAppList: {
 		Method:                MethodAppList,
 		Direction:             MethodDirectionClientToServer,
@@ -565,17 +549,6 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "ServerNotifications().ConfigWarning",
 		Stability:             MethodStabilityStable,
 	},
-	MethodCurrentTimeRead: {
-		Method:                MethodCurrentTimeRead,
-		Direction:             MethodDirectionServerToClient,
-		Kind:                  MethodKindRequest,
-		Family:                "currentTime",
-		ParamsOrPayloadSchema: "CurrentTimeReadParams",
-		ResponseSchema:        "CurrentTimeReadResponse.json",
-		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
-		FacadeTarget:          "ServerRequests().CurrentTimeRead",
-		Stability:             MethodStabilityExperimental,
-	},
 	MethodDeprecationNotice: {
 		Method:                MethodDeprecationNotice,
 		Direction:             MethodDirectionServerToClient,
@@ -673,28 +646,6 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "",
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportCompleted",
-		Stability:             MethodStabilityStable,
-	},
-	MethodExternalAgentConfigImportProgress: {
-		Method:                MethodExternalAgentConfigImportProgress,
-		Direction:             MethodDirectionServerToClient,
-		Kind:                  MethodKindNotification,
-		Family:                "externalAgentConfig",
-		ParamsOrPayloadSchema: "ExternalAgentConfigImportProgressNotification",
-		ResponseSchema:        "",
-		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
-		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportProgress",
-		Stability:             MethodStabilityStable,
-	},
-	MethodExternalAgentConfigImportReadHistories: {
-		Method:                MethodExternalAgentConfigImportReadHistories,
-		Direction:             MethodDirectionClientToServer,
-		Kind:                  MethodKindRequest,
-		Family:                "externalAgentConfig",
-		ParamsOrPayloadSchema: "",
-		ResponseSchema:        "v2/ExternalAgentConfigImportHistoriesReadResponse.json",
-		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
-		FacadeTarget:          "ExternalAgentConfigs().ImportReadHistories",
 		Stability:             MethodStabilityStable,
 	},
 	MethodFeedbackUpload: {
@@ -1311,17 +1262,6 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "",
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().ModelRerouted",
-		Stability:             MethodStabilityStable,
-	},
-	MethodModelSafetyBufferingUpdated: {
-		Method:                MethodModelSafetyBufferingUpdated,
-		Direction:             MethodDirectionServerToClient,
-		Kind:                  MethodKindNotification,
-		Family:                "model",
-		ParamsOrPayloadSchema: "ModelSafetyBufferingUpdatedNotification",
-		ResponseSchema:        "",
-		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
-		FacadeTarget:          "ServerNotifications().ModelSafetyBufferingUpdated",
 		Stability:             MethodStabilityStable,
 	},
 	MethodModelVerification: {

@@ -83,7 +83,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/ApiPathString"
           }
         },
         "write": {
@@ -93,7 +93,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/ApiPathString"
           }
         }
       }
@@ -108,6 +108,9 @@
           ]
         }
       }
+    },
+    "ApiPathString": {
+      "type": "string"
     },
     "AutoReviewDecisionSource": {
       "description": "[UNSTABLE] Source that produced a terminal approval auto-review decision.",
@@ -134,7 +137,7 @@
           ],
           "properties": {
             "path": {
-              "$ref": "#/definitions/LegacyAppPathString"
+              "$ref": "#/definitions/ApiPathString"
             },
             "type": {
               "type": "string",
@@ -583,9 +586,6 @@
         "medium",
         "high"
       ]
-    },
-    "LegacyAppPathString": {
-      "type": "string"
     },
     "NetworkApprovalProtocol": {
       "type": "string",

@@ -78,8 +78,7 @@
       "type": "string",
       "enum": [
         "created_at",
-        "updated_at",
-        "recency_at"
+        "updated_at"
       ]
     },
     "ThreadSourceKind": {
