@@ -2878,7 +2878,7 @@ func TestThreadTurnsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *
 	threads := root.Threads()
 	turnsList, err := threads.TurnsList(context.Background(), protocolv2.ThreadTurnsListParams{
 		Cursor:        protocolv2.Value("cursor-1"),
-		ItemsView:     protocolv2.Value(protocolv2.NewTurnItemsViewSummary()),
+		ItemsView:     protocolv2.Value(protocolv2.TurnItemsViewSummary),
 		Limit:         protocolv2.Value(uint32(5)),
 		SortDirection: protocolv2.Value(protocolv2.SortDirectionDesc),
 		ThreadID:      "thread-1",
@@ -6965,7 +6965,7 @@ func facadeThreadGoal(threadID string, objective string, status protocolv2.Threa
 }
 
 func facadeThreadTurn(turnID string, items []protocolv2.ThreadItem) protocolv2.Turn {
-	view := protocolv2.NewTurnItemsViewFull()
+	view := protocolv2.TurnItemsViewFull
 	return protocolv2.Turn{
 		CompletedAt: protocolv2.Value(int64(2000)),
 		DurationMS:  protocolv2.Value(int64(1000)),

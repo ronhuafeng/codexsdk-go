@@ -2427,6 +2427,44 @@ func (value *MergeStrategy) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type MessagePhase string
+
+const (
+	MessagePhaseCommentary  MessagePhase = "commentary"
+	MessagePhaseFinalAnswer MessagePhase = "final_answer"
+)
+
+func (value MessagePhase) IsValid() bool {
+	switch value {
+	case MessagePhaseCommentary:
+		return true
+	case MessagePhaseFinalAnswer:
+		return true
+	default:
+		return false
+	}
+}
+
+func (value MessagePhase) MarshalJSON() ([]byte, error) {
+	if !value.IsValid() {
+		return nil, invalidEnumValue("MessagePhase", string(value))
+	}
+	return json.Marshal(string(value))
+}
+
+func (value *MessagePhase) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	parsed := MessagePhase(raw)
+	if !parsed.IsValid() {
+		return invalidEnumValue("MessagePhase", raw)
+	}
+	*value = parsed
+	return nil
+}
+
 type ModeKind string
 
 const (
@@ -4280,6 +4318,47 @@ func (value *ThreadUnsubscribeStatus) UnmarshalJSON(data []byte) error {
 	parsed := ThreadUnsubscribeStatus(raw)
 	if !parsed.IsValid() {
 		return invalidEnumValue("ThreadUnsubscribeStatus", raw)
+	}
+	*value = parsed
+	return nil
+}
+
+type TurnItemsView string
+
+const (
+	TurnItemsViewNotLoaded TurnItemsView = "notLoaded"
+	TurnItemsViewSummary   TurnItemsView = "summary"
+	TurnItemsViewFull      TurnItemsView = "full"
+)
+
+func (value TurnItemsView) IsValid() bool {
+	switch value {
+	case TurnItemsViewNotLoaded:
+		return true
+	case TurnItemsViewSummary:
+		return true
+	case TurnItemsViewFull:
+		return true
+	default:
+		return false
+	}
+}
+
+func (value TurnItemsView) MarshalJSON() ([]byte, error) {
+	if !value.IsValid() {
+		return nil, invalidEnumValue("TurnItemsView", string(value))
+	}
+	return json.Marshal(string(value))
+}
+
+func (value *TurnItemsView) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	parsed := TurnItemsView(raw)
+	if !parsed.IsValid() {
+		return invalidEnumValue("TurnItemsView", raw)
 	}
 	*value = parsed
 	return nil
@@ -23408,110 +23487,6 @@ func (value *CommandExecutionApprovalDecision) UnmarshalJSON(data []byte) error 
 	}
 }
 
-type MessagePhaseKind string
-
-const (
-	MessagePhaseKindCommentary  MessagePhaseKind = "commentary"
-	MessagePhaseKindFinalAnswer MessagePhaseKind = "final_answer"
-)
-
-type MessagePhase struct {
-	kind               MessagePhaseKind
-	variantCommentary  *MessagePhaseCommentary
-	variantFinalAnswer *MessagePhaseFinalAnswer
-}
-
-type MessagePhaseCommentary struct{}
-
-type MessagePhaseFinalAnswer struct{}
-
-func NewMessagePhaseCommentary() MessagePhase {
-	payload := MessagePhaseCommentary{}
-	return MessagePhase{kind: MessagePhaseKindCommentary, variantCommentary: &payload}
-}
-
-func NewMessagePhaseFinalAnswer() MessagePhase {
-	payload := MessagePhaseFinalAnswer{}
-	return MessagePhase{kind: MessagePhaseKindFinalAnswer, variantFinalAnswer: &payload}
-}
-
-func (value MessagePhase) Kind() MessagePhaseKind {
-	return value.kind
-}
-
-func (value MessagePhase) IsValid() bool {
-	switch value.kind {
-	case MessagePhaseKindCommentary:
-		return value.variantCommentary != nil
-	case MessagePhaseKindFinalAnswer:
-		return value.variantFinalAnswer != nil
-	default:
-		return false
-	}
-}
-
-func (value MessagePhase) AsCommentary() (MessagePhaseCommentary, bool) {
-	if value.kind != MessagePhaseKindCommentary || value.variantCommentary == nil {
-		return MessagePhaseCommentary{}, false
-	}
-	return *value.variantCommentary, true
-}
-
-func (value MessagePhase) AsFinalAnswer() (MessagePhaseFinalAnswer, bool) {
-	if value.kind != MessagePhaseKindFinalAnswer || value.variantFinalAnswer == nil {
-		return MessagePhaseFinalAnswer{}, false
-	}
-	return *value.variantFinalAnswer, true
-}
-
-func (value MessagePhase) MarshalJSON() ([]byte, error) {
-	switch value.kind {
-	case MessagePhaseKindCommentary:
-		if value.variantCommentary == nil {
-			return nil, invalidUnionVariant("MessagePhase", "commentary")
-		}
-		return json.Marshal("commentary")
-	case MessagePhaseKindFinalAnswer:
-		if value.variantFinalAnswer == nil {
-			return nil, invalidUnionVariant("MessagePhase", "final_answer")
-		}
-		return json.Marshal("final_answer")
-	default:
-		return nil, invalidUnionValue("MessagePhase")
-	}
-}
-
-func (value *MessagePhase) UnmarshalJSON(data []byte) error {
-	decoded, err := ParseJSONValue(data)
-	if err != nil {
-		return fmt.Errorf("decode MessagePhase: %w", err)
-	}
-	switch decoded.Kind() {
-	case JSONKindString:
-		variant, _ := decoded.AsString()
-		switch variant {
-		case "commentary":
-			payload := MessagePhaseCommentary{}
-			*value = MessagePhase{kind: MessagePhaseKindCommentary, variantCommentary: &payload}
-			return nil
-		case "final_answer":
-			payload := MessagePhaseFinalAnswer{}
-			*value = MessagePhase{kind: MessagePhaseKindFinalAnswer, variantFinalAnswer: &payload}
-			return nil
-		default:
-			return unknownUnionVariant("MessagePhase", "value", variant)
-		}
-	case JSONKindObject:
-		fields, _ := decoded.AsObject()
-		if len(fields) == 0 {
-			return fmt.Errorf("decode MessagePhase: expected one object variant")
-		}
-		return rejectUnexpectedFields(fields, "MessagePhase")
-	default:
-		return fmt.Errorf("decode MessagePhase: expected string or object")
-	}
-}
-
 type ReviewDecisionKind string
 
 const (
@@ -24333,137 +24308,6 @@ func (value *SubAgentSource) UnmarshalJSON(data []byte) error {
 		return rejectUnexpectedFields(fields, "SubAgentSource")
 	default:
 		return fmt.Errorf("decode SubAgentSource: expected string or object")
-	}
-}
-
-type TurnItemsViewKind string
-
-const (
-	TurnItemsViewKindNotLoaded TurnItemsViewKind = "notLoaded"
-	TurnItemsViewKindSummary   TurnItemsViewKind = "summary"
-	TurnItemsViewKindFull      TurnItemsViewKind = "full"
-)
-
-type TurnItemsView struct {
-	kind             TurnItemsViewKind
-	variantNotLoaded *TurnItemsViewNotLoaded
-	variantSummary   *TurnItemsViewSummary
-	variantFull      *TurnItemsViewFull
-}
-
-type TurnItemsViewNotLoaded struct{}
-
-type TurnItemsViewSummary struct{}
-
-type TurnItemsViewFull struct{}
-
-func NewTurnItemsViewNotLoaded() TurnItemsView {
-	payload := TurnItemsViewNotLoaded{}
-	return TurnItemsView{kind: TurnItemsViewKindNotLoaded, variantNotLoaded: &payload}
-}
-
-func NewTurnItemsViewSummary() TurnItemsView {
-	payload := TurnItemsViewSummary{}
-	return TurnItemsView{kind: TurnItemsViewKindSummary, variantSummary: &payload}
-}
-
-func NewTurnItemsViewFull() TurnItemsView {
-	payload := TurnItemsViewFull{}
-	return TurnItemsView{kind: TurnItemsViewKindFull, variantFull: &payload}
-}
-
-func (value TurnItemsView) Kind() TurnItemsViewKind {
-	return value.kind
-}
-
-func (value TurnItemsView) IsValid() bool {
-	switch value.kind {
-	case TurnItemsViewKindNotLoaded:
-		return value.variantNotLoaded != nil
-	case TurnItemsViewKindSummary:
-		return value.variantSummary != nil
-	case TurnItemsViewKindFull:
-		return value.variantFull != nil
-	default:
-		return false
-	}
-}
-
-func (value TurnItemsView) AsNotLoaded() (TurnItemsViewNotLoaded, bool) {
-	if value.kind != TurnItemsViewKindNotLoaded || value.variantNotLoaded == nil {
-		return TurnItemsViewNotLoaded{}, false
-	}
-	return *value.variantNotLoaded, true
-}
-
-func (value TurnItemsView) AsSummary() (TurnItemsViewSummary, bool) {
-	if value.kind != TurnItemsViewKindSummary || value.variantSummary == nil {
-		return TurnItemsViewSummary{}, false
-	}
-	return *value.variantSummary, true
-}
-
-func (value TurnItemsView) AsFull() (TurnItemsViewFull, bool) {
-	if value.kind != TurnItemsViewKindFull || value.variantFull == nil {
-		return TurnItemsViewFull{}, false
-	}
-	return *value.variantFull, true
-}
-
-func (value TurnItemsView) MarshalJSON() ([]byte, error) {
-	switch value.kind {
-	case TurnItemsViewKindNotLoaded:
-		if value.variantNotLoaded == nil {
-			return nil, invalidUnionVariant("TurnItemsView", "notLoaded")
-		}
-		return json.Marshal("notLoaded")
-	case TurnItemsViewKindSummary:
-		if value.variantSummary == nil {
-			return nil, invalidUnionVariant("TurnItemsView", "summary")
-		}
-		return json.Marshal("summary")
-	case TurnItemsViewKindFull:
-		if value.variantFull == nil {
-			return nil, invalidUnionVariant("TurnItemsView", "full")
-		}
-		return json.Marshal("full")
-	default:
-		return nil, invalidUnionValue("TurnItemsView")
-	}
-}
-
-func (value *TurnItemsView) UnmarshalJSON(data []byte) error {
-	decoded, err := ParseJSONValue(data)
-	if err != nil {
-		return fmt.Errorf("decode TurnItemsView: %w", err)
-	}
-	switch decoded.Kind() {
-	case JSONKindString:
-		variant, _ := decoded.AsString()
-		switch variant {
-		case "notLoaded":
-			payload := TurnItemsViewNotLoaded{}
-			*value = TurnItemsView{kind: TurnItemsViewKindNotLoaded, variantNotLoaded: &payload}
-			return nil
-		case "summary":
-			payload := TurnItemsViewSummary{}
-			*value = TurnItemsView{kind: TurnItemsViewKindSummary, variantSummary: &payload}
-			return nil
-		case "full":
-			payload := TurnItemsViewFull{}
-			*value = TurnItemsView{kind: TurnItemsViewKindFull, variantFull: &payload}
-			return nil
-		default:
-			return unknownUnionVariant("TurnItemsView", "value", variant)
-		}
-	case JSONKindObject:
-		fields, _ := decoded.AsObject()
-		if len(fields) == 0 {
-			return fmt.Errorf("decode TurnItemsView: expected one object variant")
-		}
-		return rejectUnexpectedFields(fields, "TurnItemsView")
-	default:
-		return fmt.Errorf("decode TurnItemsView: expected string or object")
 	}
 }
 
