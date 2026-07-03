@@ -203,31 +203,6 @@
       "title": "Attestation/generateRequest"
     },
     {
-      "description": "Read the current time from an external clock owned by the client.",
-      "type": "object",
-      "required": [
-        "id",
-        "method",
-        "params"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "currentTime/read"
-          ],
-          "title": "CurrentTime/readRequestMethod"
-        },
-        "params": {
-          "$ref": "#/definitions/CurrentTimeReadParams"
-        }
-      },
-      "title": "CurrentTime/readRequest"
-    },
-    {
       "description": "DEPRECATED APIs below Request to approve a patch. This request is used for Turns started via the legacy APIs (i.e. SendUserTurn, SendUserMessage).",
       "type": "object",
       "required": [
@@ -310,7 +285,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/AbsolutePathBuf"
           }
         },
         "write": {
@@ -320,7 +295,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/AbsolutePathBuf"
           }
         }
       }
@@ -678,19 +653,11 @@
           "description": "The command's working directory.",
           "anyOf": [
             {
-              "$ref": "#/definitions/LegacyAppPathString"
+              "$ref": "#/definitions/AbsolutePathBuf"
             },
             {
               "type": "null"
             }
-          ]
-        },
-        "environmentId": {
-          "description": "Environment in which the command will run.",
-          "default": null,
-          "type": [
-            "string",
-            "null"
           ]
         },
         "itemId": {
@@ -743,17 +710,6 @@
           "type": "string"
         },
         "turnId": {
-          "type": "string"
-        }
-      }
-    },
-    "CurrentTimeReadParams": {
-      "type": "object",
-      "required": [
-        "threadId"
-      ],
-      "properties": {
-        "threadId": {
           "type": "string"
         }
       }
@@ -963,7 +919,7 @@
           ],
           "properties": {
             "path": {
-              "$ref": "#/definitions/LegacyAppPathString"
+              "$ref": "#/definitions/AbsolutePathBuf"
             },
             "type": {
               "type": "string",
@@ -1140,9 +1096,6 @@
           }
         }
       ]
-    },
-    "LegacyAppPathString": {
-      "type": "string"
     },
     "McpElicitationArrayType": {
       "type": "string",
@@ -1699,27 +1652,6 @@
             "requestedSchema": {
               "$ref": "#/definitions/McpElicitationSchema"
             }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "message",
-            "mode",
-            "requestedSchema"
-          ],
-          "properties": {
-            "_meta": true,
-            "message": {
-              "type": "string"
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "openai/form"
-              ]
-            },
-            "requestedSchema": true
           }
         },
         {
