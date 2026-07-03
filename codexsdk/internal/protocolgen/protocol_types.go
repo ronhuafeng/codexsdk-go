@@ -209,6 +209,7 @@ func schemaRefName(ref string) string {
 
 func SelectGeneratedEnums(plan ProtocolTypePlan) ([]EnumPlan, error) {
 	byName := map[string]EnumPlan{}
+	schemaByName := map[string][]byte{}
 	for _, typ := range plan.Types {
 		if typ.Schema == nil || isAggregateBundle(typ.SchemaPath) {
 			continue
@@ -221,15 +222,23 @@ func SelectGeneratedEnums(plan ProtocolTypePlan) ([]EnumPlan, error) {
 			if reservedProtocolTypeName(name) {
 				return nil, fmt.Errorf("generated enum %s conflicts with handwritten protocolv2 type", name)
 			}
+			encoded, err := json.Marshal(schema)
+			if err != nil {
+				return nil, fmt.Errorf("generated enum %s in %s cannot be encoded: %w", name, typ.SchemaPath, err)
+			}
 			existing, ok := byName[name]
 			if ok {
 				if !sameStrings(existing.Values, enumValues) {
 					return nil, fmt.Errorf("generated enum %s has conflicting values between %s and %s", name, strings.Join(existing.Sources, ", "), typ.SchemaPath)
 				}
+				if !bytes.Equal(schemaByName[name], encoded) {
+					return nil, fmt.Errorf("generated enum %s has conflicting schemas between %s and %s", name, strings.Join(existing.Sources, ", "), typ.SchemaPath)
+				}
 				existing.Sources = append(existing.Sources, typ.SchemaPath)
 				byName[name] = existing
 				continue
 			}
+			schemaByName[name] = encoded
 			byName[name] = EnumPlan{
 				TypeName: name,
 				Values:   append([]string(nil), enumValues...),
@@ -252,6 +261,7 @@ func SelectGeneratedEnums(plan ProtocolTypePlan) ([]EnumPlan, error) {
 
 func SelectGeneratedScalarAliases(plan ProtocolTypePlan) ([]ScalarAliasPlan, error) {
 	byName := map[string]ScalarAliasPlan{}
+	schemaByName := map[string][]byte{}
 	for _, typ := range plan.Types {
 		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
 			continue
@@ -268,12 +278,20 @@ func SelectGeneratedScalarAliases(plan ProtocolTypePlan) ([]ScalarAliasPlan, err
 					return nil, fmt.Errorf("generated scalar alias %s in %s has unreviewed keyword %s", name, typ.SchemaPath, keyword)
 				}
 			}
+			encoded, err := json.Marshal(schema)
+			if err != nil {
+				return nil, fmt.Errorf("generated scalar alias %s in %s cannot be encoded: %w", name, typ.SchemaPath, err)
+			}
 			existing, ok := byName[name]
 			if ok {
+				if !bytes.Equal(schemaByName[name], encoded) {
+					return nil, fmt.Errorf("generated scalar alias %s has conflicting schemas between %s and %s", name, strings.Join(existing.Sources, ", "), typ.SchemaPath)
+				}
 				existing.Sources = append(existing.Sources, typ.SchemaPath)
 				byName[name] = existing
 				continue
 			}
+			schemaByName[name] = encoded
 			byName[name] = ScalarAliasPlan{
 				TypeName: name,
 				Sources:  []string{typ.SchemaPath},
