@@ -67,6 +67,7 @@ The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine
 - landing ref is `main`
 - the sync commit is validated, rebased onto `origin/main`, and pushed to a `codex/sync-upstream-*` branch
 - the workflow creates or updates a PR against `main`, dispatches the required `Go` CI check on the PR head, and merges the PR through GitHub's protected-branch path
+- sync PRs created by `GITHUB_TOKEN` may require one maintainer approval or rerun before GitHub schedules the required `Go` pull request check; this `action_required` state is an expected GitHub Actions safety gate, not a sync failure
 - if merge queue is enabled for the repository, GitHub may enqueue the PR instead of merging it immediately
 - after a landed stable-tag sync, the workflow creates an upstream sync tag and optionally dispatches drift verification
 
@@ -364,7 +365,13 @@ The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine
 
 11. After publishing a sync PR, monitor repository automation when the task is to solve a drift issue.
 
-   Watch the required `Go` check on the PR head first. After the PR merges into `main`, the Codex Upstream Protocol Drift workflow runs on schedule or `workflow_dispatch`, not ordinary pushes. After the landed `main` CI passes, dispatch it for the selected upstream ref and watch the run:
+   Watch the required `Go` check on the PR head first. If GitHub marks the first pull request CI run as `action_required` with no jobs, a maintainer with write access should approve or rerun that run once:
+
+   ```sh
+   gh run rerun <run-id>
+   ```
+
+   After the real `Go` check passes, GitHub auto-merge should continue without a manual merge. After the PR merges into `main`, the Codex Upstream Protocol Drift workflow runs on schedule or `workflow_dispatch`, not ordinary pushes. After the landed `main` CI passes, dispatch it for the selected upstream ref and watch the run:
 
    ```sh
    gh workflow run upstream-protocol-drift.yml --ref main -f upstream_ref=<target_ref>

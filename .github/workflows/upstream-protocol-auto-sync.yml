@@ -332,6 +332,8 @@ jobs:
           ## Automated Sync
 
           This workflow will attempt a guarded Codex sync, rebase it onto the landing ref, validate it, publish a sync PR, run the required `Go` check on the PR head, and merge through the protected-branch PR path.
+
+          Sync PRs created by `GITHUB_TOKEN` may require one maintainer approval or rerun before GitHub schedules the required `Go` pull request check. If the first PR CI run is `action_required` with no jobs, rerun that run once; auto-merge should continue after the real `Go` check passes.
           """
 
           comment = f"""Protocol drift is still present.
@@ -633,7 +635,11 @@ jobs:
           set -euo pipefail
 
           gh pr merge "${PR_NUMBER}" --auto --rebase
-          echo "Auto-merge requested for sync PR #${PR_NUMBER}." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "Auto-merge requested for sync PR #${PR_NUMBER}."
+            echo
+            echo "If the required \`Go\` pull request check is \`action_required\` with no jobs, a maintainer should approve or rerun that CI run once. This is an expected GitHub Actions safety gate for PRs created by \`GITHUB_TOKEN\`; auto-merge should continue after the real \`Go\` check passes."
+          } >> "$GITHUB_STEP_SUMMARY"
 
           for _ in $(seq 1 120); do
             state="$(
@@ -654,6 +660,7 @@ jobs:
           )"
           if [[ "${state}" != "MERGED" ]]; then
             echo "Sync PR #${PR_NUMBER} was not merged before the workflow timeout window." >&2
+            echo "If the required Go check is action_required with no jobs, rerun that CI run once with maintainer permissions; auto-merge should continue after the real Go check passes." >&2
             gh pr view "${PR_NUMBER}" \
               --json state,mergeStateStatus,reviewDecision,statusCheckRollup \
               --jq '.'
