@@ -608,6 +608,7 @@ jobs:
         id: publish
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}

@@ -70,7 +70,13 @@ if [[ -n "${target_sha}" ]]; then
 fi
 python3 scripts/codexsdk_sync_state.py "${sync_state_args[@]}"
 
-if rg -n '/Users/|/home/|[.]cache/codexsdk-upstream|[.]cache/openai-codex' "${baseline}"; then
+path_scan_pattern='/Users/|/home/|[.]cache/codexsdk-upstream|[.]cache/openai-codex'
+if command -v rg >/dev/null 2>&1; then
+  path_scan=(rg -n "${path_scan_pattern}" "${baseline}")
+else
+  path_scan=(grep -RInE "${path_scan_pattern}" "${baseline}")
+fi
+if "${path_scan[@]}"; then
   echo "checked-in protocol baseline contains local or cache paths" >&2
   exit 1
 fi
