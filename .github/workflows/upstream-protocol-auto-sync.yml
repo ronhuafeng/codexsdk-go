@@ -455,10 +455,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
-      actions: write
       contents: write
       pull-requests: write
-      statuses: write
     outputs:
       landed_commit: ${{ steps.merge.outputs.landed_commit }}
       landed_ref: ${{ steps.merge.outputs.landed_ref }}
@@ -624,67 +622,18 @@ jobs:
           )
           scripts/codexsdk_publish_sync_pr.sh "${args[@]}"
 
-      - name: Dispatch sync PR CI
-        id: pr_ci
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SYNC_BRANCH: ${{ steps.publish.outputs.sync_branch }}
-          SYNC_COMMIT: ${{ steps.publish.outputs.sync_commit }}
-        run: |
-          set -euo pipefail
-          gh workflow run ci.yml --ref "${SYNC_BRANCH}"
-
-          run_id=""
-          for _ in $(seq 1 36); do
-            run_id="$(
-              gh run list \
-                --workflow ci.yml \
-                --branch "${SYNC_BRANCH}" \
-                --limit 20 \
-                --json databaseId,event,headSha \
-                --jq ".[] | select(.headSha == \"${SYNC_COMMIT}\" and .event == \"workflow_dispatch\") | .databaseId" |
-                head -n 1
-            )"
-            if [[ -n "${run_id}" ]]; then
-              break
-            fi
-            sleep 5
-          done
-          if [[ -z "${run_id}" ]]; then
-            echo "Unable to find dispatched CI run for ${SYNC_BRANCH}@${SYNC_COMMIT}." >&2
-            exit 1
-          fi
-          echo "ci_run_id=${run_id}" >> "$GITHUB_OUTPUT"
-          echo "Dispatched sync PR CI run: ${run_id}" >> "$GITHUB_STEP_SUMMARY"
-          gh run watch "${run_id}" --exit-status
-
-          ci_url="$(
-            gh run view "${run_id}" \
-              --json url \
-              --jq '.url'
-          )"
-          gh api \
-            --method POST \
-            "repos/${GITHUB_REPOSITORY}/statuses/${SYNC_COMMIT}" \
-            -f state=success \
-            -f context=Go \
-            -f target_url="${ci_url}" \
-            -f description="CI workflow_dispatch ${run_id} passed"
-          echo "Published required Go status for ${SYNC_COMMIT}." >> "$GITHUB_STEP_SUMMARY"
-
       - name: Merge sync PR
         id: merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
           PR_NUMBER: ${{ steps.publish.outputs.pr_number }}
+          SYNC_BRANCH: ${{ steps.publish.outputs.sync_branch }}
         run: |
           set -euo pipefail
 
-          if ! gh pr merge "${PR_NUMBER}" --rebase; then
-            echo "Immediate PR merge failed; attempting auto or merge-queue merge." >&2
-            gh pr merge "${PR_NUMBER}" --auto --rebase
-          fi
+          gh pr merge "${PR_NUMBER}" --auto --rebase
+          echo "Auto-merge requested for sync PR #${PR_NUMBER}." >> "$GITHUB_STEP_SUMMARY"
 
           for _ in $(seq 1 120); do
             state="$(
@@ -705,6 +654,16 @@ jobs:
           )"
           if [[ "${state}" != "MERGED" ]]; then
             echo "Sync PR #${PR_NUMBER} was not merged before the workflow timeout window." >&2
+            gh pr view "${PR_NUMBER}" \
+              --json state,mergeStateStatus,reviewDecision,statusCheckRollup \
+              --jq '.'
+            gh pr checks "${PR_NUMBER}" || true
+            gh run list \
+              --workflow ci.yml \
+              --branch "${SYNC_BRANCH}" \
+              --limit 10 \
+              --json databaseId,event,status,conclusion,headSha,url \
+              --jq '.'
             exit 1
           fi
 
@@ -719,7 +678,6 @@ jobs:
             echo "- PR: #${PR_NUMBER}"
             echo "- Landing ref: \`${LAND_REF}\`"
             echo "- Landed commit: \`${landed_commit}\`"
-            echo "- CI run: \`${{ steps.pr_ci.outputs.ci_run_id }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   finalize:
