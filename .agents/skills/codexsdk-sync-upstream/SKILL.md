@@ -5,11 +5,11 @@ description: Sync codexsdk-go's checked-in Codex app-server protocol baseline to
 
 # Codex SDK Upstream Sync
 
-## Overview
+## Contract
 
 Update the SDK by treating the checked-in app-server schema baseline as the source for generated Go code. Do not make the SDK follow the local `codex` binary implicitly during normal builds.
 
-Use the repository's tracking script first, then review protocol drift before copying anything into the tree. The helper scripts are report-only by default; they expose inconsistencies and do not auto-update schemas, manifest, coverage, or SDK files.
+Use the repository's tracking script first, then review protocol drift before copying anything into the tree. Helper scripts are report-only or mechanical unless their usage says otherwise; they must not decide the sync strategy.
 
 Tool output contract:
 
@@ -18,17 +18,9 @@ Tool output contract:
 - use `--json` when another command or workflow needs machine-readable stdout
 - treat exit code as the success/failure signal
 
-## Completion Contract
+## Completion Layers
 
-A baseline sync is complete only when:
-
-- checked-in schemas match the selected upstream target
-- baseline metadata and checked-in drift reports are sanitized and clean
-- manifest and coverage no longer reference removed methods, schemas, or fields
-- `protocolv2` generated files reproduce exactly
-- `go vet`, `go test`, generated-output diff, `git diff --check`, and path scan pass
-- if solving a drift issue, pushed CI and the drift workflow pass and the issue closes
-- if a baseline sync commit is pushed, the upstream sync tag is created and pushed
+A baseline sync is complete only when checked-in schemas match the selected upstream target, baseline metadata and checked-in drift reports are sanitized and clean, manifest and coverage no longer reference removed surface, `protocolv2` generated files reproduce exactly, and validation passes.
 
 Every final response must state the highest completed layer:
 
@@ -36,427 +28,49 @@ Every final response must state the highest completed layer:
 - `commit pushed`: the sync commit was pushed, but tag/CI/drift workflow/issue closure are still pending
 - `drift issue fully resolved`: tag, pushed CI, drift workflow, and issue closure are complete when applicable
 
+Do not call a drift issue solved at push time.
+
+## Non-Negotiable Invariants
+
+- Do not push directly to protected `main`.
+- Do not introduce a PAT, GitHub App token, bot-token bypass, or synthetic required status.
+- Do not delete or move upstream sync tags.
+- Do not weaken branch protection or merge around failed required checks.
+- Keep `action_required` documented as an expected maintainer rerun gate for sync PRs created by `GITHUB_TOKEN`.
+- Keep auto-merge on the real protected-branch PR path after the required `Go` check passes.
+- Keep generated reports free of local absolute paths, `.cache` output paths, private repo paths, account data, and raw smoke-test transcripts.
+- Preserve unrelated user changes.
+
+## Reference Routing
+
+Read only the references needed for the task:
+
+- For a local baseline sync, target resolution, drift review, checked-in baseline updates, regeneration, validation, or tagging, read [references/local-sync.md](references/local-sync.md).
+- For the GitHub Actions auto-sync workflow, protected PR path, drift issue behavior, auto-merge behavior, or remote completion layers, read [references/automation.md](references/automation.md).
+- For failed sync PR checks, auto-merge timeouts, finalize failures, drift verification failures, or existing sync tags, read [references/recovery.md](references/recovery.md).
+
+If a failure occurs, use the recovery reference before adding automation.
+
+## Default Workflow
+
+1. Inspect `git status --short`, the current branch, and current baseline metadata.
+2. Resolve the upstream target with `scripts/codexsdk_resolve_upstream.py`; default to the latest stable `rust-vX.Y.Z` tag only when no target is specified.
+3. Run `scripts/codexsdk_target_policy.py` before generating drift. Stop on `block`; do not convert a policy block into a drift issue.
+4. Generate drift artifacts with `scripts/codexsdk_track_upstream.sh` after policy allows the target.
+5. Review compact drift reports before updating checked-in files.
+6. Apply reviewed baseline changes, regenerate generated Go, and reconcile handwritten SDK only when reviewed drift requires it.
+7. Run validation from the local sync reference before staging or publishing.
+8. If publishing, use the protected PR path and report the correct completion layer.
+
 ## Required Inputs
 
 Collect or infer:
 
-- upstream Codex target tag, ref, or commit; default to the latest stable `rust-vX.Y.Z` tag when the user does not specify one
-- resolved upstream commit, recorded as the peeled full SHA for the selected target
-- upstream provenance, recorded as both `source_ref_name` and `source_ref_kind` (`stable_rust_tag`, `manual_ref`, or `manual_commit`)
-- local OpenAI Codex repo path, from the prompt, `CODEXSDK_CODEX_REPO`, or default `.cache/openai-codex`
-- generator mode: default to `cargo`; use `binary` only when the provided `codex` binary is known to be built from the resolved target commit
+- upstream Codex target tag, ref, or commit
+- resolved upstream commit as the peeled full SHA
+- upstream provenance as `source_ref_name` and `source_ref_kind`
+- local OpenAI Codex repo path, from the prompt, `CODEXSDK_CODEX_REPO`, or `.cache/openai-codex`
+- generator mode, defaulting to `cargo`; use `binary` only when the provided `codex` binary is known to be built from the resolved target commit
 - output workdir, defaulting to `.cache/codexsdk-upstream-<short-sha>`
 
-If the target cannot be inferred from a user request, the latest stable `rust-vX.Y.Z` tag, or local context, ask for it before changing files.
-
-Keep upstream clones, drift artifacts, and Rust build cache under repo-local `.cache/` by default. Never check in `.cache` contents.
-
-Use this cache topology unless the user provides an explicit alternative:
-
-- upstream clone: `.cache/openai-codex`
-- sync output: `.cache/codexsdk-upstream-<short-sha>`
-- clean rerun output: `.cache/codexsdk-upstream-<short-sha>-clean`
-- Rust build cache: `.cache/cargo-target/codex`
-
-Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at any time.
-
-## Repository Automation Contract
-
-The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine drift repair. Both `schedule` and `workflow_dispatch` events use the same protected-branch PR path:
-
-- landing ref is `main`
-- the sync commit is validated, rebased onto `origin/main`, and pushed to a `codex/sync-upstream-*` branch
-- the workflow creates or updates a PR against `main`, dispatches the required `Go` CI check on the PR head, and merges the PR through GitHub's protected-branch path
-- sync PRs created by `GITHUB_TOKEN` may require one maintainer approval or rerun before GitHub schedules the required `Go` pull request check; this `action_required` state is an expected GitHub Actions safety gate, not a sync failure
-- if merge queue is enabled for the repository, GitHub may enqueue the PR instead of merging it immediately
-- after a landed stable-tag sync, the workflow creates an upstream sync tag and optionally dispatches drift verification
-
-## Workflow
-
-1. Inspect the current repository state.
-
-   ```sh
-   git status --short
-   git branch --show-current
-   sed -n '1,80p' codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json
-   ```
-
-   Keep unrelated user changes intact.
-
-   Branch safety gate:
-
-   - if the current branch is `dependabot/*`, `renovate/*`, `release/*`, `release-*`, `hotfix/*`, or `hotfix-*`, do not commit sync work there unless the user explicitly asked to use that branch
-   - if the branch is clearly for an unrelated PR or feature, stop before editing and create a sync branch such as `codex/sync-upstream-rust-vX.Y.Z` after resolving the target
-   - if the user explicitly requested the current branch, mention that in the final response
-
-2. Resolve the target tag/ref and run the target policy gate.
-
-   Use the canonical resolver. Do not hand-roll `sort`, prerelease filtering, or annotated-tag peeling in shell.
-
-   ```sh
-   mkdir -p .cache
-   target_json=.cache/codexsdk-upstream-target.json
-   if [ -n "<requested_ref>" ]; then
-     python3 scripts/codexsdk_resolve_upstream.py --upstream-ref "<requested_ref>" --json > "$target_json"
-   else
-     python3 scripts/codexsdk_resolve_upstream.py --latest-stable --json > "$target_json"
-   fi
-   ```
-
-   Resolve the selected upstream target to:
-
-   - `upstream_ref`: original tag/ref/commit requested by the user or latest stable `rust-vX.Y.Z`
-   - `upstream_ref_kind`: `stable_rust_tag`, `manual_ref`, or `manual_commit`
-   - `tag_sha`: tag object SHA when the target is a tag; equal to the commit for lightweight tags
-   - `peeled_commit_sha` / `upstream_sha`: peeled full commit SHA used for generation
-   - `target_explicit`: `true` only when the user explicitly supplied the target
-
-   Before generating drift, run the policy gate:
-
-   ```sh
-   python3 scripts/codexsdk_target_policy.py \
-     --baseline codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json \
-     --target-ref <upstream_ref> \
-     --target-kind <stable_rust_tag|manual_ref|manual_commit> \
-     --target-sha <upstream_sha> \
-     --target-explicit <true|false> \
-     --mode <scheduled|manual> \
-     --allow-downgrade false
-   ```
-
-   Policy decisions:
-
-   - `allow`: continue with drift generation
-   - `skip`: baseline already points at the selected target; close/update drift issue if needed and stop
-   - `block`: stop without generating drift because this is a track switch, downgrade, moved tag, or ambiguous target
-
-   Do not convert a `block` decision into a protocol drift issue. Report the exact baseline target, requested target, and policy reason instead.
-
-3. Generate drift artifacts only after the policy gate allows the target.
-
-   ```sh
-   CARGO_TARGET_DIR="$PWD/.cache/cargo-target/codex" \
-     scripts/codexsdk_track_upstream.sh \
-     --codex-repo "$PWD/.cache/openai-codex" \
-     --commit <upstream_sha> \
-     --source-ref <upstream_ref> \
-     --source-ref-kind <upstream_ref_kind> \
-     --out "$PWD/.cache/codexsdk-upstream-<short-sha>"
-   ```
-
-   Let `scripts/codexsdk_track_upstream.sh` fetch the selected target narrowly. Do not run broad `git fetch origin --tags` or broad upstream refreshes unless the cache is missing or the user explicitly asks to refresh it.
-
-   The script is intentionally read-only for the checked-in baseline. It writes candidate schemas under `schema/` and review reports under `reports/`, delegating the schema comparison to `scripts/codexsdk_schema_diff.py`. Add `--verbose` during interactive runs if you want it to print artifact paths.
-
-4. Review the generated reports before editing.
-
-   Read:
-
-   - `.cache/codexsdk-upstream-<short-sha>/reports/SUMMARY.md`
-   - `.cache/codexsdk-upstream-<short-sha>/reports/drift_summary.json`
-   - `.cache/codexsdk-upstream-<short-sha>/reports/matrix_update_skeleton.json`
-
-   Before overwriting checked-in clean reports, keep a short pre-sync drift summary for the issue comment, PR body, commit notes, or final response:
-
-   - files added, changed, and removed
-   - method deltas and added methods
-   - stable vs experimental classification for added methods
-   - handwritten SDK and coverage implications
-
-   Treat any added, removed, or changed schema as review-required. Classify the drift before updating `manifest.json`, `coverage_matrix.json`, or handwritten SDK files:
-
-   - method drift: added or removed request/notification method entries
-   - schema file drift: added, removed, or changed JSON schema files
-   - generated Go type drift: generated struct, enum, union, or nullable field changes
-   - SDK surface class: `metadata-only`, `generated-only`, `public-facade-required`, or `ignored-internal`
-   - handwritten SDK impact: facade/client/type/test/docs changes needed beyond generated code, with a short reason for each file
-   - coverage impact: `coverage_matrix.json` entries needed for new or changed surface
-
-   If new methods appear, generate a non-experimental schema from the same target once and compare method presence before deciding public SDK surface:
-
-   ```sh
-   repo="$PWD"
-   stable_out="$repo/.cache/codexsdk-upstream-<short-sha>-stable/schema"
-   stable_worktree="$repo/.cache/codexsdk-upstream-<short-sha>-stable/codex-worktree"
-   mkdir -p "$stable_out"
-   git -C "$repo/.cache/openai-codex" worktree add --detach "$stable_worktree" <upstream_sha>
-   (
-     cd "$stable_worktree/codex-rs"
-     CARGO_TARGET_DIR="$repo/.cache/cargo-target/codex" \
-       cargo run -p codex-cli -- app-server generate-json-schema --out "$stable_out"
-   )
-   ```
-
-   For example, an optional nullable field added to an existing response type normally requires generated Go and focused tests, but no facade change unless handwritten SDK code exposes or interprets that field.
-
-   Tracking reports may not capture every field-level consequence. If generator output, coverage, or manifest validation points at a stale field, inspect the changed object schema properties and requiredness before adding code.
-
-   Keep the implementation minimal:
-
-   - prefer removing stale entries over preserving removed upstream surface
-   - add focused generator support and focused tests only for schema shapes required by the selected target
-   - let existing tools expose inconsistencies; do not build broad auto-rewriters into this workflow
-   - keep `codexsdk_schema_diff.py` and `codexsdk_sync_state.py` report-only unless the user explicitly asks for a separate automated updater design
-
-   Keep the public SDK minimal:
-
-   - do not add a new public facade for experimental or internal upstream surface unless the user explicitly asks for it or the existing manifest rules classify it as supported public SDK surface
-   - do not add raw JSON-RPC passthrough helpers when a typed `protocolv2` params/response path exists
-   - do not add empty coverage, manifest, or test skeletons for unchanged methods
-   - prefer leaving newly discovered upstream-only surface available through generated `protocolv2` until there is a reviewed SDK use case
-
-5. Update the checked-in baseline only after review.
-
-   Update files under `codexsdk/internal/protocolschema/appserver/v2`:
-
-   - copy reviewed schema changes from `.cache/codexsdk-upstream-<short-sha>/schema`
-   - update `baseline_metadata.json` with public provenance only: upstream URL, `source_ref_name`, `source_ref_kind`, peeled full `source_commit`, Codex version, source license, repo-relative source paths, schema count, and schema bundle checksum
-   - update `manifest.json` according to `manifest_generation.json` rules and response mappings
-   - update `coverage_matrix.json` with explicit support status, owner, reason, revisit trigger, and exit condition for new or changed surface
-   - update `drift_report.json` and `matrix_update_skeleton.json` by comparing the updated baseline with the trusted candidate schema and copying the clean reports
-
-   Use compare-only for the final clean report only when the candidate schema was generated from the resolved target in this workflow:
-
-   ```sh
-   scripts/codexsdk_track_upstream.sh \
-     --compare-only \
-     --baseline codexsdk/internal/protocolschema/appserver/v2 \
-     --candidate "$PWD/.cache/codexsdk-upstream-<short-sha>/schema" \
-     --commit <upstream_sha> \
-     --source-ref <upstream_ref> \
-     --source-ref-kind <upstream_ref_kind> \
-     --out "$PWD/.cache/codexsdk-upstream-<short-sha>-clean" \
-     --verbose
-   ```
-
-   Run the full tracking script instead of compare-only if the candidate provenance is uncertain, the generator changed, the selected target moved, or sync-state reports metadata mismatch.
-
-   Sanitize checked-in reports before staging:
-
-   - replace local source repo paths with `https://github.com/openai/codex`
-   - replace local generator worktree paths with `codex app-server generate-json-schema --experimental --out <tmpdir>`
-   - include the baseline schema bundle checksum from `baseline_metadata.json`
-   - keep the canonical-JSON comparison note when object member ordering is irrelevant
-
-   Do not check in local absolute paths, `.cache/...` output paths, private repo paths, account data, or raw smoke-test transcripts.
-
-6. Regenerate protocol code.
-
-   ```sh
-   GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen
-   ```
-
-   This updates:
-
-   - `codexsdk/protocolv2/protocol_types.gen.go`
-   - `codexsdk/protocolv2/method_registry.gen.go`
-
-7. Reconcile handwritten SDK behavior when schema changes require it.
-
-   Check at least:
-
-   - `codexsdk/client.go`
-   - `codexsdk/facades.go`
-   - `codexsdk/types.go`
-   - `codexsdk/*_test.go`
-   - `README.md`, `CHANGELOG.md`, `NOTICE`, and `docs/release.md` if compatibility, provenance, or release guidance changed
-
-   Before editing a handwritten SDK file, write down which reviewed drift item requires it. A handwritten change is justified only when it preserves compatibility, exposes an already-supported stable method, fixes an existing facade broken by the new schema, or updates tests/docs for a real user-visible behavior change.
-
-   Prefer typed `protocolv2` params/responses over raw JSON-RPC escape hatches. If a method is experimental, internal, or newly discovered only because the experimental schema is included, leave it in generated `protocolv2` unless the user asks for a public facade.
-
-8. Validate.
-
-   ```sh
-   git ls-files -z -- '*.go' ':!:vendor/**' | xargs -0 gofmt -w
-   GOWORK=off go vet ./...
-   GOWORK=off go test ./...
-
-   tmp="$(mktemp -d)"
-   GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -out "$tmp"
-   diff -u codexsdk/protocolv2/method_registry.gen.go "$tmp/method_registry.gen.go"
-   diff -u codexsdk/protocolv2/protocol_types.gen.go "$tmp/protocol_types.gen.go"
-
-   git diff --check
-   git diff --name-status
-
-   python3 scripts/codexsdk_sync_state.py \
-     --baseline codexsdk/internal/protocolschema/appserver/v2
-
-   rg -n "/Users/|/home/|\\.cache/codexsdk-upstream|\\.cache/openai-codex" \
-     codexsdk/internal/protocolschema/appserver/v2 \
-     .agents/skills/codexsdk-sync-upstream/SKILL.md \
-     .gitignore
-   ```
-
-   The path scan may match intentional relative `.cache/...` instructions in this skill or `.gitignore`; it must not find local absolute paths in checked-in schema metadata or reports.
-
-   `codexsdk_sync_state.py` prints nothing when the checked-in baseline is valid. On failure, read stderr findings or rerun with `--json` for structured output.
-
-   If validation fails on missing coverage fields or generated constants, first check for stale manifest, coverage, or handwritten references to removed upstream methods, schemas, or fields before adding new abstractions.
-
-   If `protocolv2gen` fails, triage in this order:
-
-   | Symptom | Check first |
-   | --- | --- |
-   | Unknown scalar or alias type | scalar alias mapping in `codexsdk/internal/protocolgen` |
-   | Nullable `$ref` or pointer mismatch | nullable `$ref` dependency handling |
-   | Missing generated struct/field | generated struct checkpoint tests |
-   | Missing method constant or handler metadata | method registry count and manifest entries |
-   | Unexpected protocol type count | protocol type count tests and stale removed schemas |
-
-   Review `git diff --name-status` against the drift classification before staging:
-
-   - schema JSON, checked-in drift reports, metadata, manifest, coverage matrix, and generated `protocolv2` files are expected for real schema drift
-   - handwritten SDK files are expected only for `public-facade-required` or compatibility-preserving changes
-   - README, CHANGELOG, NOTICE, and release docs are expected only for provenance, compatibility, or release guidance changes
-   - no stale manifest or coverage entries may remain for removed upstream methods
-
-   Run the real app-server smoke test only when the user explicitly wants it or the change affects lifecycle behavior:
-
-   ```sh
-   CODEXSDK_REAL_APP_SERVER_SMOKE=1 \
-   CODEXSDK_REAL_APP_SERVER_MODEL=<model> \
-   GOWORK=off go test ./codexsdk -run TestRealAppServerSmokeStartResumeFork -count=1
-   ```
-
-9. Before committing, check whether the selected upstream target moved.
-
-   ```sh
-   python3 scripts/codexsdk_resolve_upstream.py --latest-stable --json
-   ```
-
-   For the default scheduled workflow, compare against the latest stable `rust-vX.Y.Z` tag, not `main`. Apply these target-movement rules:
-
-   - if the current baseline `source_ref_kind` is `stable_rust_tag`, move only forward by semantic tag version
-   - if the current baseline came from `manual_ref` or `manual_commit`, do not automatically move it to an older stable tag or unrelated ref; stop and explain the difference
-   - if the latest stable tag changed after the selected target, run the tracking script against the new tag without changing checked-in files first
-   - if the new tag is drift-clean relative to the updated baseline, do not chase it with a provenance-only commit unless the user asked for exact latest provenance
-   - if it has real protocol drift, stop and explain the new target so the user can choose whether to continue
-
-   Do not enter an unbounded loop chasing moving upstream refs.
-
-   If Cargo fails because crate downloads hit low-speed timeouts, rerun the failed generation command with the retry environment rather than changing code:
-
-   ```sh
-   CARGO_HTTP_TIMEOUT=600 \
-   CARGO_HTTP_LOW_SPEED_LIMIT=0 \
-   CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-   CARGO_TARGET_DIR="$PWD/.cache/cargo-target/codex" \
-     scripts/codexsdk_track_upstream.sh ...
-   ```
-
-10. Tag the codexsdk-go sync commit when a baseline sync has landed on `main`.
-
-   Do this only after a successful baseline sync commit exists on the landing ref. Do not tag drift-check-only work, failed sync attempts, unmerged PR heads, or uncommitted changes.
-
-   ```sh
-   python3 scripts/codexsdk_sync_tag.py --json
-   python3 scripts/codexsdk_sync_tag.py --create --push origin
-   ```
-
-   Tag rules:
-
-   - stable upstream tags use `upstream-codex-rust-vX.Y.Z`
-   - manual upstream commits and manual refs do not get upstream sync tags
-   - do not create Go module-style `vX.Y.Z` tags for upstream sync markers
-   - do not move existing upstream sync tags
-   - if the same upstream tag needs a follow-up codexsdk-go fix, use `python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin` to create `-sync.N`
-
-11. After publishing a sync PR, monitor repository automation when the task is to solve a drift issue.
-
-   Watch the required `Go` check on the PR head first. If GitHub marks the first pull request CI run as `action_required` with no jobs, a maintainer with write access should approve or rerun that run once:
-
-   ```sh
-   gh run rerun <run-id>
-   ```
-
-   After the real `Go` check passes, GitHub auto-merge should continue without a manual merge. After the PR merges into `main`, the Codex Upstream Protocol Drift workflow runs on schedule or `workflow_dispatch`, not ordinary pushes. After the landed `main` CI passes, dispatch it for the selected upstream ref and watch the run:
-
-   ```sh
-   gh workflow run upstream-protocol-drift.yml --ref main -f upstream_ref=<target_ref>
-   gh run watch <run-id> --exit-status
-   ```
-
-   Cold GitHub runners may spend several minutes compiling Rust before the drift report step advances.
-
-   Confirm the drift issue outcome:
-
-   - if drift is clean, the workflow should close the existing drift issue
-   - if drift remains, the workflow should update the existing drift issue rather than creating duplicates
-   - if the selected upstream tag/ref moved or a newer stable tag exists, report the exact tag/ref and commit and whether the remaining drift is real or clean
-
-   Do not call the task complete at push time. Use the completion layers from the Completion Contract in the final response.
-
-## Failure Recovery Recipes
-
-Use these recipes before adding new workflow automation. Keep recovery actions on the protected PR path, and do not delete tags, delete branches, write synthetic required statuses, or force-push `main`.
-
-### Sync PR `Go` Check Is `action_required`
-
-This is expected for sync PRs created by `GITHUB_TOKEN`. Confirm the first run has no jobs, then have a maintainer with write access approve or rerun it once:
-
-```sh
-gh run view <run-id> --attempt 1 --json conclusion,jobs,actor,triggeringActor
-gh run rerun <run-id>
-```
-
-After the real `Go` check passes, auto-merge should continue. Do not manually merge just to bypass this gate.
-
-### Sync PR Does Not Merge Before Timeout
-
-Inspect the PR state, required checks, and recent CI runs on the sync branch:
-
-```sh
-gh pr view <pr-number> --json state,mergeStateStatus,reviewDecision,statusCheckRollup
-gh pr checks <pr-number>
-gh run list --workflow ci.yml --branch <sync-branch> --limit 10 \
-  --json databaseId,event,status,conclusion,headSha,url
-```
-
-If the required `Go` run is `action_required`, rerun it once as above. If a real check failed, inspect logs and fix the sync branch with a normal follow-up commit or rerun the auto-sync workflow; do not force a merge around the failed required check.
-
-### Finalize Failed After PR Merged
-
-If the sync PR merged but tag creation or drift dispatch failed, recover from the landed `main` commit:
-
-```sh
-git fetch origin main --tags
-git checkout --detach origin/main
-python3 scripts/codexsdk_sync_tag.py --json
-python3 scripts/codexsdk_sync_tag.py --create --push origin
-```
-
-If the base upstream sync tag already exists at another commit, use the suffix path instead:
-
-```sh
-python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin
-```
-
-Then dispatch drift verification for the landed baseline target and watch it:
-
-```sh
-gh workflow run upstream-protocol-drift.yml --ref main -f upstream_ref=<target_ref>
-gh run watch <run-id> --exit-status
-```
-
-### Drift Verification Fails After Main CI Passes
-
-Treat this as incomplete until the cause is understood. Check whether the landed `baseline_metadata.json` still matches the intended upstream target, then inspect the drift run logs. If the failure is transient, rerun the drift workflow. If the drift is real, keep or update the protocol-drift issue and run another sync; do not report `drift issue fully resolved`.
-
-### Sync Tag Already Exists
-
-The base tag `upstream-codex-rust-vX.Y.Z` is used for the first landed sync to a stable upstream tag. Follow-up syncs to the same upstream tag must use `-sync.N` through `scripts/codexsdk_sync_tag.py --next-suffix`; never move or delete an existing upstream sync tag.
-
-## Decision Rules
-
-- If drift is clean and the user only asked to check a tag/ref/commit, report that no SDK update is needed.
-- If drift is clean but the user explicitly asked to move the baseline provenance to that tag/ref/commit, update provenance and clean drift artifacts without changing schema-derived Go output.
-- If the target policy gate returns `block`, stop before generating drift; do not create or update a protocol drift issue.
-- If a baseline sync commit was created, create an annotated upstream sync tag with `scripts/codexsdk_sync_tag.py`; never move or overwrite an existing upstream sync tag.
-- If generated Go fails because a new schema shape is unsupported, update `codexsdk/internal/protocolgen` with a reviewed generation rule and focused tests before regenerating.
-- If a method disappears upstream, preserve compatibility only when it is safe and intentional; otherwise document the breaking change.
-- If upstream adds experimental surface, mark it experimental unless it appears in the non-experimental schema comparison and the existing manifest rules say otherwise.
-- If compare-only and full tracking disagree, trust the full tracking output and investigate candidate provenance before editing checked-in files.
-- If a workflow closes drift issues by label, verify the existing issue has the required drift label before dispatching the workflow.
-- If a scheduled or manual drift issue already exists, update or close that issue; do not create a new issue for each upstream target while the old one is unresolved.
+If the target cannot be inferred from the user request, latest stable tag, or local context, ask before changing files.
