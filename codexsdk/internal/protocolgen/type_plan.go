@@ -1,6 +1,7 @@
 package protocolgen
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -41,6 +42,7 @@ type FieldPlan struct {
 	MinItems        *uint64
 	Minimum         *float64
 	Path            string
+	RefPath         string
 	Reason          string
 	Required        bool
 	SchemaPath      string
@@ -113,6 +115,11 @@ func BuildProtocolTypePlan(schemaRoot string) (ProtocolTypePlan, error) {
 		}
 		plan.Types = append(plan.Types, typePlan)
 	}
+	resolver, err := newGeneratedDefinitionNameResolver(plan)
+	if err != nil {
+		return ProtocolTypePlan{}, err
+	}
+	resolveProtocolTypePlanRefs(&plan, resolver)
 	return plan, nil
 }
 
@@ -132,6 +139,207 @@ func (p ProtocolTypePlan) FieldByPath(path string) (FieldPlan, bool) {
 		}
 	}
 	return FieldPlan{}, false
+}
+
+type generatedDefinitionNameResolver struct {
+	namesByPath map[string]string
+}
+
+type generatedDefinitionSource struct {
+	baseName       string
+	encoded        []byte
+	kind           generatedDefinitionKind
+	parentTypeName string
+	path           string
+}
+
+func newGeneratedDefinitionNameResolver(plan ProtocolTypePlan) (generatedDefinitionNameResolver, error) {
+	usedNames := map[string]bool{}
+	for _, typ := range plan.Types {
+		if typ.TypeName != "" {
+			usedNames[typ.TypeName] = true
+		}
+	}
+
+	byBaseName := map[string][]generatedDefinitionSource{}
+	for _, typ := range plan.Types {
+		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
+			continue
+		}
+		for name, schema := range typ.Schema.Definitions {
+			if !isGeneratedDefinitionNameResolverSource(typ.SchemaPath, name, schema) {
+				continue
+			}
+			kind := classifyGeneratedDefinition(schema)
+			if kind == generatedDefinitionUnsupported {
+				continue
+			}
+			encoded, err := json.Marshal(schema)
+			if err != nil {
+				return generatedDefinitionNameResolver{}, fmt.Errorf("generated definition %s in %s cannot be encoded: %w", name, typ.SchemaPath, err)
+			}
+			byBaseName[name] = append(byBaseName[name], generatedDefinitionSource{
+				baseName:       name,
+				encoded:        encoded,
+				kind:           kind,
+				parentTypeName: typ.TypeName,
+				path:           definitionSchemaPath(typ.SchemaPath, name),
+			})
+		}
+	}
+
+	resolver := generatedDefinitionNameResolver{namesByPath: map[string]string{}}
+	var baseNames []string
+	for name := range byBaseName {
+		baseNames = append(baseNames, name)
+	}
+	sort.Strings(baseNames)
+	for _, baseName := range baseNames {
+		sources := byBaseName[baseName]
+		sort.Slice(sources, func(i, j int) bool {
+			return sources[i].path < sources[j].path
+		})
+		bySignature := map[string][]generatedDefinitionSource{}
+		for _, source := range sources {
+			signature := string(source.kind) + "\x00" + string(source.encoded)
+			bySignature[signature] = append(bySignature[signature], source)
+		}
+		if len(bySignature) == 1 {
+			typeName := claimGeneratedDefinitionTypeName(baseName, usedNames)
+			for _, source := range sources {
+				resolver.namesByPath[source.path] = typeName
+			}
+			continue
+		}
+
+		var signatures []string
+		for signature := range bySignature {
+			signatures = append(signatures, signature)
+		}
+		sort.Slice(signatures, func(i, j int) bool {
+			return bySignature[signatures[i]][0].path < bySignature[signatures[j]][0].path
+		})
+		for _, signature := range signatures {
+			signatureSources := bySignature[signature]
+			sort.Slice(signatureSources, func(i, j int) bool {
+				return signatureSources[i].path < signatureSources[j].path
+			})
+			typeName := claimGeneratedDefinitionTypeName(definitionScopedTypeName(signatureSources[0].parentTypeName, baseName), usedNames)
+			for _, source := range signatureSources {
+				resolver.namesByPath[source.path] = typeName
+			}
+		}
+	}
+	return resolver, nil
+}
+
+func isGeneratedDefinitionNameResolverSource(schemaPath string, name string, schema *Schema) bool {
+	if classifyGeneratedDefinition(schema) == generatedDefinitionStringEnum && isImplicitGeneratedStringEnumDefinitionSchema(schema) {
+		return true
+	}
+	return isReviewedGeneratedDefinition(schemaPath, name)
+}
+
+func definitionSchemaPath(schemaPath string, name string) string {
+	return schemaPath + "#/definitions/" + name
+}
+
+func definitionScopedTypeName(parentTypeName string, baseName string) string {
+	if parentTypeName == "" {
+		return baseName
+	}
+	return parentTypeName + baseName
+}
+
+func claimGeneratedDefinitionTypeName(preferred string, used map[string]bool) string {
+	if preferred == "" {
+		preferred = "GeneratedDefinition"
+	}
+	if reservedProtocolTypeName(preferred) {
+		preferred += "Value"
+	}
+	if !used[preferred] {
+		used[preferred] = true
+		return preferred
+	}
+	for index := 2; ; index++ {
+		candidate := fmt.Sprintf("%s%d", preferred, index)
+		if reservedProtocolTypeName(candidate) || used[candidate] {
+			continue
+		}
+		used[candidate] = true
+		return candidate
+	}
+}
+
+func (r generatedDefinitionNameResolver) NameForDefinition(schemaPath string, name string) (string, bool) {
+	return r.NameForPath(definitionSchemaPath(schemaPath, name))
+}
+
+func (r generatedDefinitionNameResolver) NameForPath(path string) (string, bool) {
+	name, ok := r.namesByPath[path]
+	return name, ok
+}
+
+func (r generatedDefinitionNameResolver) ResolveField(field FieldPlan) FieldPlan {
+	if field.RefPath == "" {
+		return field
+	}
+	typeName, ok := r.NameForPath(field.RefPath)
+	if !ok {
+		return field
+	}
+	field.GoType = replaceLeafGoType(field.GoType, refTypeName(field.RefPath), typeName)
+	return field
+}
+
+func resolveProtocolTypePlanRefs(plan *ProtocolTypePlan, resolver generatedDefinitionNameResolver) {
+	for index := range plan.Fields {
+		plan.Fields[index] = resolver.ResolveField(plan.Fields[index])
+	}
+	for typeIndex := range plan.Types {
+		for fieldIndex := range plan.Types[typeIndex].Fields {
+			plan.Types[typeIndex].Fields[fieldIndex] = resolver.ResolveField(plan.Types[typeIndex].Fields[fieldIndex])
+		}
+	}
+}
+
+func replaceLeafGoType(goType string, oldLeaf string, newLeaf string) string {
+	if oldLeaf == "" || newLeaf == "" || oldLeaf == newLeaf {
+		return goType
+	}
+	switch {
+	case goType == oldLeaf:
+		return newLeaf
+	case strings.HasPrefix(goType, "*"):
+		return "*" + replaceLeafGoType(strings.TrimPrefix(goType, "*"), oldLeaf, newLeaf)
+	case strings.HasPrefix(goType, "[]"):
+		return "[]" + replaceLeafGoType(strings.TrimPrefix(goType, "[]"), oldLeaf, newLeaf)
+	case strings.HasPrefix(goType, "map[string]"):
+		return "map[string]" + replaceLeafGoType(strings.TrimPrefix(goType, "map[string]"), oldLeaf, newLeaf)
+	case strings.HasPrefix(goType, "protocolv2.Nullable[") && strings.HasSuffix(goType, "]"):
+		inner := strings.TrimSuffix(strings.TrimPrefix(goType, "protocolv2.Nullable["), "]")
+		return "protocolv2.Nullable[" + replaceLeafGoType(inner, oldLeaf, newLeaf) + "]"
+	case strings.HasPrefix(goType, "Nullable[") && strings.HasSuffix(goType, "]"):
+		inner := strings.TrimSuffix(strings.TrimPrefix(goType, "Nullable["), "]")
+		return "Nullable[" + replaceLeafGoType(inner, oldLeaf, newLeaf) + "]"
+	default:
+		return goType
+	}
+}
+
+func absoluteRefPath(schemaPath string, ref string) string {
+	if ref == "" {
+		return ""
+	}
+	if strings.HasPrefix(ref, "#") {
+		document := schemaPath
+		if before, _, ok := strings.Cut(schemaPath, "#"); ok {
+			document = before
+		}
+		return document + ref
+	}
+	return ref
 }
 
 func planType(file SchemaFile) (TypePlan, error) {
@@ -305,6 +513,7 @@ func planField(coverage CoverageField, schema *Schema) (FieldPlan, error) {
 		}
 		plan.Kind = FieldPlanRef
 		plan.GoType = optionalGoType(plan.Required, refTypeName(schema.Ref))
+		plan.RefPath = absoluteRefPath(plan.SchemaPath, schema.Ref)
 		plan.Reason = "direct schema ref"
 		return plan, nil
 	}
@@ -317,6 +526,7 @@ func planField(coverage CoverageField, schema *Schema) (FieldPlan, error) {
 		}
 		plan.Kind = FieldPlanAllOfRef
 		plan.GoType = optionalGoType(plan.Required, refTypeName(schema.AllOf[0].Ref))
+		plan.RefPath = absoluteRefPath(plan.SchemaPath, schema.AllOf[0].Ref)
 		plan.Reason = "single allOf ref normalized as ref"
 		return plan, nil
 	}
@@ -550,6 +760,7 @@ func planAnyOfField(plan FieldPlan, schema *Schema) (FieldPlan, error) {
 		}
 		plan.Kind = FieldPlanNullableRef
 		plan.GoType = nullableGoType(plan.Required, refTypeName(inner.Ref))
+		plan.RefPath = absoluteRefPath(plan.SchemaPath, inner.Ref)
 		plan.Reason = "nullable ref represented with Nullable"
 		return plan, nil
 	case inner.Type.Only("string") || inner.Type.Only("boolean") || inner.Type.Only("integer"):
@@ -564,6 +775,7 @@ func planAnyOfField(plan FieldPlan, schema *Schema) (FieldPlan, error) {
 	case len(inner.AllOf) == 1 && inner.AllOf[0].Ref != "":
 		plan.Kind = FieldPlanNullableRef
 		plan.GoType = nullableGoType(plan.Required, refTypeName(inner.AllOf[0].Ref))
+		plan.RefPath = absoluteRefPath(plan.SchemaPath, inner.AllOf[0].Ref)
 		plan.Reason = "nullable single allOf ref represented with Nullable"
 		return plan, nil
 	default:
@@ -612,6 +824,7 @@ func planArrayField(plan FieldPlan, schema *Schema, nullable bool) (FieldPlan, e
 		}
 		plan.Kind = FieldPlanArrayRef
 		plan.GoType = optionalOrNullableGoType(fieldRequired, nullable, "[]"+refTypeName(schema.Items.Ref))
+		plan.RefPath = absoluteRefPath(plan.SchemaPath, schema.Items.Ref)
 		plan.Reason = "array of refs"
 		return plan, nil
 	case schema.Items.Type.Only("string"):
@@ -724,47 +937,49 @@ func planObjectField(plan FieldPlan, schema *Schema) (FieldPlan, error) {
 		}
 		return FieldPlan{}, fmt.Errorf("field %s has unreviewed additionalProperties=true", plan.Path)
 	}
-	valueType, err := mapValueType(plan.Path, schema.AdditionalProperties.Schema)
+	valueType, refPath, err := mapValueType(plan.Path, plan.SchemaPath, schema.AdditionalProperties.Schema)
 	if err != nil {
 		return FieldPlan{}, err
 	}
 	plan.Kind = FieldPlanTypedMap
 	plan.GoType = nullableAwareGoType(plan.Required, plan.WireAllowsNull, "map[string]"+valueType)
+	plan.RefPath = refPath
 	plan.Reason = "object map with typed additionalProperties"
 	return plan, nil
 }
 
-func mapValueType(path string, schema *Schema) (string, error) {
+func mapValueType(path string, schemaPath string, schema *Schema) (string, string, error) {
 	switch {
 	case schema == nil:
-		return "", fmt.Errorf("field %s additionalProperties has no schema", path)
+		return "", "", fmt.Errorf("field %s additionalProperties has no schema", path)
 	case schema.Ref != "":
-		return refTypeName(schema.Ref), nil
+		return refTypeName(schema.Ref), absoluteRefPath(schemaPath, schema.Ref), nil
 	case schema.Type.Only("string"):
-		return "string", nil
+		return "string", "", nil
 	case schema.Type.Only("boolean"):
-		return "bool", nil
+		return "bool", "", nil
 	case schema.Type.Only("integer"):
-		return scalarGoType(schema, "integer")
+		goType, err := scalarGoType(schema, "integer")
+		return goType, "", err
 	case schema.Type.Has("null"):
 		nonNull, ok := schema.Type.NullableSingle()
 		if !ok {
-			return "", fmt.Errorf("field %s has unsupported nullable additionalProperties schema", path)
+			return "", "", fmt.Errorf("field %s has unsupported nullable additionalProperties schema", path)
 		}
 		switch nonNull {
 		case "string", "boolean", "integer":
 			goType, err := scalarGoType(schema, nonNull)
 			if err != nil {
-				return "", err
+				return "", "", err
 			}
-			return "*protocolv2.Nullable[" + goType + "]", nil
+			return "*protocolv2.Nullable[" + goType + "]", "", nil
 		default:
-			return "", fmt.Errorf("field %s has unsupported nullable additionalProperties type %q", path, nonNull)
+			return "", "", fmt.Errorf("field %s has unsupported nullable additionalProperties type %q", path, nonNull)
 		}
 	case schema.IsTrueSchema():
-		return "protocolv2.JSONValue", nil
+		return "protocolv2.JSONValue", "", nil
 	default:
-		return "", fmt.Errorf("field %s has unsupported additionalProperties schema", path)
+		return "", "", fmt.Errorf("field %s has unsupported additionalProperties schema", path)
 	}
 }
 
