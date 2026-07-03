@@ -82,59 +82,53 @@ func TestJSONRPCMessageIsNotPublicGeneratedSurface(t *testing.T) {
 	}
 }
 
-func TestAppInfoDefinitionsStayEquivalent(t *testing.T) {
+func TestGeneratedDefinitionSourcesStayCanonical(t *testing.T) {
 	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"AppBranding", "AppInfo", "AppMetadata", "AppReview", "AppScreenshot"} {
-		assertDefinitionsEqualIfPresent(t, plan, "v2/AppsListResponse.json", "v2/AppListUpdatedNotification.json", name)
-	}
-}
 
-func TestFuzzyFileSearchResultDefinitionsStayEquivalent(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
+	type source struct {
+		encoded []byte
+		kind    string
+		path    string
 	}
-	for _, name := range []string{"FuzzyFileSearchResult", "FuzzyFileSearchMatchType"} {
-		assertDefinitionsEqualIfPresent(t, plan, "FuzzyFileSearchResponse.json", "FuzzyFileSearchSessionUpdatedNotification.json", name)
-	}
-}
 
-func TestProcessTerminalSizeDefinitionsStayEquivalent(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
+	byName := map[string]source{}
+	selectedCount := 0
+	for _, typ := range plan.Types {
+		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
+			continue
+		}
+		for name, schema := range typ.Schema.Definitions {
+			kind, ok := selectedGeneratedDefinitionKindForTest(typ.SchemaPath, name, schema)
+			if !ok {
+				continue
+			}
+			if strings.Contains(kind, "+") {
+				t.Fatalf("generated definition %s in %s maps to multiple generated kinds: %s", name, typ.SchemaPath, kind)
+			}
+			selectedCount++
+			encoded := encodedSchema(t, schema)
+			previous, ok := byName[name]
+			if !ok {
+				byName[name] = source{
+					encoded: encoded,
+					kind:    kind,
+					path:    typ.SchemaPath,
+				}
+				continue
+			}
+			if previous.kind != kind {
+				t.Fatalf("generated definition %s maps to multiple generated kinds: %s in %s, %s in %s", name, previous.kind, previous.path, kind, typ.SchemaPath)
+			}
+			if !bytes.Equal(previous.encoded, encoded) {
+				t.Fatalf("generated definition %s maps to one Go type but schema differs between %s and %s", name, previous.path, typ.SchemaPath)
+			}
+		}
 	}
-	assertDefinitionsEqualIfPresent(t, plan, "v2/ProcessSpawnParams.json", "v2/ProcessResizePtyParams.json", "ProcessTerminalSize")
-}
-
-func TestCommandExecTerminalSizeDefinitionsStayEquivalent(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertDefinitionsEqualIfPresent(t, plan, "v2/CommandExecParams.json", "v2/CommandExecResizeParams.json", "CommandExecTerminalSize")
-}
-
-func TestExternalAgentConfigMigrationDefinitionsStayEquivalent(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{
-		"CommandMigration",
-		"ExternalAgentConfigMigrationItem",
-		"ExternalAgentConfigMigrationItemType",
-		"HookMigration",
-		"McpServerMigration",
-		"MigrationDetails",
-		"PluginsMigration",
-		"SessionMigration",
-		"SubagentMigration",
-	} {
-		assertDefinitionsEqualIfPresent(t, plan, "v2/ExternalAgentConfigDetectResponse.json", "v2/ExternalAgentConfigImportParams.json", name)
+	if selectedCount == 0 {
+		t.Fatal("selected generated definition count = 0")
 	}
 }
 
@@ -410,122 +404,49 @@ func TestSelectGeneratedUntaggedObjectUnions(t *testing.T) {
 	}
 }
 
-func TestReviewDecisionResponseDefinitionsStayShared(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"ReviewDecision", "NetworkPolicyAmendment"} {
-		assertDefinitionsEqualIfPresent(t, plan, "ApplyPatchApprovalResponse.json", "ExecCommandApprovalResponse.json", name)
-		assertDefinitionsEqualIfPresent(t, plan, "ApplyPatchApprovalResponse.json", "CommandExecutionRequestApprovalResponse.json", name)
-	}
-}
-
-func TestPermissionApprovalDefinitionsStayShared(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	names := []string{
-		"AdditionalFileSystemPermissions",
-		"AdditionalNetworkPermissions",
-		"FileSystemAccessMode",
-		"FileSystemPath",
-		"FileSystemSandboxEntry",
-		"FileSystemSpecialPath",
-	}
-	names = append(names, "ApiPathString", "LegacyAppPathString", "AbsolutePathBuf")
-	for _, name := range names {
-		assertDefinitionsEqualIfPresent(t, plan, "CommandExecutionRequestApprovalParams.json", "PermissionsRequestApprovalParams.json", name)
-		assertDefinitionsEqualIfPresent(t, plan, "CommandExecutionRequestApprovalParams.json", "PermissionsRequestApprovalResponse.json", name)
-	}
-}
-
-func TestGuardianApprovalReviewDefinitionsStayShared(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{
-		"GuardianApprovalReview",
-		"GuardianApprovalReviewAction",
-		"RequestPermissionProfile",
-	} {
-		assertDefinitionsEqualIfPresent(t, plan, "v2/ItemGuardianApprovalReviewStartedNotification.json", "v2/ItemGuardianApprovalReviewCompletedNotification.json", name)
-	}
-}
-
-func TestCommandExecPermissionDefinitionsStayShared(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"AbsolutePathBuf"} {
-		assertDefinitionsEqualIfPresent(t, plan, "v2/CommandExecParams.json", "CommandExecutionRequestApprovalParams.json", name)
-	}
-}
-
-func TestAccountRateLimitDefinitionsStayShared(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{
-		"CreditsSnapshot",
-		"PlanType",
-		"RateLimitReachedType",
-		"RateLimitSnapshot",
-		"RateLimitWindow",
-	} {
-		assertDefinitionsEqualIfPresent(t, plan, "v2/GetAccountRateLimitsResponse.json", "v2/AccountRateLimitsUpdatedNotification.json", name)
-	}
-}
-
-func TestThreadTurnParamDefinitionsStayShared(t *testing.T) {
-	plan, err := BuildProtocolTypePlan(filepath.Join("..", "protocolschema", "appserver", "v2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{
-		"AbsolutePathBuf",
-		"ApprovalsReviewer",
-		"AskForApproval",
-	} {
-		assertDefinitionsEqualIfPresent(t, plan, "v2/ThreadStartParams.json", "v2/ThreadForkParams.json", name)
-		assertDefinitionsEqualIfPresent(t, plan, "v2/ThreadStartParams.json", "v2/TurnStartParams.json", name)
-	}
-	for _, name := range []string{"Personality", "TurnEnvironmentParams"} {
-		assertDefinitionsEqualIfPresent(t, plan, "v2/ThreadStartParams.json", "v2/TurnStartParams.json", name)
-	}
-	assertDefinitionsEqualIfPresent(t, plan, "v2/ThreadStartParams.json", "v2/ThreadForkParams.json", "ThreadSource")
-	assertDefinitionsEqualIfPresent(t, plan, "v2/ThreadStartParams.json", "v2/ThreadForkParams.json", "SandboxMode")
-}
-
-func encodedDefinition(t *testing.T, typ TypePlan, name string) []byte {
+func encodedSchema(t *testing.T, schema *Schema) []byte {
 	t.Helper()
-	if typ.Schema == nil || typ.Schema.Definitions[name] == nil {
-		t.Fatalf("%s definition is missing from %s", name, typ.SchemaPath)
-	}
-	raw, err := json.Marshal(typ.Schema.Definitions[name])
+	raw, err := json.Marshal(schema)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return raw
 }
 
-func assertDefinitionsEqualIfPresent(t *testing.T, plan ProtocolTypePlan, leftPath string, rightPath string, name string) {
-	t.Helper()
-	left, ok := plan.TypeBySchema(leftPath)
-	if !ok || !definitionExists(left, name) {
-		return
+func selectedGeneratedDefinitionKindForTest(schemaPath string, name string, schema *Schema) (string, bool) {
+	var kinds []string
+	if _, ok := reviewedStringEnumValues(schemaPath, name, schema); ok {
+		kinds = append(kinds, "string_enum")
 	}
-	right, ok := plan.TypeBySchema(rightPath)
-	if !ok || !definitionExists(right, name) {
-		return
+	if isGeneratedDefinitionScalarAliasCheckpoint(schemaPath, name) {
+		kinds = append(kinds, "scalar_alias")
 	}
-	if !bytes.Equal(encodedDefinition(t, left, name), encodedDefinition(t, right, name)) {
-		t.Fatalf("%s definition differs between %s and %s", name, leftPath, rightPath)
+	if isGeneratedDefinitionScalarUnionCheckpoint(schemaPath, name) {
+		kinds = append(kinds, "scalar_union")
 	}
+	if isGeneratedDefinitionStructCheckpoint(schemaPath, name) {
+		if !isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(schemaPath, name) || schema == nil || len(schema.OneOf) == 0 {
+			kinds = append(kinds, "struct")
+		}
+	}
+	if isGeneratedDefinitionTaggedUnionCheckpoint(schemaPath, name) {
+		if !isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(schemaPath, name) || !isObjectStructDefinitionSchema(schema) {
+			kinds = append(kinds, "tagged_union")
+		}
+	}
+	if isGeneratedDefinitionMixedUnionCheckpoint(schemaPath, name) {
+		kinds = append(kinds, "mixed_union")
+	}
+	if isGeneratedDefinitionUntaggedObjectUnionCheckpoint(schemaPath, name) {
+		kinds = append(kinds, "untagged_object_union")
+	}
+	if len(kinds) == 0 {
+		return "", false
+	}
+	if len(kinds) != 1 {
+		return strings.Join(kinds, "+"), true
+	}
+	return kinds[0], true
 }
 
 func assertGeneratedFieldPlan(t *testing.T, owner string, field FieldPlan) {
