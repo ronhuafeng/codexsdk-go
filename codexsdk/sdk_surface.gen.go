@@ -47,9 +47,11 @@ type Accounts interface {
 	LoginCancel(ctx context.Context, params protocolv2.CancelLoginAccountParams) (protocolv2.CancelLoginAccountResponse, error)
 	LoginStart(ctx context.Context, params protocolv2.LoginAccountParams) (protocolv2.LoginAccountResponse, error)
 	Logout(ctx context.Context) (protocolv2.LogoutAccountResponse, error)
+	RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error)
 	RateLimitsRead(ctx context.Context) (protocolv2.GetAccountRateLimitsResponse, error)
 	Read(ctx context.Context, params protocolv2.GetAccountParams) (protocolv2.GetAccountResponse, error)
 	SendAddCreditsNudgeEmail(ctx context.Context, params protocolv2.SendAddCreditsNudgeEmailParams) (protocolv2.SendAddCreditsNudgeEmailResponse, error)
+	WorkspaceMessagesRead(ctx context.Context) (protocolv2.GetWorkspaceMessagesResponse, error)
 }
 
 func (c *client) Accounts() Accounts {
@@ -154,6 +156,7 @@ type externalAgentConfigsFacade struct {
 type ExternalAgentConfigs interface {
 	Detect(ctx context.Context, params protocolv2.ExternalAgentConfigDetectParams) (protocolv2.ExternalAgentConfigDetectResponse, error)
 	Import(ctx context.Context, params protocolv2.ExternalAgentConfigImportParams) (protocolv2.ExternalAgentConfigImportResponse, error)
+	ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error)
 }
 
 func (c *client) ExternalAgentConfigs() ExternalAgentConfigs {
@@ -412,6 +415,7 @@ type Threads interface {
 	NameSet(ctx context.Context, params protocolv2.ThreadSetNameParams) (protocolv2.ThreadSetNameResponse, error)
 	Read(ctx context.Context, params protocolv2.ThreadReadParams) (protocolv2.ThreadReadResponse, error)
 	RealtimeAppendAudio(ctx context.Context, params protocolv2.ThreadRealtimeAppendAudioParams) (protocolv2.ThreadRealtimeAppendAudioResponse, error)
+	RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error)
 	RealtimeAppendText(ctx context.Context, params protocolv2.ThreadRealtimeAppendTextParams) (protocolv2.ThreadRealtimeAppendTextResponse, error)
 	RealtimeListVoices(ctx context.Context, params protocolv2.ThreadRealtimeListVoicesParams) (protocolv2.ThreadRealtimeListVoicesResponse, error)
 	RealtimeStart(ctx context.Context, params protocolv2.ThreadRealtimeStartParams) (protocolv2.ThreadRealtimeStartResponse, error)
@@ -482,6 +486,14 @@ func (f accountsFacade) Logout(ctx context.Context) (protocolv2.LogoutAccountRes
 	return response, nil
 }
 
+func (f accountsFacade) RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error) {
+	var response protocolv2.ConsumeAccountRateLimitResetCreditResponse
+	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountRateLimitResetCreditConsume, params, &response); err != nil {
+		return protocolv2.ConsumeAccountRateLimitResetCreditResponse{}, err
+	}
+	return response, nil
+}
+
 func (f accountsFacade) RateLimitsRead(ctx context.Context) (protocolv2.GetAccountRateLimitsResponse, error) {
 	var response protocolv2.GetAccountRateLimitsResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodAccountRateLimitsRead, &response); err != nil {
@@ -502,6 +514,14 @@ func (f accountsFacade) SendAddCreditsNudgeEmail(ctx context.Context, params pro
 	var response protocolv2.SendAddCreditsNudgeEmailResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountSendAddCreditsNudgeEmail, params, &response); err != nil {
 		return protocolv2.SendAddCreditsNudgeEmailResponse{}, err
+	}
+	return response, nil
+}
+
+func (f accountsFacade) WorkspaceMessagesRead(ctx context.Context) (protocolv2.GetWorkspaceMessagesResponse, error) {
+	var response protocolv2.GetWorkspaceMessagesResponse
+	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodAccountWorkspaceMessagesRead, &response); err != nil {
+		return protocolv2.GetWorkspaceMessagesResponse{}, err
 	}
 	return response, nil
 }
@@ -630,6 +650,14 @@ func (f externalAgentConfigsFacade) Import(ctx context.Context, params protocolv
 	var response protocolv2.ExternalAgentConfigImportResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodExternalAgentConfigImport, params, &response); err != nil {
 		return protocolv2.ExternalAgentConfigImportResponse{}, err
+	}
+	return response, nil
+}
+
+func (f externalAgentConfigsFacade) ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error) {
+	var response protocolv2.ExternalAgentConfigImportHistoriesReadResponse
+	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodExternalAgentConfigImportReadHistories, &response); err != nil {
+		return protocolv2.ExternalAgentConfigImportHistoriesReadResponse{}, err
 	}
 	return response, nil
 }
@@ -1198,6 +1226,14 @@ func (f threadsFacade) RealtimeAppendAudio(ctx context.Context, params protocolv
 	var response protocolv2.ThreadRealtimeAppendAudioResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeAppendAudio, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeAppendAudioResponse{}, err
+	}
+	return response, nil
+}
+
+func (f threadsFacade) RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error) {
+	var response protocolv2.ThreadRealtimeAppendSpeechResponse
+	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeAppendSpeech, params, &response); err != nil {
+		return protocolv2.ThreadRealtimeAppendSpeechResponse{}, err
 	}
 	return response, nil
 }
