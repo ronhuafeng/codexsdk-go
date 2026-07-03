@@ -122,15 +122,6 @@
         "default"
       ]
     },
-    "MultiAgentMode": {
-      "description": "Controls whether the model receives multi-agent delegation instructions and, when it does, whether it should only spawn sub-agents after an explicit user request or may delegate proactively when doing so would help. `none` leaves the multi-agent tools available without injecting delegation instructions.",
-      "type": "string",
-      "enum": [
-        "none",
-        "explicitRequestOnly",
-        "proactive"
-      ]
-    },
     "NetworkAccess": {
       "type": "string",
       "enum": [
@@ -347,15 +338,6 @@
         },
         "modelProvider": {
           "type": "string"
-        },
-        "multiAgentMode": {
-          "description": "@deprecated Always `explicitRequestOnly`. Use `effort` for Ultra behavior.",
-          "default": "explicitRequestOnly",
-          "allOf": [
-            {
-              "$ref": "#/definitions/MultiAgentMode"
-            }
-          ]
         },
         "personality": {
           "anyOf": [

@@ -28,8 +28,7 @@
       "type": "string",
       "enum": [
         "user",
-        "developer",
-        "assistant"
+        "developer"
       ]
     }
   }

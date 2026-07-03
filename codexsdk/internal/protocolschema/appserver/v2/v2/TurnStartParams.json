@@ -97,17 +97,6 @@
         "null"
       ]
     },
-    "multiAgentMode": {
-      "description": "@deprecated Ignored. Use `effort: \"ultra\"` for proactive multi-agent behavior.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/MultiAgentMode"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "outputSchema": {
       "description": "Optional JSON Schema used to constrain the final assistant message for this turn."
     },
@@ -312,24 +301,12 @@
         "original"
       ]
     },
-    "LegacyAppPathString": {
-      "type": "string"
-    },
     "ModeKind": {
       "description": "Initial collaboration mode to use when the TUI starts.",
       "type": "string",
       "enum": [
         "plan",
         "default"
-      ]
-    },
-    "MultiAgentMode": {
-      "description": "Controls whether the model receives multi-agent delegation instructions and, when it does, whether it should only spawn sub-agents after an explicit user request or may delegate proactively when doing so would help. `none` leaves the multi-agent tools available without injecting delegation instructions.",
-      "type": "string",
-      "enum": [
-        "none",
-        "explicitRequestOnly",
-        "proactive"
       ]
     },
     "NetworkAccess": {
@@ -530,7 +507,7 @@
       ],
       "properties": {
         "cwd": {
-          "$ref": "#/definitions/LegacyAppPathString"
+          "$ref": "#/definitions/AbsolutePathBuf"
         },
         "environmentId": {
           "type": "string"
