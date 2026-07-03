@@ -414,6 +414,9 @@ func generatedDefinitionTypeCandidates(parent TypePlan) ([]TypePlan, error) {
 	var candidates []TypePlan
 	for _, name := range names {
 		schema := parent.Schema.Definitions[name]
+		if isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(parent.SchemaPath, name) && schema != nil && len(schema.OneOf) > 0 {
+			continue
+		}
 		typ, err := definitionObjectTypePlan(parent, name, schema)
 		if err != nil {
 			return nil, err
@@ -1308,6 +1311,9 @@ func generatedDefinitionTaggedUnionCandidates(parent TypePlan) ([]TypePlan, erro
 	for _, name := range names {
 		schema := parent.Schema.Definitions[name]
 		if schema == nil || len(schema.OneOf) == 0 {
+			if isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(parent.SchemaPath, name) && isObjectStructDefinitionSchema(schema) {
+				continue
+			}
 			return nil, fmt.Errorf("definition tagged union %s in %s is not a oneOf schema", name, parent.SchemaPath)
 		}
 		candidates = append(candidates, TypePlan{
@@ -2067,7 +2073,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		}
 	case "v2/ThreadStartParams.json":
 		switch name {
-		case "SelectedCapabilityRoot", "TurnEnvironmentParams":
+		case "DynamicToolSpec", "SelectedCapabilityRoot", "TurnEnvironmentParams":
 			return true
 		default:
 			return false
@@ -2108,6 +2114,14 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 	default:
 		return false
 	}
+}
+
+func isObjectStructDefinitionSchema(schema *Schema) bool {
+	return schema != nil && schema.Type.Only("object")
+}
+
+func isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(schemaPath string, name string) bool {
+	return schemaPath == "v2/ThreadStartParams.json" && name == "DynamicToolSpec"
 }
 
 func isGeneratedDefinitionMixedUnionCheckpoint(schemaPath string, name string) bool {
