@@ -1,19 +1,13 @@
 {
-  "field_updates": [],
-  "instructions": [
-    "Do not silently mark new surface as supported.",
-    "New or changed surface starts as deferred with unclassified or drift-derived stability until reviewed.",
-    "No raw passthrough status is allowed."
-  ],
-  "method_updates": [],
-  "schema_version": 1,
-  "source": "drift_report.json",
   "status": "empty",
-  "type_updates": [],
+  "source": "drift_summary.json",
   "valid_statuses": [
     "supported",
     "supported-generated",
     "deferred",
     "intentionally-unsupported"
-  ]
+  ],
+  "method_updates": [],
+  "type_updates": [],
+  "field_updates": []
 }

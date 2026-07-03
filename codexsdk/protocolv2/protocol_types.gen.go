@@ -6511,6 +6511,7 @@ type CommandExecutionRequestApprovalParams struct {
 	Command                         *Nullable[string]                             `json:"command,omitempty"`
 	CommandActions                  *Nullable[[]CommandAction]                    `json:"commandActions,omitempty"`
 	CWD                             *Nullable[string]                             `json:"cwd,omitempty"`
+	EnvironmentID                   *Nullable[string]                             `json:"environmentId,omitempty"`
 	ItemID                          string                                        `json:"itemId"`
 	NetworkApprovalContext          *Nullable[NetworkApprovalContext]             `json:"networkApprovalContext,omitempty"`
 	ProposedExecpolicyAmendment     *Nullable[[]string]                           `json:"proposedExecpolicyAmendment,omitempty"`
@@ -6548,6 +6549,10 @@ func (value *CommandExecutionRequestApprovalParams) UnmarshalJSON(data []byte) e
 		return err
 	}
 	_, err = decodeNullableJSONField[string](fields, "cwd", "CommandExecutionRequestApprovalParams.cwd", &decoded.CWD)
+	if err != nil {
+		return err
+	}
+	_, err = decodeNullableJSONField[string](fields, "environmentId", "CommandExecutionRequestApprovalParams.environmentId", &decoded.EnvironmentID)
 	if err != nil {
 		return err
 	}
@@ -7746,8 +7751,9 @@ func (value *DynamicToolCallResponse) UnmarshalJSON(data []byte) error {
 }
 
 type EnvironmentAddParams struct {
-	EnvironmentID string `json:"environmentId"`
-	ExecServerURL string `json:"execServerUrl"`
+	ConnectTimeoutMS *Nullable[uint64] `json:"connectTimeoutMs,omitempty"`
+	EnvironmentID    string            `json:"environmentId"`
+	ExecServerURL    string            `json:"execServerUrl"`
 }
 
 func (value *EnvironmentAddParams) UnmarshalJSON(data []byte) error {
@@ -7756,6 +7762,10 @@ func (value *EnvironmentAddParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded EnvironmentAddParams
+	_, err = decodeNullableJSONField[uint64](fields, "connectTimeoutMs", "EnvironmentAddParams.connectTimeoutMs", &decoded.ConnectTimeoutMS)
+	if err != nil {
+		return err
+	}
 	seenEnvironmentID, err := decodeJSONField(fields, "environmentId", "EnvironmentAddParams.environmentId", false, &decoded.EnvironmentID)
 	if err != nil {
 		return err
@@ -8420,6 +8430,7 @@ func (value *ExternalAgentConfigImportItemTypeSuccess) UnmarshalJSON(data []byte
 
 type ExternalAgentConfigImportParams struct {
 	MigrationItems []ExternalAgentConfigMigrationItem `json:"migrationItems"`
+	Source         *Nullable[string]                  `json:"source,omitempty"`
 }
 
 func (value ExternalAgentConfigImportParams) MarshalJSON() ([]byte, error) {
@@ -8442,6 +8453,10 @@ func (value *ExternalAgentConfigImportParams) UnmarshalJSON(data []byte) error {
 	}
 	if !seenMigrationItems {
 		return missingRequiredField("ExternalAgentConfigImportParams.migrationItems")
+	}
+	_, err = decodeNullableJSONField[string](fields, "source", "ExternalAgentConfigImportParams.source", &decoded.Source)
+	if err != nil {
+		return err
 	}
 	if err := rejectUnexpectedFields(fields, "ExternalAgentConfigImportParams"); err != nil {
 		return err
@@ -17726,6 +17741,7 @@ type ThreadForkResponse struct {
 	InstructionSources      *[]string                          `json:"instructionSources,omitempty"`
 	Model                   string                             `json:"model"`
 	ModelProvider           string                             `json:"modelProvider"`
+	MultiAgentMode          *MultiAgentMode                    `json:"multiAgentMode,omitempty"`
 	ReasoningEffort         *Nullable[ReasoningEffort]         `json:"reasoningEffort,omitempty"`
 	RuntimeWorkspaceRoots   *[]string                          `json:"runtimeWorkspaceRoots,omitempty"`
 	Sandbox                 SandboxPolicy                      `json:"sandbox"`
@@ -17781,6 +17797,10 @@ func (value *ThreadForkResponse) UnmarshalJSON(data []byte) error {
 	}
 	if !seenModelProvider {
 		return missingRequiredField("ThreadForkResponse.modelProvider")
+	}
+	_, err = decodeJSONField(fields, "multiAgentMode", "ThreadForkResponse.multiAgentMode", false, &decoded.MultiAgentMode)
+	if err != nil {
+		return err
 	}
 	_, err = decodeNullableJSONField[ReasoningEffort](fields, "reasoningEffort", "ThreadForkResponse.reasoningEffort", &decoded.ReasoningEffort)
 	if err != nil {
@@ -18996,17 +19016,19 @@ func (value *ThreadRealtimeSdpNotification) UnmarshalJSON(data []byte) error {
 }
 
 type ThreadRealtimeStartParams struct {
-	CodexResponseItemPrefix *Nullable[string]                       `json:"codexResponseItemPrefix,omitempty"`
-	CodexResponsesAsItems   *Nullable[bool]                         `json:"codexResponsesAsItems,omitempty"`
-	IncludeStartupContext   *Nullable[bool]                         `json:"includeStartupContext,omitempty"`
-	Model                   *Nullable[string]                       `json:"model,omitempty"`
-	OutputModality          RealtimeOutputModality                  `json:"outputModality"`
-	Prompt                  *Nullable[string]                       `json:"prompt,omitempty"`
-	RealtimeSessionID       *Nullable[string]                       `json:"realtimeSessionId,omitempty"`
-	ThreadID                string                                  `json:"threadId"`
-	Transport               *Nullable[ThreadRealtimeStartTransport] `json:"transport,omitempty"`
-	Version                 *Nullable[RealtimeConversationVersion]  `json:"version,omitempty"`
-	Voice                   *Nullable[RealtimeVoice]                `json:"voice,omitempty"`
+	ClientManagedHandoffs      *Nullable[bool]                         `json:"clientManagedHandoffs,omitempty"`
+	CodexResponseHandoffPrefix *Nullable[string]                       `json:"codexResponseHandoffPrefix,omitempty"`
+	CodexResponseItemPrefix    *Nullable[string]                       `json:"codexResponseItemPrefix,omitempty"`
+	CodexResponsesAsItems      *Nullable[bool]                         `json:"codexResponsesAsItems,omitempty"`
+	IncludeStartupContext      *Nullable[bool]                         `json:"includeStartupContext,omitempty"`
+	Model                      *Nullable[string]                       `json:"model,omitempty"`
+	OutputModality             RealtimeOutputModality                  `json:"outputModality"`
+	Prompt                     *Nullable[string]                       `json:"prompt,omitempty"`
+	RealtimeSessionID          *Nullable[string]                       `json:"realtimeSessionId,omitempty"`
+	ThreadID                   string                                  `json:"threadId"`
+	Transport                  *Nullable[ThreadRealtimeStartTransport] `json:"transport,omitempty"`
+	Version                    *Nullable[RealtimeConversationVersion]  `json:"version,omitempty"`
+	Voice                      *Nullable[RealtimeVoice]                `json:"voice,omitempty"`
 }
 
 func (value *ThreadRealtimeStartParams) UnmarshalJSON(data []byte) error {
@@ -19015,6 +19037,14 @@ func (value *ThreadRealtimeStartParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var decoded ThreadRealtimeStartParams
+	_, err = decodeNullableJSONField[bool](fields, "clientManagedHandoffs", "ThreadRealtimeStartParams.clientManagedHandoffs", &decoded.ClientManagedHandoffs)
+	if err != nil {
+		return err
+	}
+	_, err = decodeNullableJSONField[string](fields, "codexResponseHandoffPrefix", "ThreadRealtimeStartParams.codexResponseHandoffPrefix", &decoded.CodexResponseHandoffPrefix)
+	if err != nil {
+		return err
+	}
 	_, err = decodeNullableJSONField[string](fields, "codexResponseItemPrefix", "ThreadRealtimeStartParams.codexResponseItemPrefix", &decoded.CodexResponseItemPrefix)
 	if err != nil {
 		return err
@@ -19390,6 +19420,7 @@ type ThreadResumeResponse struct {
 	InstructionSources      *[]string                          `json:"instructionSources,omitempty"`
 	Model                   string                             `json:"model"`
 	ModelProvider           string                             `json:"modelProvider"`
+	MultiAgentMode          *MultiAgentMode                    `json:"multiAgentMode,omitempty"`
 	ReasoningEffort         *Nullable[ReasoningEffort]         `json:"reasoningEffort,omitempty"`
 	RuntimeWorkspaceRoots   *[]string                          `json:"runtimeWorkspaceRoots,omitempty"`
 	Sandbox                 SandboxPolicy                      `json:"sandbox"`
@@ -19449,6 +19480,10 @@ func (value *ThreadResumeResponse) UnmarshalJSON(data []byte) error {
 	}
 	if !seenModelProvider {
 		return missingRequiredField("ThreadResumeResponse.modelProvider")
+	}
+	_, err = decodeJSONField(fields, "multiAgentMode", "ThreadResumeResponse.multiAgentMode", false, &decoded.MultiAgentMode)
+	if err != nil {
+		return err
 	}
 	_, err = decodeNullableJSONField[ReasoningEffort](fields, "reasoningEffort", "ThreadResumeResponse.reasoningEffort", &decoded.ReasoningEffort)
 	if err != nil {
@@ -19748,6 +19783,7 @@ type ThreadSettingsUpdateParams struct {
 	CWD               *Nullable[string]            `json:"cwd,omitempty"`
 	Effort            *Nullable[ReasoningEffort]   `json:"effort,omitempty"`
 	Model             *Nullable[string]            `json:"model,omitempty"`
+	MultiAgentMode    *Nullable[MultiAgentMode]    `json:"multiAgentMode,omitempty"`
 	Permissions       *Nullable[string]            `json:"permissions,omitempty"`
 	Personality       *Nullable[Personality]       `json:"personality,omitempty"`
 	SandboxPolicy     *Nullable[SandboxPolicy]     `json:"sandboxPolicy,omitempty"`
@@ -19783,6 +19819,10 @@ func (value *ThreadSettingsUpdateParams) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	_, err = decodeNullableJSONField[string](fields, "model", "ThreadSettingsUpdateParams.model", &decoded.Model)
+	if err != nil {
+		return err
+	}
+	_, err = decodeNullableJSONField[MultiAgentMode](fields, "multiAgentMode", "ThreadSettingsUpdateParams.multiAgentMode", &decoded.MultiAgentMode)
 	if err != nil {
 		return err
 	}
@@ -19926,6 +19966,7 @@ type ThreadStartParams struct {
 	MockExperimentalField   *Nullable[string]                   `json:"mockExperimentalField,omitempty"`
 	Model                   *Nullable[string]                   `json:"model,omitempty"`
 	ModelProvider           *Nullable[string]                   `json:"modelProvider,omitempty"`
+	MultiAgentMode          *Nullable[MultiAgentMode]           `json:"multiAgentMode,omitempty"`
 	Permissions             *Nullable[string]                   `json:"permissions,omitempty"`
 	Personality             *Nullable[Personality]              `json:"personality,omitempty"`
 	RuntimeWorkspaceRoots   *Nullable[[]string]                 `json:"runtimeWorkspaceRoots,omitempty"`
@@ -19995,6 +20036,10 @@ func (value *ThreadStartParams) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+	_, err = decodeNullableJSONField[MultiAgentMode](fields, "multiAgentMode", "ThreadStartParams.multiAgentMode", &decoded.MultiAgentMode)
+	if err != nil {
+		return err
+	}
 	_, err = decodeNullableJSONField[string](fields, "permissions", "ThreadStartParams.permissions", &decoded.Permissions)
 	if err != nil {
 		return err
@@ -20046,6 +20091,7 @@ type ThreadStartResponse struct {
 	InstructionSources      *[]string                          `json:"instructionSources,omitempty"`
 	Model                   string                             `json:"model"`
 	ModelProvider           string                             `json:"modelProvider"`
+	MultiAgentMode          *MultiAgentMode                    `json:"multiAgentMode,omitempty"`
 	ReasoningEffort         *Nullable[ReasoningEffort]         `json:"reasoningEffort,omitempty"`
 	RuntimeWorkspaceRoots   *[]string                          `json:"runtimeWorkspaceRoots,omitempty"`
 	Sandbox                 SandboxPolicy                      `json:"sandbox"`
@@ -20101,6 +20147,10 @@ func (value *ThreadStartResponse) UnmarshalJSON(data []byte) error {
 	}
 	if !seenModelProvider {
 		return missingRequiredField("ThreadStartResponse.modelProvider")
+	}
+	_, err = decodeJSONField(fields, "multiAgentMode", "ThreadStartResponse.multiAgentMode", false, &decoded.MultiAgentMode)
+	if err != nil {
+		return err
 	}
 	_, err = decodeNullableJSONField[ReasoningEffort](fields, "reasoningEffort", "ThreadStartResponse.reasoningEffort", &decoded.ReasoningEffort)
 	if err != nil {
@@ -21307,6 +21357,7 @@ type TurnStartParams struct {
 	Environments               *Nullable[[]TurnEnvironmentParams]           `json:"environments,omitempty"`
 	Input                      []UserInput                                  `json:"input"`
 	Model                      *Nullable[string]                            `json:"model,omitempty"`
+	MultiAgentMode             *Nullable[MultiAgentMode]                    `json:"multiAgentMode,omitempty"`
 	OutputSchema               *OutputSchema                                `json:"outputSchema,omitempty"`
 	Permissions                *Nullable[string]                            `json:"permissions,omitempty"`
 	Personality                *Nullable[Personality]                       `json:"personality,omitempty"`
@@ -21372,6 +21423,10 @@ func (value *TurnStartParams) UnmarshalJSON(data []byte) error {
 		return missingRequiredField("TurnStartParams.input")
 	}
 	_, err = decodeNullableJSONField[string](fields, "model", "TurnStartParams.model", &decoded.Model)
+	if err != nil {
+		return err
+	}
+	_, err = decodeNullableJSONField[MultiAgentMode](fields, "multiAgentMode", "TurnStartParams.multiAgentMode", &decoded.MultiAgentMode)
 	if err != nil {
 		return err
 	}
