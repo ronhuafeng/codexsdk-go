@@ -654,33 +654,11 @@ jobs:
             -m "Upstream-ref-kind: ${UPSTREAM_REF_KIND}" \
             -m "Upstream-commit: ${UPSTREAM_SHA}"
 
-      - name: Detect GitHub App token config
-        id: sync_app_token_config
-        env:
-          CODEXSDK_SYNC_APP_CLIENT_ID: ${{ vars.CODEXSDK_SYNC_APP_CLIENT_ID || secrets.CODEXSDK_SYNC_APP_CLIENT_ID }}
-          CODEXSDK_SYNC_APP_PRIVATE_KEY: ${{ secrets.CODEXSDK_SYNC_APP_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          if [[ -n "${CODEXSDK_SYNC_APP_CLIENT_ID}" && -n "${CODEXSDK_SYNC_APP_PRIVATE_KEY}" ]]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create GitHub App token
-        id: sync_app_token
-        if: steps.sync_app_token_config.outputs.enabled == 'true'
-        uses: actions/create-github-app-token@v3
-        with:
-          client-id: ${{ vars.CODEXSDK_SYNC_APP_CLIENT_ID || secrets.CODEXSDK_SYNC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.CODEXSDK_SYNC_APP_PRIVATE_KEY }}
-
       - name: Pre-main gate and land
         id: land
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
           AUTO_MERGE_PR_ON_FAILURE: ${{ github.event_name == 'schedule' || inputs.auto_merge_fallback_pr }}
-          CODEXSDK_SYNC_APP_TOKEN: ${{ steps.sync_app_token.outputs.token }}
           CODEXSDK_SYNC_BOT_TOKEN: ${{ secrets.CODEXSDK_SYNC_BOT_TOKEN }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
           OPEN_PR_ON_FAILURE: ${{ github.event_name == 'schedule' || inputs.open_pr_on_landing_failure }}
@@ -690,10 +668,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if [[ -n "${CODEXSDK_SYNC_APP_TOKEN}" ]]; then
-            export GH_TOKEN="${CODEXSDK_SYNC_APP_TOKEN}"
-            export CODEXSDK_SYNC_BOT_TOKEN="${CODEXSDK_SYNC_APP_TOKEN}"
-          elif [[ -n "${CODEXSDK_SYNC_BOT_TOKEN}" ]]; then
+          if [[ -n "${CODEXSDK_SYNC_BOT_TOKEN}" ]]; then
             export GH_TOKEN="${CODEXSDK_SYNC_BOT_TOKEN}"
           fi
           args=(
