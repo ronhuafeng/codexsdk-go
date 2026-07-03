@@ -1,14 +1,22 @@
 {
-  "baseline_schema_bundle_sha256": "16cfa46b38f00f3204a7f9f469cc084a1d31aef702c136f3e82794fdcef7099a",
-  "codex_version": "codex-cli 0.0.0",
-  "comparison_command": "codex app-server generate-json-schema --experimental --out <tmpdir>",
+  "status": "clean",
   "comparison_mode": "canonical-json",
+  "target": {
+    "source_repo": "https://github.com/openai/codex",
+    "source_ref_name": "rust-v0.142.5",
+    "source_ref_kind": "stable_rust_tag",
+    "source_commit": "26de83050b20f7e0ee211b9739e52ae00ce8032a",
+    "codex_version": "codex-cli 0.142.5",
+    "generator": "cargo",
+    "generator_detail": "codex app-server generate-json-schema --experimental --out codexsdk/internal/protocolschema/appserver/v2",
+    "schema_bundle_sha256": "c66670d7682c14758b8f7ae9af5d7657496c7f6c32df6bcf836f3f9dfe575bcf",
+    "canonical_json_note": "Schema comparisons use canonical JSON; object member ordering is irrelevant."
+  },
   "file_diff": {
     "added": [],
     "changed": [],
     "removed": []
   },
-  "matrix_update_skeleton": "matrix_update_skeleton.json",
   "method_diff": {
     "ClientRequest.json": {
       "added": [],
@@ -27,8 +35,5 @@
       "removed": []
     }
   },
-  "note": "This report compares canonical JSON, so object member ordering differences in generated schema bundles do not count as protocol drift.",
-  "schema_version": 1,
-  "source_commit": "598125109dd2e098486884d8fb563ebe90bc24da",
-  "status": "clean"
+  "matrix_update_skeleton": "matrix_update_skeleton.json"
 }

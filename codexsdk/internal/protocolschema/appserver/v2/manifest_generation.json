@@ -71,8 +71,10 @@
     "experimental_schema_command": "codex app-server generate-json-schema --experimental --out <tmpdir>",
     "response_mapping_source": "codex-rs/app-server-protocol/src/protocol/common.rs",
     "source_repo": "https://github.com/openai/codex",
-    "source_commit": "598125109dd2e098486884d8fb563ebe90bc24da",
-    "stable_schema_command": "codex app-server generate-json-schema --out <tmpdir>"
+    "source_commit": "26de83050b20f7e0ee211b9739e52ae00ce8032a",
+    "stable_schema_command": "codex app-server generate-json-schema --out <tmpdir>",
+    "source_ref_name": "rust-v0.142.5",
+    "source_ref_kind": "stable_rust_tag"
   },
   "non_goals": [
     "This file does not generate protocolv2 Go code.",
