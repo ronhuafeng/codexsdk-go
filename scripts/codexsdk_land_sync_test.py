@@ -305,7 +305,7 @@ class LandSyncTest(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("requires CODEXSDK_SYNC_BOT_TOKEN", completed.stderr)
+            self.assertIn("requires CODEXSDK_SYNC_BOT_TOKEN or a generated GitHub App token", completed.stderr)
             self.assertIn("required checks would never appear", completed.stderr)
 
 
