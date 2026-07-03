@@ -508,6 +508,37 @@ func TestPlanFieldNormalizesNestedNullableAnyOf(t *testing.T) {
 	}
 }
 
+func TestPlanFieldClassifiesNullableRefFixture(t *testing.T) {
+	coverage := CoverageField{
+		Field:     "profile",
+		Path:      "Example.json#/properties/profile",
+		Required:  false,
+		Schema:    "Example.json",
+		Stability: "stable",
+		Status:    "supported-generated",
+		Type:      "Example",
+	}
+	field, err := planField(coverage, &Schema{
+		AnyOf: []*Schema{{
+			Ref: "#/definitions/Profile",
+		}, {
+			Type: SchemaTypeSet{Values: []string{"null"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if field.Kind != FieldPlanNullableRef {
+		t.Fatalf("nullable ref fixture kind = %s, want %s", field.Kind, FieldPlanNullableRef)
+	}
+	if field.GoType != "*protocolv2.Nullable[Profile]" {
+		t.Fatalf("nullable ref fixture GoType = %q, want *protocolv2.Nullable[Profile]", field.GoType)
+	}
+	if !field.WireAllowsNull || !field.WireOmitAllowed {
+		t.Fatal("nullable ref fixture must preserve omit/null/value semantics")
+	}
+}
+
 func TestProtocolTypePlanDoesNotPlanRawPublicPassthrough(t *testing.T) {
 	plan, err := BuildProtocolTypePlan(schemaRoot())
 	if err != nil {
