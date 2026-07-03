@@ -105,6 +105,9 @@ func TestGeneratedDefinitionSourcesStayCanonical(t *testing.T) {
 			if !ok {
 				continue
 			}
+			if kind == "" {
+				t.Fatalf("generated definition %s in %s has unsupported schema shape", name, typ.SchemaPath)
+			}
 			if strings.Contains(kind, "+") {
 				t.Fatalf("generated definition %s in %s maps to multiple generated kinds: %s", name, typ.SchemaPath, kind)
 			}
@@ -174,7 +177,7 @@ func TestSelectGeneratedEnums(t *testing.T) {
 			if !ok || typ.Schema == nil || typ.Schema.Definitions[enum.TypeName] == nil {
 				t.Fatalf("generated enum %s source %s does not contain its definition", enum.TypeName, source)
 			}
-			sourceValues, ok := reviewedStringEnumValues(source, enum.TypeName, typ.Schema.Definitions[enum.TypeName])
+			sourceValues, ok := stringEnumValues(typ.Schema.Definitions[enum.TypeName])
 			if !ok || !sameStrings(sourceValues, enum.Values) {
 				t.Fatalf("generated enum %s values %v do not match source %s values %v", enum.TypeName, enum.Values, source, sourceValues)
 			}
@@ -232,7 +235,7 @@ func TestStringEnumValuesRejectsImpureSingleOneOfWrapper(t *testing.T) {
 	}
 }
 
-func TestReviewedStringEnumValuesAcceptsCheckpointedPureMultiOneOf(t *testing.T) {
+func TestStringEnumValuesAcceptsPureMultiOneOf(t *testing.T) {
 	stringEnum := func(value string) *Schema {
 		return &Schema{
 			Type: SchemaTypeSet{Values: []string{"string"}},
@@ -243,28 +246,22 @@ func TestReviewedStringEnumValuesAcceptsCheckpointedPureMultiOneOf(t *testing.T)
 		stringEnum("accept"),
 		stringEnum("decline"),
 	}}
-	if values, ok := reviewedStringEnumValues("FileChangeRequestApprovalResponse.json", "FileChangeApprovalDecision", schema); !ok || strings.Join(values, ",") != "accept,decline" {
-		t.Fatalf("reviewed multi-oneOf enum values = %v, ok=%t", values, ok)
+	if values, ok := stringEnumValues(schema); !ok || strings.Join(values, ",") != "accept,decline" {
+		t.Fatalf("multi-oneOf enum values = %v, ok=%t", values, ok)
 	}
 	modelSchema := &Schema{OneOf: []*Schema{
 		stringEnum("text"),
 		stringEnum("image"),
 	}}
-	if values, ok := reviewedStringEnumValues("v2/ModelListResponse.json", "InputModality", modelSchema); !ok || strings.Join(values, ",") != "text,image" {
-		t.Fatalf("reviewed InputModality multi-oneOf enum values = %v, ok=%t", values, ok)
+	if values, ok := stringEnumValues(modelSchema); !ok || strings.Join(values, ",") != "text,image" {
+		t.Fatalf("InputModality multi-oneOf enum values = %v, ok=%t", values, ok)
 	}
 	processSchema := &Schema{OneOf: []*Schema{
 		stringEnum("stdout"),
 		stringEnum("stderr"),
 	}}
-	if values, ok := reviewedStringEnumValues("v2/ProcessOutputDeltaNotification.json", "ProcessOutputStream", processSchema); !ok || strings.Join(values, ",") != "stdout,stderr" {
-		t.Fatalf("reviewed ProcessOutputStream multi-oneOf enum values = %v, ok=%t", values, ok)
-	}
-	if values, ok := reviewedStringEnumValues("v2/CommandExecOutputDeltaNotification.json", "CommandExecOutputStream", processSchema); !ok || strings.Join(values, ",") != "stdout,stderr" {
-		t.Fatalf("reviewed CommandExecOutputStream multi-oneOf enum values = %v, ok=%t", values, ok)
-	}
-	if values, ok := reviewedStringEnumValues("Other.json", "FileChangeApprovalDecision", schema); ok {
-		t.Fatalf("uncheckpointed multi-oneOf enum was accepted: %v", values)
+	if values, ok := stringEnumValues(processSchema); !ok || strings.Join(values, ",") != "stdout,stderr" {
+		t.Fatalf("stream multi-oneOf enum values = %v, ok=%t", values, ok)
 	}
 	mixed := &Schema{OneOf: []*Schema{
 		stringEnum("accept"),
@@ -273,7 +270,7 @@ func TestReviewedStringEnumValuesAcceptsCheckpointedPureMultiOneOf(t *testing.T)
 			Properties: map[string]*Schema{"value": stringEnum("decline")},
 		},
 	}}
-	if values, ok := reviewedStringEnumValues("FileChangeRequestApprovalResponse.json", "FileChangeApprovalDecision", mixed); ok {
+	if values, ok := stringEnumValues(mixed); ok {
 		t.Fatalf("mixed multi-oneOf enum was accepted: %v", values)
 	}
 }
@@ -414,39 +411,17 @@ func encodedSchema(t *testing.T, schema *Schema) []byte {
 }
 
 func selectedGeneratedDefinitionKindForTest(schemaPath string, name string, schema *Schema) (string, bool) {
-	var kinds []string
-	if _, ok := reviewedStringEnumValues(schemaPath, name, schema); ok {
-		kinds = append(kinds, "string_enum")
+	if isImplicitGeneratedStringEnumDefinitionSchema(schema) {
+		return string(generatedDefinitionStringEnum), true
 	}
-	if isGeneratedDefinitionScalarAliasCheckpoint(schemaPath, name) {
-		kinds = append(kinds, "scalar_alias")
-	}
-	if isGeneratedDefinitionScalarUnionCheckpoint(schemaPath, name) {
-		kinds = append(kinds, "scalar_union")
-	}
-	if isGeneratedDefinitionStructCheckpoint(schemaPath, name) {
-		if !isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(schemaPath, name) || schema == nil || len(schema.OneOf) == 0 {
-			kinds = append(kinds, "struct")
-		}
-	}
-	if isGeneratedDefinitionTaggedUnionCheckpoint(schemaPath, name) {
-		if !isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(schemaPath, name) || !isObjectStructDefinitionSchema(schema) {
-			kinds = append(kinds, "tagged_union")
-		}
-	}
-	if isGeneratedDefinitionMixedUnionCheckpoint(schemaPath, name) {
-		kinds = append(kinds, "mixed_union")
-	}
-	if isGeneratedDefinitionUntaggedObjectUnionCheckpoint(schemaPath, name) {
-		kinds = append(kinds, "untagged_object_union")
-	}
-	if len(kinds) == 0 {
+	if !isReviewedGeneratedDefinition(schemaPath, name) {
 		return "", false
 	}
-	if len(kinds) != 1 {
-		return strings.Join(kinds, "+"), true
+	kind := classifyGeneratedDefinition(schema)
+	if kind == generatedDefinitionUnsupported {
+		return "", true
 	}
-	return kinds[0], true
+	return string(kind), true
 }
 
 func assertGeneratedFieldPlan(t *testing.T, owner string, field FieldPlan) {

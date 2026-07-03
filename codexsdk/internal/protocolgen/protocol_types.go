@@ -10,6 +10,9 @@ import (
 )
 
 func GenerateProtocolTypes(plan ProtocolTypePlan) ([]byte, error) {
+	if err := validateReviewedGeneratedDefinitionShapes(plan); err != nil {
+		return nil, err
+	}
 	enums, err := SelectGeneratedEnums(plan)
 	if err != nil {
 		return nil, err
@@ -207,6 +210,136 @@ func schemaRefName(ref string) string {
 	return parts[len(parts)-1]
 }
 
+type generatedDefinitionKind string
+
+const (
+	generatedDefinitionUnsupported         generatedDefinitionKind = ""
+	generatedDefinitionMixedUnion          generatedDefinitionKind = "mixed_union"
+	generatedDefinitionScalarAlias         generatedDefinitionKind = "scalar_alias"
+	generatedDefinitionScalarUnion         generatedDefinitionKind = "scalar_union"
+	generatedDefinitionStringEnum          generatedDefinitionKind = "string_enum"
+	generatedDefinitionStruct              generatedDefinitionKind = "struct"
+	generatedDefinitionTaggedUnion         generatedDefinitionKind = "tagged_union"
+	generatedDefinitionUntaggedObjectUnion generatedDefinitionKind = "untagged_object_union"
+)
+
+func classifyGeneratedDefinition(schema *Schema) generatedDefinitionKind {
+	switch {
+	case schema == nil:
+		return generatedDefinitionUnsupported
+	case isObjectStructDefinitionSchema(schema):
+		return generatedDefinitionStruct
+	case isScalarAliasDefinitionSchema(schema):
+		return generatedDefinitionScalarAlias
+	case isScalarUnionDefinitionSchema(schema):
+		return generatedDefinitionScalarUnion
+	case isStringEnumDefinitionSchema(schema):
+		return generatedDefinitionStringEnum
+	case isTaggedUnionDefinitionSchema(schema):
+		return generatedDefinitionTaggedUnion
+	case isMixedUnionDefinitionSchema(schema):
+		return generatedDefinitionMixedUnion
+	case isUntaggedObjectUnionDefinitionSchema(schema):
+		return generatedDefinitionUntaggedObjectUnion
+	default:
+		return generatedDefinitionUnsupported
+	}
+}
+
+func validateReviewedGeneratedDefinitionShapes(plan ProtocolTypePlan) error {
+	for _, typ := range plan.Types {
+		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
+			continue
+		}
+		for name, schema := range typ.Schema.Definitions {
+			if !isReviewedGeneratedDefinition(typ.SchemaPath, name) {
+				continue
+			}
+			if classifyGeneratedDefinition(schema) == generatedDefinitionUnsupported {
+				return fmt.Errorf("reviewed generated definition %s in %s has unsupported schema shape", name, typ.SchemaPath)
+			}
+		}
+	}
+	return nil
+}
+
+func isStringEnumDefinitionSchema(schema *Schema) bool {
+	_, ok := stringEnumValues(schema)
+	return ok
+}
+
+func isImplicitGeneratedStringEnumDefinitionSchema(schema *Schema) bool {
+	if isDirectStringEnumSchema(schema) {
+		return true
+	}
+	if schema == nil || schema.Bool != nil || !isPureSingleOneOfWrapper(schema) {
+		return false
+	}
+	return isDirectStringEnumSchema(schema.OneOf[0])
+}
+
+func isScalarAliasDefinitionSchema(schema *Schema) bool {
+	if schema == nil || !schema.Type.Only("string") || len(schema.Enum) != 0 || hasNonTypeShape(schema) {
+		return false
+	}
+	for _, keyword := range unmodeledKeywords(schema) {
+		if keyword != "minLength" {
+			return false
+		}
+	}
+	return true
+}
+
+func isScalarUnionDefinitionSchema(schema *Schema) bool {
+	return schema != nil && isReviewedScalarUnion(schema.AnyOf)
+}
+
+func isTaggedUnionDefinitionSchema(schema *Schema) bool {
+	if schema == nil || len(schema.OneOf) == 0 {
+		return false
+	}
+	for _, variant := range schema.OneOf {
+		if variant == nil || !variant.Type.Only("object") || len(variant.Properties) == 0 {
+			return false
+		}
+		if _, _, err := variantDiscriminator(variant); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func isMixedUnionDefinitionSchema(schema *Schema) bool {
+	if schema == nil || len(schema.OneOf) == 0 {
+		return false
+	}
+	var hasString bool
+	var hasObject bool
+	for _, variant := range schema.OneOf {
+		switch {
+		case isDirectStringEnumSchema(variant):
+			hasString = true
+		case variant != nil && variant.Type.Only("object"):
+			hasObject = true
+		default:
+			return false
+		}
+	}
+	return hasString && hasObject
+}
+
+func isUntaggedObjectUnionDefinitionSchema(schema *Schema) bool {
+	if schema == nil || len(schema.AnyOf) == 0 {
+		return false
+	}
+	for _, variant := range schema.AnyOf {
+		if variant == nil || !variant.Type.Only("object") || len(variant.Properties) == 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func SelectGeneratedEnums(plan ProtocolTypePlan) ([]EnumPlan, error) {
 	byName := map[string]EnumPlan{}
 	schemaByName := map[string][]byte{}
@@ -215,7 +348,13 @@ func SelectGeneratedEnums(plan ProtocolTypePlan) ([]EnumPlan, error) {
 			continue
 		}
 		for name, schema := range typ.Schema.Definitions {
-			enumValues, ok := reviewedStringEnumValues(typ.SchemaPath, name, schema)
+			if classifyGeneratedDefinition(schema) != generatedDefinitionStringEnum {
+				continue
+			}
+			if !isReviewedGeneratedDefinition(typ.SchemaPath, name) && !isImplicitGeneratedStringEnumDefinitionSchema(schema) {
+				continue
+			}
+			enumValues, ok := stringEnumValues(schema)
 			if !ok {
 				continue
 			}
@@ -267,7 +406,7 @@ func SelectGeneratedScalarAliases(plan ProtocolTypePlan) ([]ScalarAliasPlan, err
 			continue
 		}
 		for name, schema := range typ.Schema.Definitions {
-			if !isGeneratedDefinitionScalarAliasCheckpoint(typ.SchemaPath, name) {
+			if !isReviewedGeneratedDefinition(typ.SchemaPath, name) || classifyGeneratedDefinition(schema) != generatedDefinitionScalarAlias {
 				continue
 			}
 			if schema == nil || !schema.Type.Only("string") || len(schema.Enum) != 0 || hasNonTypeShape(schema) {
@@ -422,8 +561,8 @@ func generatedDefinitionTypeCandidates(parent TypePlan) ([]TypePlan, error) {
 		return nil, nil
 	}
 	var names []string
-	for name := range parent.Schema.Definitions {
-		if isGeneratedDefinitionStructCheckpoint(parent.SchemaPath, name) {
+	for name, schema := range parent.Schema.Definitions {
+		if isReviewedGeneratedDefinition(parent.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionStruct {
 			names = append(names, name)
 		}
 	}
@@ -432,9 +571,6 @@ func generatedDefinitionTypeCandidates(parent TypePlan) ([]TypePlan, error) {
 	var candidates []TypePlan
 	for _, name := range names {
 		schema := parent.Schema.Definitions[name]
-		if isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(parent.SchemaPath, name) && schema != nil && len(schema.OneOf) > 0 {
-			continue
-		}
 		typ, err := definitionObjectTypePlan(parent, name, schema)
 		if err != nil {
 			return nil, err
@@ -508,8 +644,8 @@ func mixedUnionCandidates(plan ProtocolTypePlan) ([]TypePlan, error) {
 			continue
 		}
 		var names []string
-		for name := range typ.Schema.Definitions {
-			if isGeneratedDefinitionMixedUnionCheckpoint(typ.SchemaPath, name) {
+		for name, schema := range typ.Schema.Definitions {
+			if isReviewedGeneratedDefinition(typ.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionMixedUnion {
 				names = append(names, name)
 			}
 		}
@@ -749,8 +885,8 @@ func untaggedObjectUnionCandidates(plan ProtocolTypePlan) ([]TypePlan, error) {
 			continue
 		}
 		var names []string
-		for name := range typ.Schema.Definitions {
-			if isGeneratedDefinitionUntaggedObjectUnionCheckpoint(typ.SchemaPath, name) {
+		for name, schema := range typ.Schema.Definitions {
+			if isReviewedGeneratedDefinition(typ.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionUntaggedObjectUnion {
 				names = append(names, name)
 			}
 		}
@@ -973,8 +1109,8 @@ func generatedDefinitionScalarUnionCandidates(parent TypePlan) ([]TypePlan, erro
 		return nil, nil
 	}
 	var names []string
-	for name := range parent.Schema.Definitions {
-		if isGeneratedDefinitionScalarUnionCheckpoint(parent.SchemaPath, name) {
+	for name, schema := range parent.Schema.Definitions {
+		if isReviewedGeneratedDefinition(parent.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionScalarUnion {
 			names = append(names, name)
 		}
 	}
@@ -1179,8 +1315,8 @@ func generatedScalarUnionTypeNames(plan ProtocolTypePlan) []string {
 		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
 			continue
 		}
-		for name := range typ.Schema.Definitions {
-			if isGeneratedDefinitionScalarUnionCheckpoint(typ.SchemaPath, name) {
+		for name, schema := range typ.Schema.Definitions {
+			if isReviewedGeneratedDefinition(typ.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionScalarUnion {
 				names[name] = true
 			}
 		}
@@ -1199,8 +1335,8 @@ func generatedScalarAliasTypeNames(plan ProtocolTypePlan) []string {
 		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
 			continue
 		}
-		for name := range typ.Schema.Definitions {
-			if isGeneratedDefinitionScalarAliasCheckpoint(typ.SchemaPath, name) {
+		for name, schema := range typ.Schema.Definitions {
+			if isReviewedGeneratedDefinition(typ.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionScalarAlias {
 				names[name] = true
 			}
 		}
@@ -1219,8 +1355,8 @@ func generatedStructTypeNames(plan ProtocolTypePlan) []string {
 		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
 			continue
 		}
-		for name := range typ.Schema.Definitions {
-			if isGeneratedDefinitionStructCheckpoint(typ.SchemaPath, name) {
+		for name, schema := range typ.Schema.Definitions {
+			if isReviewedGeneratedDefinition(typ.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionStruct {
 				names[name] = true
 			}
 		}
@@ -1261,8 +1397,8 @@ func generatedMixedUnionTypeNames(plan ProtocolTypePlan) []string {
 		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
 			continue
 		}
-		for name := range typ.Schema.Definitions {
-			if isGeneratedDefinitionMixedUnionCheckpoint(typ.SchemaPath, name) {
+		for name, schema := range typ.Schema.Definitions {
+			if isReviewedGeneratedDefinition(typ.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionMixedUnion {
 				names[name] = true
 			}
 		}
@@ -1281,8 +1417,8 @@ func generatedUntaggedObjectUnionTypeNames(plan ProtocolTypePlan) []string {
 		if typ.Schema == nil || len(typ.Schema.Definitions) == 0 {
 			continue
 		}
-		for name := range typ.Schema.Definitions {
-			if isGeneratedDefinitionUntaggedObjectUnionCheckpoint(typ.SchemaPath, name) {
+		for name, schema := range typ.Schema.Definitions {
+			if isReviewedGeneratedDefinition(typ.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionUntaggedObjectUnion {
 				names[name] = true
 			}
 		}
@@ -1318,8 +1454,8 @@ func generatedDefinitionTaggedUnionCandidates(parent TypePlan) ([]TypePlan, erro
 		return nil, nil
 	}
 	var names []string
-	for name := range parent.Schema.Definitions {
-		if isGeneratedDefinitionTaggedUnionCheckpoint(parent.SchemaPath, name) {
+	for name, schema := range parent.Schema.Definitions {
+		if isReviewedGeneratedDefinition(parent.SchemaPath, name) && classifyGeneratedDefinition(schema) == generatedDefinitionTaggedUnion {
 			names = append(names, name)
 		}
 	}
@@ -1329,9 +1465,6 @@ func generatedDefinitionTaggedUnionCandidates(parent TypePlan) ([]TypePlan, erro
 	for _, name := range names {
 		schema := parent.Schema.Definitions[name]
 		if schema == nil || len(schema.OneOf) == 0 {
-			if isGeneratedDefinitionStructTaggedUnionTransitionCheckpoint(parent.SchemaPath, name) && isObjectStructDefinitionSchema(schema) {
-				continue
-			}
 			return nil, fmt.Errorf("definition tagged union %s in %s is not a oneOf schema", name, parent.SchemaPath)
 		}
 		candidates = append(candidates, TypePlan{
@@ -1557,6 +1690,9 @@ func stringEnumValues(schema *Schema) ([]string, bool) {
 	if isDirectStringEnumSchema(schema) {
 		return append([]string(nil), schema.Enum...), true
 	}
+	if values, ok := pureMultiOneOfStringEnumValues(schema); ok {
+		return values, true
+	}
 	if schema == nil || schema.Bool != nil || !isPureSingleOneOfWrapper(schema) {
 		return nil, false
 	}
@@ -1568,13 +1704,10 @@ func stringEnumValues(schema *Schema) ([]string, bool) {
 }
 
 func reviewedStringEnumValues(schemaPath string, name string, schema *Schema) ([]string, bool) {
-	if values, ok := stringEnumValues(schema); ok {
-		return values, true
-	}
-	if !isGeneratedDefinitionStringEnumCheckpoint(schemaPath, name) {
+	if !isReviewedGeneratedDefinition(schemaPath, name) {
 		return nil, false
 	}
-	return pureMultiOneOfStringEnumValues(schema)
+	return stringEnumValues(schema)
 }
 
 func pureMultiOneOfStringEnumValues(schema *Schema) ([]string, bool) {
@@ -1718,6 +1851,16 @@ func isGeneratedTaggedUnionCheckpoint(path string) bool {
 
 func isGeneratedScalarUnionCheckpoint(path string) bool {
 	return path == "RequestId.json"
+}
+
+func isReviewedGeneratedDefinition(schemaPath string, name string) bool {
+	return isGeneratedDefinitionScalarAliasCheckpoint(schemaPath, name) ||
+		isGeneratedDefinitionScalarUnionCheckpoint(schemaPath, name) ||
+		isGeneratedDefinitionStringEnumCheckpoint(schemaPath, name) ||
+		isGeneratedDefinitionStructCheckpoint(schemaPath, name) ||
+		isGeneratedDefinitionTaggedUnionCheckpoint(schemaPath, name) ||
+		isGeneratedDefinitionMixedUnionCheckpoint(schemaPath, name) ||
+		isGeneratedDefinitionUntaggedObjectUnionCheckpoint(schemaPath, name)
 }
 
 func isGeneratedDefinitionScalarUnionCheckpoint(schemaPath string, name string) bool {

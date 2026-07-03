@@ -182,7 +182,7 @@ func TestGeneratedThreadTurnLifecycleParamsProtocolMarshalAndUnmarshal(t *testin
 			Content: []ContentItem{
 				NewContentItemInputText(ContentItemInputText{Text: "resume"}),
 			},
-			Phase: Value(NewMessagePhaseFinalAnswer()),
+			Phase: Value(MessagePhaseFinalAnswer),
 			Role:  "user",
 		}),
 		NewResponseItemFunctionCallOutput(ResponseItemFunctionCallOutput{
@@ -219,7 +219,7 @@ func TestGeneratedThreadTurnLifecycleParamsProtocolMarshalAndUnmarshal(t *testin
 	if !ok || decodedMessage.Role != "user" || decodedMessage.Phase == nil {
 		t.Fatalf("decoded resume message = %#v, ok=%t", decodedMessage, ok)
 	}
-	if _, ok := decodedMessage.Phase.Value.AsFinalAnswer(); !ok {
+	if *decodedMessage.Phase.Value != MessagePhaseFinalAnswer {
 		t.Fatalf("decoded resume message phase = %#v, ok=%t", decodedMessage.Phase.Value, ok)
 	}
 	decodedOutput, ok := (*decodedResume.History.Value)[1].AsFunctionCallOutput()
@@ -244,7 +244,7 @@ func TestGeneratedTurnStartResponseProtocolMarshalAndUnmarshal(t *testing.T) {
 			Items: []ThreadItem{
 				NewThreadItemAgentMessage(ThreadItemAgentMessage{
 					ID:    "item-1",
-					Phase: Value(NewMessagePhaseFinalAnswer()),
+					Phase: Value(MessagePhaseFinalAnswer),
 					Text:  "final",
 				}),
 				NewThreadItemMCPToolCall(ThreadItemMCPToolCall{
@@ -281,7 +281,7 @@ func TestGeneratedTurnStartResponseProtocolMarshalAndUnmarshal(t *testing.T) {
 	if !ok || message.Phase == nil || message.Phase.Value == nil || message.Text != "final" {
 		t.Fatalf("decoded agent message = %#v, ok=%t", message, ok)
 	}
-	if _, ok := message.Phase.Value.AsFinalAnswer(); !ok {
+	if *message.Phase.Value != MessagePhaseFinalAnswer {
 		t.Fatalf("decoded message phase = %#v", message.Phase.Value)
 	}
 	toolCall, ok := decoded.Turn.Items[1].AsMCPToolCall()
@@ -372,7 +372,7 @@ func TestGeneratedTurnResponseCoreAdjacentPayloadsProtocolMarshalAndUnmarshal(t 
 	}
 
 	turnsListParamsRaw, err := json.Marshal(ThreadTurnsListParams{
-		ItemsView:     Value(NewTurnItemsViewSummary()),
+		ItemsView:     Value(TurnItemsViewSummary),
 		Limit:         Value(uint32(10)),
 		SortDirection: Value(SortDirectionDesc),
 		ThreadID:      "thread-1",
@@ -387,7 +387,7 @@ func TestGeneratedTurnResponseCoreAdjacentPayloadsProtocolMarshalAndUnmarshal(t 
 	if err := json.Unmarshal(turnsListParamsRaw, &decodedTurnsListParams); err != nil {
 		t.Fatal(err)
 	}
-	if decodedTurnsListParams.ItemsView == nil || decodedTurnsListParams.ItemsView.Value == nil || decodedTurnsListParams.ItemsView.Value.Kind() != TurnItemsViewKindSummary {
+	if decodedTurnsListParams.ItemsView == nil || decodedTurnsListParams.ItemsView.Value == nil || *decodedTurnsListParams.ItemsView.Value != TurnItemsViewSummary {
 		t.Fatalf("decoded thread turns list params = %#v", decodedTurnsListParams)
 	}
 

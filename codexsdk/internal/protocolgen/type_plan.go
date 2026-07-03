@@ -208,25 +208,43 @@ func isReviewedScalarUnion(variants []*Schema) bool {
 	}
 	seen := map[string]bool{}
 	for _, variant := range variants {
-		if variant == nil || hasNonTypeShape(variant) {
+		if variant == nil {
 			return false
 		}
 		switch {
 		case variant.Type.Only("string"):
+			if hasNonTypeShape(variant) {
+				return false
+			}
 			if len(unmodeledKeywords(variant)) > 0 {
 				return false
 			}
 			seen["string"] = true
 		case variant.Type.Only("integer") && variant.Format == "int64":
+			if hasNonTypeShape(variant) {
+				return false
+			}
 			if !sameStrings(unmodeledKeywords(variant), []string{"format"}) {
 				return false
 			}
 			seen["integer"] = true
+		case variant.Type.Only("array") && variant.Items != nil && (variant.Items.Ref != "" || variant.Items.Type.Only("string")):
+			if variant.Ref != "" ||
+				len(variant.Properties) > 0 ||
+				len(variant.OneOf) > 0 ||
+				len(variant.AnyOf) > 0 ||
+				len(variant.AllOf) > 0 ||
+				len(variant.Enum) > 0 ||
+				variant.AdditionalProperties.Present ||
+				len(unmodeledKeywords(variant)) > 0 {
+				return false
+			}
+			seen["array"] = true
 		default:
 			return false
 		}
 	}
-	return len(seen) == 2 && seen["string"] && seen["integer"]
+	return len(seen) == len(variants) && len(seen) >= 2
 }
 
 func planField(coverage CoverageField, schema *Schema) (FieldPlan, error) {
