@@ -4,27 +4,28 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/codexsdk_land_sync.sh --land-ref <branch> --work-branch <branch> --target-ref <ref> --target-sha <sha> [options]
+  scripts/codexsdk_land_sync.sh --mode <direct|pr> --land-ref <branch> --target-ref <ref> --target-sha <sha> [options]
 
 Options:
   --candidate <path>        Candidate schema directory validated against the checked-in baseline.
+  --mode <direct|pr>        direct fast-forward pushes the landing ref. pr pushes
+                            --work-branch and opens or reuses a draft PR.
   --remote <name>           Git remote to fetch and push. Defaults to origin.
-  --open-pr-on-failure      Create or reuse a draft PR when direct fast-forward landing fails.
+  --work-branch <branch>    Required when --mode pr. Branch used as the PR head.
 
-The script assumes HEAD is the committed sync change on the temporary work branch.
-It validates, rebases onto the current remote landing ref, pushes the temporary
-branch, then attempts a non-force fast-forward push to the landing ref. If the
-landing ref moves during the attempt, it rebases and validates once more.
+The script assumes HEAD is the committed sync change. It validates, rebases onto
+the current remote landing ref, then either fast-forward pushes the landing ref
+or publishes a draft PR branch.
 EOF
 }
 
 remote="origin"
+mode=""
 land_ref=""
 work_branch=""
 target_ref=""
 target_sha=""
 candidate=""
-open_pr_on_failure=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -36,9 +37,9 @@ while [[ $# -gt 0 ]]; do
       land_ref="$2"
       shift 2
       ;;
-    --open-pr-on-failure)
-      open_pr_on_failure=1
-      shift
+    --mode)
+      mode="$2"
+      shift 2
       ;;
     --remote)
       remote="$2"
@@ -68,13 +69,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${land_ref}" || -z "${work_branch}" || -z "${target_ref}" || -z "${target_sha}" ]]; then
+if [[ -z "${mode}" || -z "${land_ref}" || -z "${target_ref}" || -z "${target_sha}" ]]; then
   usage >&2
   exit 2
 fi
+case "${mode}" in
+  direct|pr)
+    ;;
+  *)
+    echo "mode must be direct or pr" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
 land_ref="${land_ref#refs/heads/}"
 work_branch="${work_branch#refs/heads/}"
-if [[ "${land_ref}" == "${work_branch}" ]]; then
+if [[ "${mode}" == "pr" && -z "${work_branch}" ]]; then
+  echo "work branch is required in pr mode" >&2
+  exit 2
+fi
+if [[ -n "${work_branch}" && "${land_ref}" == "${work_branch}" ]]; then
   echo "land ref and work branch must differ" >&2
   exit 2
 fi
@@ -180,25 +194,26 @@ fail_with_pr() {
   local reason=$1
   echo "${reason}" >&2
   git rebase --abort >/dev/null 2>&1 || true
-  if [[ "${open_pr_on_failure}" -eq 1 ]]; then
-    push_work_branch || true
-    open_or_reuse_pr || true
-  fi
-  echo "Unable to land ${work_branch} into ${land_ref}." >&2
+  echo "Unable to publish sync commit for ${land_ref} in ${mode} mode." >&2
   exit 1
 }
 
 validate_sync
 if ! rebase_and_validate; then
-  fail_with_pr "Pre-main gate failed during rebase, target movement check, or validation."
+  fail_with_pr "Pre-publish gate failed during rebase, target movement check, or validation."
 fi
-push_work_branch
+
+if [[ "${mode}" == "pr" ]]; then
+  push_work_branch
+  open_or_reuse_pr
+  write_output "work_branch" "${work_branch}"
+  exit 0
+fi
 
 if try_land_fast_forward; then
   landed_commit="$(git rev-parse HEAD)"
   write_output "landed_commit" "${landed_commit}"
   write_output "landed_ref" "${land_ref}"
-  write_output "work_branch" "${work_branch}"
   exit 0
 fi
 
@@ -206,19 +221,13 @@ echo "Landing ref changed or rejected the fast-forward push; retrying once after
 if ! rebase_and_validate; then
   fail_with_pr "Retry gate failed during rebase, target movement check, or validation."
 fi
-push_work_branch
 
 if try_land_fast_forward; then
   landed_commit="$(git rev-parse HEAD)"
   write_output "landed_commit" "${landed_commit}"
   write_output "landed_ref" "${land_ref}"
-  write_output "work_branch" "${work_branch}"
   exit 0
 fi
 
-if [[ "${open_pr_on_failure}" -eq 1 ]]; then
-  open_or_reuse_pr
-fi
-
-echo "Unable to land ${work_branch} into ${land_ref} after one retry." >&2
+echo "Unable to fast-forward ${land_ref} after one retry." >&2
 exit 1

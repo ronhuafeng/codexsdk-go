@@ -29,11 +29,6 @@ on:
         required: false
         type: boolean
         default: true
-      open_pr_on_landing_failure:
-        description: "Open a draft PR if the temporary branch cannot fast-forward land."
-        required: false
-        type: boolean
-        default: true
 
 defaults:
   run:
@@ -516,8 +511,9 @@ jobs:
           git config user.name "codexsdk-sync-bot"
           git config user.email "codexsdk-sync-bot@users.noreply.github.com"
 
-      - name: Create temporary sync branch
+      - name: Create manual sync PR branch
         id: branch
+        if: github.event_name == 'workflow_dispatch'
         env:
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
         run: |
@@ -559,10 +555,11 @@ jobs:
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
+          SYNC_MODE: ${{ github.event_name == 'schedule' && 'direct' || 'pr' }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_REF_KIND: ${{ needs.detect.outputs.upstream_ref_kind }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
-          WORK_BRANCH: ${{ steps.branch.outputs.work_branch }}
+          WORK_BRANCH: ${{ steps.branch.outputs.work_branch || '' }}
         run: |
           set -euo pipefail
           mkdir -p "${CODEXSDK_AUTO_SYNC_DIR}"
@@ -577,7 +574,8 @@ jobs:
           - upstream ref kind: ${UPSTREAM_REF_KIND}
           - upstream commit: ${UPSTREAM_SHA}
           - landing ref: ${LAND_REF}
-          - temporary work branch: ${WORK_BRANCH}
+          - publish mode: ${SYNC_MODE}
+          - manual PR branch: ${WORK_BRANCH:-<none>}
 
           Candidate schema and drift artifacts from this workflow's detect job are already available under:
 
@@ -592,7 +590,7 @@ jobs:
 
           Inspect the apply summary, compact drift reports, and git diff name-status. Confirm there is no obvious provenance, sanitization, manifest, coverage, or generated-code issue. Do not re-copy schemas, re-run the full Rust schema generator, or print large files. Do not try to manually review every generated JSON or Go line.
 
-          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not commit, tag, push, create a PR, dispatch workflows, or close issues. The workflow will validate, commit, rebase, land, tag, and dispatch follow-up checks after you finish.
+          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not commit, tag, push, create a PR, dispatch workflows, or close issues. The workflow will validate, commit, and publish after you finish. Scheduled runs publish directly to the landing ref; manual runs publish a draft PR branch.
 
           Keep command output compact. Do not print full schema, report, manifest, coverage, or generated Go files. Avoid chained shell commands because the action sandbox may reject them; run separate focused commands instead.
 
@@ -646,27 +644,27 @@ jobs:
             -m "Upstream-ref-kind: ${UPSTREAM_REF_KIND}" \
             -m "Upstream-commit: ${UPSTREAM_SHA}"
 
-      - name: Pre-main gate and land
+      - name: Publish sync
         id: land
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
-          OPEN_PR_ON_FAILURE: ${{ github.event_name == 'schedule' || inputs.open_pr_on_landing_failure }}
+          SYNC_MODE: ${{ github.event_name == 'schedule' && 'direct' || 'pr' }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
-          WORK_BRANCH: ${{ steps.branch.outputs.work_branch }}
+          WORK_BRANCH: ${{ steps.branch.outputs.work_branch || '' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           args=(
+            --mode "${SYNC_MODE}"
             --land-ref "${LAND_REF}"
-            --work-branch "${WORK_BRANCH}"
             --target-ref "${UPSTREAM_REF}"
             --target-sha "${UPSTREAM_SHA}"
             --candidate "${CANDIDATE_DIR}/schema"
           )
-          if [[ "${OPEN_PR_ON_FAILURE}" == "true" ]]; then
-            args+=(--open-pr-on-failure)
+          if [[ "${SYNC_MODE}" == "pr" ]]; then
+            args+=(--work-branch "${WORK_BRANCH}")
           fi
           scripts/codexsdk_land_sync.sh "${args[@]}"
 
