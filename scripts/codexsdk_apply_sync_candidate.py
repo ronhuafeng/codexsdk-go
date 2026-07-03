@@ -594,6 +594,11 @@ def main() -> int:
             env={**dict(os.environ), "GOWORK": "off"},
             check=True,
         )
+        subprocess.run(
+            ["python3", "scripts/codexsdk_generate_sdk_surface.py"],
+            cwd=Path.cwd(),
+            check=True,
+        )
 
     summary = {
         "status": "ok",
