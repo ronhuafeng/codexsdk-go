@@ -1,9 +1,9 @@
-name: Codex Upstream Protocol Drift
-run-name: Protocol drift ${{ inputs.upstream_ref || 'latest stable' }}
+name: Codex Upstream Protocol Auto Sync
+run-name: Protocol sync ${{ inputs.upstream_ref || 'latest stable' }} -> main
 
 on:
   schedule:
-    - cron: "0 10 * * 1-5"
+    - cron: "30 10 * * 1-5"
   workflow_dispatch:
     inputs:
       upstream_ref:
@@ -15,48 +15,76 @@ on:
         required: false
         type: boolean
         default: false
+      dispatch_drift_check:
+        description: "Dispatch the drift workflow after landing."
+        required: false
+        type: boolean
+        default: true
 
 defaults:
   run:
     shell: bash
 
 env:
+  CODEX_UPSTREAM_COMMON_RS: codex-rs/app-server-protocol/src/protocol/common.rs
   CODEX_UPSTREAM_REPO: https://github.com/openai/codex.git
+  CODEXSDK_AUTO_SYNC_DIR: .cache/codexsdk-auto-sync
   CODEXSDK_DRIFT_ARTIFACT_DIR: /tmp/codexsdk-upstream
   CODEXSDK_DRIFT_LABEL: protocol-drift
   CODEXSDK_RUST_TARGET_DIR: .cache/cargo-target/codex
   CODEXSDK_SCHEMA_BASELINE: codexsdk/internal/protocolschema/appserver/v2
+  CODEXSDK_SYNC_CANDIDATE_PREFIX: .cache/codexsdk-upstream
+  CODEXSDK_SYNC_TAG_JSON: /tmp/codexsdk-sync-tag.json
   CODEXSDK_TARGET_POLICY_JSON: /tmp/codexsdk-target-policy.json
   CODEXSDK_UPSTREAM_CLONE: /tmp/openai-codex
   CODEXSDK_UPSTREAM_TARGET_JSON: /tmp/codexsdk-upstream-target.json
 
 concurrency:
-  group: codex-upstream-protocol-drift
+  group: codex-upstream-protocol-auto-sync-main
   queue: max
   cancel-in-progress: false
 
 jobs:
   detect:
-    name: Detect protocol drift
+    name: Detect drift
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: read
       issues: write
+    outputs:
+      baseline_sha: ${{ steps.refs.outputs.baseline_sha }}
+      drift_sha: ${{ steps.drift.outputs.drift_sha }}
+      drift_status: ${{ steps.drift.outputs.status }}
+      land_ref: ${{ steps.landing.outputs.land_ref }}
+      policy_decision: ${{ steps.target_policy.outputs.decision }}
+      policy_reason: ${{ steps.target_policy.outputs.reason }}
+      upstream_ref: ${{ steps.refs.outputs.upstream_ref }}
+      upstream_ref_kind: ${{ steps.refs.outputs.upstream_ref_kind }}
+      upstream_sha: ${{ steps.refs.outputs.upstream_sha }}
+      upstream_short_sha: ${{ steps.refs.outputs.upstream_short_sha }}
 
     steps:
-      - name: Check out
-        uses: actions/checkout@v7
+      - name: Resolve landing ref
+        id: landing
+        run: |
+          set -euo pipefail
+          echo "land_ref=main" >> "$GITHUB_OUTPUT"
+          echo "Landing ref: main" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Resolve upstream baseline
+      - name: Check out landing ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.landing.outputs.land_ref }}
+          fetch-depth: 0
+
+      - name: Resolve upstream target
         id: refs
         env:
           REQUESTED_UPSTREAM_REF: ${{ inputs.upstream_ref || '' }}
         run: |
           set -euo pipefail
-
           python3 scripts/codexsdk_resolve_upstream.py \
-            --remote "${CODEX_UPSTREAM_REPO}" \
             --upstream-ref "${REQUESTED_UPSTREAM_REF}" \
             --json > "${CODEXSDK_UPSTREAM_TARGET_JSON}"
 
@@ -72,13 +100,14 @@ jobs:
               output.write(f"upstream_ref_kind={target['upstream_ref_kind']}\n")
               output.write(f"upstream_sha={target['upstream_sha']}\n")
               output.write(f"upstream_short_sha={target['upstream_sha'][:12]}\n")
-              output.write(f"baseline_sha={metadata['source_commit']}\n")
               output.write(f"target_explicit={str(target['target_explicit']).lower()}\n")
+              output.write(f"baseline_sha={metadata['source_commit']}\n")
           PY
 
           {
-            echo "## Codex upstream protocol drift"
+            echo "## Codex upstream protocol auto sync"
             echo
+            echo "- Landing ref: \`${{ steps.landing.outputs.land_ref }}\`"
             echo "- Baseline: \`$(python3 -c 'import json, os; print(json.load(open(os.environ["CODEXSDK_SCHEMA_BASELINE"] + "/baseline_metadata.json"))["source_commit"])')\`"
             echo "- Upstream target: \`$(jq -r '.upstream_ref' "${CODEXSDK_UPSTREAM_TARGET_JSON}")\` (\`$(jq -r '.upstream_ref_kind' "${CODEXSDK_UPSTREAM_TARGET_JSON}")\`)"
             echo "- Upstream commit: \`$(jq -r '.upstream_sha' "${CODEXSDK_UPSTREAM_TARGET_JSON}")\`"
@@ -139,29 +168,24 @@ jobs:
             echo
             echo "- Decision: \`$(jq -r '.decision' "${CODEXSDK_TARGET_POLICY_JSON}")\`"
             echo "- Reason: $(jq -r '.reason' "${CODEXSDK_TARGET_POLICY_JSON}")"
-            echo "- Baseline target: \`${{ steps.refs.outputs.baseline_sha }}\`"
-            echo "- Requested target: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_ref_kind }}\`)"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Skip when target policy is current
-        if: steps.target_policy.outputs.decision == 'skip'
-        run: |
-          echo "Baseline already points at the selected openai/codex upstream target: ${{ steps.refs.outputs.upstream_ref }}." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Stop when target policy blocks drift detection
+      - name: Stop when target policy blocks sync
         if: steps.target_policy.outputs.decision == 'block'
         run: |
           {
-            echo "Protocol drift generation was skipped by target policy."
+            echo
+            echo "Protocol sync was skipped by target policy."
             echo
             echo "Reason: ${{ steps.target_policy.outputs.reason }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close drift issue when baseline is current
         if: steps.target_policy.outputs.decision == 'skip'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-
           label="${CODEXSDK_DRIFT_LABEL}"
           issue_number="$(
             gh issue list \
@@ -170,7 +194,6 @@ jobs:
               --json number \
               --jq '.[0].number // empty'
           )"
-
           if [[ -n "$issue_number" ]]; then
             gh issue close "$issue_number" \
               --reason completed \
@@ -179,8 +202,6 @@ jobs:
           else
             echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clone upstream Codex
         if: steps.target_policy.outputs.decision == 'allow'
@@ -199,15 +220,27 @@ jobs:
         run: |
           CARGO_TARGET_DIR="$PWD/${CODEXSDK_RUST_TARGET_DIR}" \
             scripts/codexsdk_track_upstream.sh \
-            --codex-repo "${CODEXSDK_UPSTREAM_CLONE}" \
-            --commit "${{ steps.refs.outputs.upstream_sha }}" \
-            --source-ref "${{ steps.refs.outputs.upstream_ref }}" \
-            --source-ref-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
-            --out "${CODEXSDK_DRIFT_ARTIFACT_DIR}"
+              --codex-repo "${CODEXSDK_UPSTREAM_CLONE}" \
+              --commit "${{ steps.refs.outputs.upstream_sha }}" \
+              --source-ref "${{ steps.refs.outputs.upstream_ref }}" \
+              --source-ref-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
+              --out "${CODEXSDK_DRIFT_ARTIFACT_DIR}"
+
+      - name: Capture upstream response mappings
+        if: steps.target_policy.outputs.decision == 'allow'
+        run: |
+          git -C "${CODEXSDK_UPSTREAM_CLONE}" show \
+            "${{ steps.refs.outputs.upstream_sha }}:${CODEX_UPSTREAM_COMMON_RS}" \
+            > "${CODEXSDK_DRIFT_ARTIFACT_DIR}/common.rs"
 
       - name: Prepare drift issue
         if: steps.target_policy.outputs.decision == 'allow'
         id: drift
+        env:
+          BASELINE_SHA: ${{ steps.refs.outputs.baseline_sha }}
+          UPSTREAM_REF: ${{ steps.refs.outputs.upstream_ref }}
+          UPSTREAM_REF_KIND: ${{ steps.refs.outputs.upstream_ref_kind }}
+          UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -295,18 +328,9 @@ jobs:
 
           {chr(10).join(method_lines)}
 
-          ## Suggested Local Sync
+          ## Automated Sync
 
-          ```sh
-          scripts/codexsdk_track_upstream.sh \\
-            --codex-repo /path/to/openai/codex \\
-            --commit {upstream} \\
-            --source-ref {upstream_ref} \\
-            --source-ref-kind {upstream_ref_kind} \\
-            --out /tmp/codexsdk-upstream
-          ```
-
-          Then use `$codexsdk-sync-upstream` to review drift, update the checked-in baseline, regenerate `protocolv2`, reconcile handwritten SDK behavior, and run validation.
+          This workflow will attempt a guarded Codex sync, rebase it onto the landing ref, validate it, and land it with a non-force push.
           """
 
           comment = f"""Protocol drift is still present.
@@ -328,18 +352,13 @@ jobs:
               output.write(f"status={status}\n")
               output.write(f"drift_sha={drift_sha}\n")
           PY
-        env:
-          BASELINE_SHA: ${{ steps.refs.outputs.baseline_sha }}
-          UPSTREAM_REF: ${{ steps.refs.outputs.upstream_ref }}
-          UPSTREAM_REF_KIND: ${{ steps.refs.outputs.upstream_ref_kind }}
-          UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
 
-      - name: Upload drift reports
+      - name: Upload sync candidate artifacts
         if: steps.target_policy.outputs.decision == 'allow'
         uses: actions/upload-artifact@v7
         with:
-          name: codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}
-          path: ${{ env.CODEXSDK_DRIFT_ARTIFACT_DIR }}/reports
+          name: codex-upstream-sync-candidate-${{ steps.refs.outputs.upstream_sha }}
+          path: ${{ env.CODEXSDK_DRIFT_ARTIFACT_DIR }}
           if-no-files-found: error
 
       - name: Update workflow summary
@@ -347,6 +366,8 @@ jobs:
         run: |
           set -euo pipefail
           {
+            echo
+            echo "## Drift report"
             echo
             echo "- Drift status: \`${{ steps.drift.outputs.status }}\`"
             echo "- Drift fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`"
@@ -356,9 +377,10 @@ jobs:
 
       - name: Close drift issue when drift is clean
         if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'clean'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-
           label="${CODEXSDK_DRIFT_LABEL}"
           issue_number="$(
             gh issue list \
@@ -367,7 +389,6 @@ jobs:
               --json number \
               --jq '.[0].number // empty'
           )"
-
           if [[ -n "$issue_number" ]]; then
             gh issue close "$issue_number" \
               --reason completed \
@@ -376,14 +397,13 @@ jobs:
           else
             echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create or update drift issue
         if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-
           label="${CODEXSDK_DRIFT_LABEL}"
           gh label create "$label" \
             --description "Upstream Codex app-server protocol drift needs review" \
@@ -397,7 +417,6 @@ jobs:
               --json number \
               --jq '.[0].number // empty'
           )"
-
           if [[ -n "$issue_number" ]]; then
             existing_drift_sha="$(
               gh issue view "$issue_number" \
@@ -408,11 +427,9 @@ jobs:
                 | tr -d '\r'
             )"
             title="$(cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-title.txt")"
-
             gh issue edit "$issue_number" \
               --title "$title" \
               --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-body.md"
-
             if [[ "$existing_drift_sha" == "${{ steps.drift.outputs.drift_sha }}" ]]; then
               echo "Updated existing drift issue #${issue_number}; fingerprint unchanged, so no comment was added." >> "$GITHUB_STEP_SUMMARY"
             else
@@ -429,5 +446,273 @@ jobs:
             )"
             echo "Created drift issue: ${new_issue_url}" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  sync:
+    name: Sync and land
+    needs: detect
+    if: needs.detect.outputs.policy_decision == 'allow' && needs.detect.outputs.drift_status == 'review-required'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    outputs:
+      landed_commit: ${{ steps.land.outputs.landed_commit }}
+      landed_ref: ${{ steps.land.outputs.landed_ref }}
+
+    steps:
+      - name: Check out landing ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.detect.outputs.land_ref }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Codex Rust
+        uses: ./.github/actions/setup-codex-rust
+        with:
+          cache-key-suffix: ${{ needs.detect.outputs.upstream_short_sha }}
+          target-dir: ${{ env.CODEXSDK_RUST_TARGET_DIR }}
+
+      - name: Download sync candidate artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: codex-upstream-sync-candidate-${{ needs.detect.outputs.upstream_sha }}
+          path: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "codexsdk-sync-bot"
+          git config user.email "codexsdk-sync-bot@users.noreply.github.com"
+
+      - name: Apply sync candidate mechanically
+        env:
+          CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
+          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
+          UPSTREAM_REF_KIND: ${{ needs.detect.outputs.upstream_ref_kind }}
+          UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${CODEXSDK_AUTO_SYNC_DIR}"
+          python3 scripts/codexsdk_apply_sync_candidate.py \
+            --candidate "${CANDIDATE_DIR}/schema" \
+            --reports "${CANDIDATE_DIR}/reports" \
+            --common-rs "${CANDIDATE_DIR}/common.rs" \
+            --target-ref "${UPSTREAM_REF}" \
+            --target-kind "${UPSTREAM_REF_KIND}" \
+            --target-sha "${UPSTREAM_SHA}" \
+            --json | tee "${CODEXSDK_AUTO_SYNC_DIR}/apply-result.json"
+          git diff --name-status > "${CODEXSDK_AUTO_SYNC_DIR}/diff-name-status.txt"
+
+      - name: Build Codex sync prompt
+        env:
+          CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
+          LAND_REF: ${{ needs.detect.outputs.land_ref }}
+          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
+          UPSTREAM_REF_KIND: ${{ needs.detect.outputs.upstream_ref_kind }}
+          UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${CODEXSDK_AUTO_SYNC_DIR}"
+          cat > "${CODEXSDK_AUTO_SYNC_DIR}/prompt.md" <<EOF
+          You are maintaining codexsdk-go.
+
+          Read and follow .agents/skills/codexsdk-sync-upstream/SKILL.md completely before editing.
+
+          This workflow has already applied the large mechanical sync with scripts/codexsdk_apply_sync_candidate.py. Perform a bounded maintainer review of the resulting worktree for this already-resolved upstream target:
+
+          - upstream ref: ${UPSTREAM_REF}
+          - upstream ref kind: ${UPSTREAM_REF_KIND}
+          - upstream commit: ${UPSTREAM_SHA}
+          - landing ref: ${LAND_REF}
+
+          Candidate schema and drift artifacts from this workflow's detect job are already available under:
+
+          - ${CANDIDATE_DIR}/schema
+          - ${CANDIDATE_DIR}/reports
+          - ${CANDIDATE_DIR}/common.rs
+
+          Mechanical apply summary:
+
+          - ${CODEXSDK_AUTO_SYNC_DIR}/apply-result.json
+          - ${CODEXSDK_AUTO_SYNC_DIR}/diff-name-status.txt
+
+          Inspect the apply summary, compact drift reports, and git diff name-status. Confirm there is no obvious provenance, sanitization, manifest, coverage, or generated-code issue. Do not re-copy schemas, re-run the full Rust schema generator, or print large files. Do not try to manually review every generated JSON or Go line.
+
+          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not perform repository side effects. The workflow will validate, commit, and publish directly to the landing ref after you finish.
+
+          Keep command output compact. Do not print full schema, report, manifest, coverage, or generated Go files. Avoid chained shell commands because the action sandbox may reject them; run separate focused commands instead.
+
+          Keep handwritten SDK changes minimal and justify them through reviewed drift. Leave newly discovered experimental or internal upstream surface in generated protocolv2 unless the manifest rules require public SDK exposure.
+          EOF
+
+      - name: Run Codex upstream sync
+        uses: openai/codex-action@v1
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/${{ env.CODEXSDK_RUST_TARGET_DIR }}
+        with:
+          openai-api-key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          responses-api-endpoint: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
+          model: ${{ secrets.CODEX_MODEL }}
+          prompt-file: ${{ env.CODEXSDK_AUTO_SYNC_DIR }}/prompt.md
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          allow-bots: "true"
+          codex-args: '["--ephemeral"]'
+
+      - name: Validate sync before commit
+        env:
+          CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
+          UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          scripts/codexsdk_validate_sync.sh \
+            --candidate "${CANDIDATE_DIR}/schema" \
+            --target-sha "${UPSTREAM_SHA}"
+
+      - name: Commit sync changes
+        env:
+          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
+          UPSTREAM_REF_KIND: ${{ needs.detect.outputs.upstream_ref_kind }}
+          UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          git diff --name-status
+          if git diff --quiet; then
+            echo "Codex sync produced no file changes while drift was review-required." >&2
+            exit 1
+          fi
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No staged sync changes are available to commit." >&2
+            exit 1
+          fi
+          git commit \
+            -m "Sync Codex protocol baseline to ${UPSTREAM_REF}" \
+            -m "Upstream-ref: ${UPSTREAM_REF}" \
+            -m "Upstream-ref-kind: ${UPSTREAM_REF_KIND}" \
+            -m "Upstream-commit: ${UPSTREAM_SHA}"
+
+      - name: Publish sync
+        id: land
+        env:
+          CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
+          LAND_REF: ${{ needs.detect.outputs.land_ref }}
+          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
+          UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          args=(
+            --land-ref "${LAND_REF}"
+            --target-ref "${UPSTREAM_REF}"
+            --target-sha "${UPSTREAM_SHA}"
+            --candidate "${CANDIDATE_DIR}/schema"
+          )
+          scripts/codexsdk_land_sync.sh "${args[@]}"
+
+  finalize:
+    name: Finalize landed sync
+    needs:
+      - detect
+      - sync
+    if: needs.sync.outputs.landed_commit != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      actions: write
+      contents: write
+
+    steps:
+      - name: Check out landed commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.sync.outputs.landed_ref }}
+          fetch-depth: 0
+
+      - name: Check out exact landed commit
+        run: |
+          git checkout --detach "${{ needs.sync.outputs.landed_commit }}"
+
+      - name: Create upstream sync tag
+        id: tag
+        if: needs.detect.outputs.upstream_ref_kind == 'stable_rust_tag'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          if python3 scripts/codexsdk_sync_tag.py --create --push origin --json > "${CODEXSDK_SYNC_TAG_JSON}"; then
+            :
+          else
+            python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin --json > "${CODEXSDK_SYNC_TAG_JSON}"
+          fi
+          tag_name="$(jq -r '.tag_name' "${CODEXSDK_SYNC_TAG_JSON}")"
+          action="$(jq -r '.action' "${CODEXSDK_SYNC_TAG_JSON}")"
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Upstream sync tag"
+            echo
+            echo "- Tag: \`${tag_name}\`"
+            echo "- Action: \`${action}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch drift verification
+        if: github.event_name == 'schedule' || inputs.dispatch_drift_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LANDED_COMMIT: ${{ needs.sync.outputs.landed_commit }}
+          LANDED_REF: ${{ needs.sync.outputs.landed_ref }}
+          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          gh workflow run upstream-protocol-drift.yml \
+            --ref "${LANDED_REF}" \
+            -f "upstream_ref=${UPSTREAM_REF}"
+
+          run_id=""
+          for _ in $(seq 1 24); do
+            run_id="$(
+              gh run list \
+                --workflow upstream-protocol-drift.yml \
+                --branch "${LANDED_REF}" \
+                --limit 20 \
+                --json databaseId,headSha \
+                --jq ".[] | select(.headSha == \"${LANDED_COMMIT}\") | .databaseId" |
+                head -n 1
+            )"
+            if [[ -n "${run_id}" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          if [[ -z "${run_id}" ]]; then
+            echo "Unable to find dispatched drift workflow run for ${LANDED_REF}@${LANDED_COMMIT}." >&2
+            exit 1
+          fi
+          echo "Dispatched drift workflow run: ${run_id}" >> "$GITHUB_STEP_SUMMARY"
+          gh run watch "${run_id}" --exit-status
+
+      - name: Report final sync outcome
+        env:
+          LANDED_COMMIT: ${{ needs.sync.outputs.landed_commit }}
+          LANDED_REF: ${{ needs.sync.outputs.landed_ref }}
+          TAG_NAME: ${{ steps.tag.outputs.tag_name }}
+          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
+          UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
+        run: |
+          {
+            echo
+            echo "## Sync landed"
+            echo
+            echo "- Landing ref: \`${LANDED_REF}\`"
+            echo "- Landed commit: \`${LANDED_COMMIT}\`"
+            echo "- Upstream target: \`${UPSTREAM_REF}\`"
+            echo "- Upstream commit: \`${UPSTREAM_SHA}\`"
+            if [[ -n "${TAG_NAME}" ]]; then
+              echo "- Sync tag: \`${TAG_NAME}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

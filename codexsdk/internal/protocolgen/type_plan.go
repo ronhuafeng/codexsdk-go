@@ -164,6 +164,11 @@ func planType(file SchemaFile) (TypePlan, error) {
 			plan.Reason = "top-level anyOf with reviewed mutually exclusive scalar JSON kinds"
 			return plan, nil
 		}
+		if isReviewedTopLevelNullableParamsWrapper(file.Path, schema.AnyOf) {
+			plan.Kind = TypePlanAnyOfDeferred
+			plan.Reason = "top-level nullable params wrapper is represented by aggregate request params handling"
+			return plan, nil
+		}
 		if file.Path != "JSONRPCMessage.json" {
 			return TypePlan{}, fmt.Errorf("top-level anyOf schema %s has no reviewed generation policy", file.Path)
 		}
@@ -173,6 +178,28 @@ func planType(file SchemaFile) (TypePlan, error) {
 		return TypePlan{}, fmt.Errorf("schema %s has unsupported top-level shape", file.Path)
 	}
 	return plan, nil
+}
+
+func isReviewedTopLevelNullableParamsWrapper(path string, variants []*Schema) bool {
+	switch path {
+	case "v2/NullableRemoteControlDisableParams.json", "v2/NullableRemoteControlEnableParams.json":
+	default:
+		return false
+	}
+	if len(variants) != 2 {
+		return false
+	}
+	var hasRef bool
+	var hasNull bool
+	for _, variant := range variants {
+		switch {
+		case variant != nil && variant.Ref != "":
+			hasRef = true
+		case variant != nil && variant.Type.Only("null"):
+			hasNull = true
+		}
+	}
+	return hasRef && hasNull
 }
 
 func isReviewedScalarUnion(variants []*Schema) bool {
@@ -859,6 +886,10 @@ func scalarAliasRefGoType(ref string) (string, bool) {
 	switch refTypeName(ref) {
 	case "AgentPath":
 		return "string", true
+	case "ApiPathString":
+		return "string", true
+	case "LegacyAppPathString":
+		return "string", true
 	case "AbsolutePathBuf":
 		return "string", true
 	case "ThreadId":
@@ -989,6 +1020,8 @@ func isJSONValueFieldPath(path string) bool {
 		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/4/properties/arguments",
 		"v2/ThreadResumeParams.json#/definitions/ResponseItem#/oneOf/5/properties/arguments",
 		"v2/ThreadStartParams.json#/definitions/DynamicToolSpec/properties/inputSchema",
+		"v2/ThreadStartParams.json#/definitions/DynamicToolSpec#/oneOf/0/properties/inputSchema",
+		"v2/ThreadStartParams.json#/definitions/DynamicToolNamespaceTool#/oneOf/0/properties/inputSchema",
 		"v2/ThreadRealtimeItemAddedNotification.json#/properties/item",
 		"v2/TurnModerationMetadataNotification.json#/properties/metadata",
 		"v2/TurnStartResponse.json#/definitions/McpToolCallResult/properties/_meta",

@@ -23,7 +23,6 @@ type ThreadClient interface {
 	StartThreadStream(ctx context.Context, req StartThreadRequest) (*ThreadStream, error)
 	ResumeThreadStream(ctx context.Context, req ResumeThreadRequest) (*ThreadStream, error)
 	ForkThread(ctx context.Context, req ForkThreadRequest) (ThreadForkResult, error)
-	Close() error
 }
 
 type Client interface {
@@ -62,6 +61,7 @@ type Accounts interface {
 	LoginStart(ctx context.Context, params protocolv2.LoginAccountParams) (protocolv2.LoginAccountResponse, error)
 	Logout(ctx context.Context) (protocolv2.LogoutAccountResponse, error)
 	RateLimitsRead(ctx context.Context) (protocolv2.GetAccountRateLimitsResponse, error)
+	RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error)
 	Read(ctx context.Context, params protocolv2.GetAccountParams) (protocolv2.GetAccountResponse, error)
 	SendAddCreditsNudgeEmail(ctx context.Context, params protocolv2.SendAddCreditsNudgeEmailParams) (protocolv2.SendAddCreditsNudgeEmailResponse, error)
 }
@@ -208,6 +208,7 @@ type Threads interface {
 	NameSet(ctx context.Context, params protocolv2.ThreadSetNameParams) (protocolv2.ThreadSetNameResponse, error)
 	Read(ctx context.Context, params protocolv2.ThreadReadParams) (protocolv2.ThreadReadResponse, error)
 	RealtimeAppendAudio(ctx context.Context, params protocolv2.ThreadRealtimeAppendAudioParams) (protocolv2.ThreadRealtimeAppendAudioResponse, error)
+	RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error)
 	RealtimeAppendText(ctx context.Context, params protocolv2.ThreadRealtimeAppendTextParams) (protocolv2.ThreadRealtimeAppendTextResponse, error)
 	RealtimeListVoices(ctx context.Context, params protocolv2.ThreadRealtimeListVoicesParams) (protocolv2.ThreadRealtimeListVoicesResponse, error)
 	RealtimeStart(ctx context.Context, params protocolv2.ThreadRealtimeStartParams) (protocolv2.ThreadRealtimeStartResponse, error)

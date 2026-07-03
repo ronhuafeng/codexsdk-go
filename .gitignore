@@ -3,9 +3,12 @@ bin/
 dist/
 coverage.out
 *.test
+__pycache__/
+*.pyc
 
 # Protocol maintenance scratch space
 codexsdk-upstream/
+.cache/
 
 # Local editor and OS files
 .DS_Store

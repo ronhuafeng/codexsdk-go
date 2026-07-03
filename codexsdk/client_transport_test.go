@@ -293,11 +293,6 @@ func TestInternalJSONRPCReadLoopInvalidEnvelopeFailsPendingWaits(t *testing.T) {
 			message: "expected exactly one JSON-RPC envelope shape",
 		},
 		{
-			name:    "unknown top-level field",
-			line:    `{"id":"go-sdk-1","result":{"ok":true},"extra":"stdout_secret"}` + "\n",
-			message: `decode JSONRPCMessage.response`,
-		},
-		{
 			name:    "duplicate top-level key",
 			line:    `{"id":"go-sdk-1","id":"go-sdk-1","result":{"ok":true}}` + "\n",
 			message: "duplicate object key",

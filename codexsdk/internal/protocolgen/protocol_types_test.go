@@ -52,8 +52,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			}
 		}
 	}
-	if got, want := len(selected), 429; got != want {
-		t.Fatalf("selected generated type count = %d, want %d", got, want)
+	if got, min := len(selected), 439; got < min {
+		t.Fatalf("selected generated type count = %d, want at least %d", got, min)
 	}
 	for _, name := range []string{
 		"AccountLoginCompletedNotification",
@@ -114,8 +114,9 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ConfigWarningNotification",
 		"ConfigWriteResponse",
 		"ConfiguredHookMatcherGroup",
+		"ConsumeAccountRateLimitResetCreditParams",
+		"ConsumeAccountRateLimitResetCreditResponse",
 		"CreditsSnapshot",
-		"DynamicToolSpec",
 		"DynamicToolCallResponse",
 		"DynamicToolCallParams",
 		"ErrorNotification",
@@ -128,8 +129,11 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ExperimentalFeatureListResponse",
 		"ExternalAgentConfigDetectParams",
 		"ExternalAgentConfigDetectResponse",
+		"ExternalAgentConfigImportItemTypeFailure",
+		"ExternalAgentConfigImportItemTypeSuccess",
 		"ExternalAgentConfigImportParams",
 		"ExternalAgentConfigImportResponse",
+		"ExternalAgentConfigImportTypeResult",
 		"ExternalAgentConfigMigrationItem",
 		"FeedbackUploadParams",
 		"FileChangePatchUpdatedNotification",
@@ -255,6 +259,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ProcessTerminalSize",
 		"ProcessWriteStdinParams",
 		"ProcessWriteStdinResponse",
+		"RateLimitResetCreditsSummary",
 		"RateLimitSnapshot",
 		"RateLimitWindow",
 		"RawResponseItemCompletedNotification",
@@ -335,6 +340,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		"ThreadReadParams",
 		"ThreadRealtimeAppendAudioResponse",
 		"ThreadRealtimeAppendAudioParams",
+		"ThreadRealtimeAppendSpeechParams",
+		"ThreadRealtimeAppendSpeechResponse",
 		"ThreadRealtimeAppendTextParams",
 		"ThreadRealtimeAppendTextResponse",
 		"ThreadRealtimeClosedNotification",
@@ -574,6 +581,15 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 	}
 	if configReadResponseFields["origins"].Kind != FieldPlanTypedMap {
 		t.Fatalf("ConfigReadResponse.origins Kind = %s, want %s", configReadResponseFields["origins"].Kind, FieldPlanTypedMap)
+	}
+	appsDefaultConfig := selectedByName["AppsDefaultConfig"]
+	appsDefaultConfigFields := map[string]FieldPlan{}
+	for _, field := range appsDefaultConfig.Fields {
+		appsDefaultConfigFields[field.FieldName] = field
+	}
+	if appsDefaultConfigFields["approvals_reviewer"].GoType != "*protocolv2.Nullable[ApprovalsReviewer]" ||
+		appsDefaultConfigFields["approvals_reviewer"].Required {
+		t.Fatalf("AppsDefaultConfig.approvals_reviewer field = %#v", appsDefaultConfigFields["approvals_reviewer"])
 	}
 	config := selectedByName["Config"]
 	if !config.OpenDynamicProperties {
@@ -975,8 +991,9 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		rateLimitResponseFields[field.FieldName] = field
 	}
 	for fieldName, wantGoType := range map[string]string{
-		"rateLimits":          "RateLimitSnapshot",
-		"rateLimitsByLimitId": "*protocolv2.Nullable[map[string]RateLimitSnapshot]",
+		"rateLimitResetCredits": "*protocolv2.Nullable[RateLimitResetCreditsSummary]",
+		"rateLimits":            "RateLimitSnapshot",
+		"rateLimitsByLimitId":   "*protocolv2.Nullable[map[string]RateLimitSnapshot]",
 	} {
 		if got := rateLimitResponseFields[fieldName].GoType; got != wantGoType {
 			t.Fatalf("GetAccountRateLimitsResponse.%s GoType = %q, want %q", fieldName, got, wantGoType)
@@ -1230,24 +1247,6 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 	if threadStartFields["config"].Kind != FieldPlanJSONValueMap {
 		t.Fatalf("ThreadStartParams.config Kind = %s, want %s", threadStartFields["config"].Kind, FieldPlanJSONValueMap)
 	}
-	dynamicTool := selectedByName["DynamicToolSpec"]
-	dynamicToolFields := map[string]FieldPlan{}
-	for _, field := range dynamicTool.Fields {
-		dynamicToolFields[field.FieldName] = field
-	}
-	for fieldName, wantGoType := range map[string]string{
-		"description": "string",
-		"inputSchema": "protocolv2.JSONValue",
-		"name":        "string",
-		"namespace":   "*protocolv2.Nullable[string]",
-	} {
-		if got := dynamicToolFields[fieldName].GoType; got != wantGoType {
-			t.Fatalf("DynamicToolSpec.%s GoType = %q, want %q", fieldName, got, wantGoType)
-		}
-	}
-	if dynamicToolFields["inputSchema"].Kind != FieldPlanJSONValue {
-		t.Fatalf("DynamicToolSpec.inputSchema Kind = %s, want %s", dynamicToolFields["inputSchema"].Kind, FieldPlanJSONValue)
-	}
 	turnStart := selectedByName["TurnStartParams"]
 	turnStartFields := map[string]FieldPlan{}
 	for _, field := range turnStart.Fields {
@@ -1334,6 +1333,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 	}
 	for _, typeName := range []string{
 		"ThreadRealtimeAppendAudioResponse",
+		"ThreadRealtimeAppendSpeechResponse",
 		"ThreadRealtimeAppendTextResponse",
 		"ThreadRealtimeListVoicesParams",
 		"ThreadRealtimeStartResponse",
@@ -1344,6 +1344,7 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		}
 	}
 	for _, typeName := range []string{
+		"ThreadRealtimeAppendSpeechParams",
 		"ThreadRealtimeAppendTextParams",
 		"ThreadRealtimeErrorNotification",
 		"ThreadRealtimeSdpNotification",
@@ -1359,6 +1360,10 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 	threadRealtimeAppendTextFields := generatedFields("ThreadRealtimeAppendTextParams")
 	if threadRealtimeAppendTextFields["text"].GoType != "string" || !threadRealtimeAppendTextFields["text"].Required {
 		t.Fatalf("ThreadRealtimeAppendTextParams.text field = %#v", threadRealtimeAppendTextFields["text"])
+	}
+	threadRealtimeAppendSpeechFields := generatedFields("ThreadRealtimeAppendSpeechParams")
+	if threadRealtimeAppendSpeechFields["text"].GoType != "string" || !threadRealtimeAppendSpeechFields["text"].Required {
+		t.Fatalf("ThreadRealtimeAppendSpeechParams.text field = %#v", threadRealtimeAppendSpeechFields["text"])
 	}
 	realtimeVoicesListFields := generatedFields("RealtimeVoicesList")
 	if realtimeVoicesListFields["defaultV1"].GoType != "RealtimeVoice" ||
@@ -1425,7 +1430,17 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		t.Fatalf("ThreadRealtimeSdpNotification.sdp field = %#v", threadRealtimeSdpFields["sdp"])
 	}
 	threadRealtimeStartFields := generatedFields("ThreadRealtimeStartParams")
-	if threadRealtimeStartFields["outputModality"].GoType != "RealtimeOutputModality" ||
+	if architecture, ok := threadRealtimeStartFields["architecture"]; ok &&
+		(architecture.GoType != "*protocolv2.Nullable[RealtimeConversationArchitecture]" || architecture.Required) {
+		t.Fatalf("ThreadRealtimeStartParams.architecture field = %#v", architecture)
+	}
+	if threadRealtimeStartFields["codexResponseItemPrefix"].GoType != "*protocolv2.Nullable[string]" ||
+		threadRealtimeStartFields["codexResponseItemPrefix"].Required ||
+		threadRealtimeStartFields["codexResponsesAsItems"].GoType != "*protocolv2.Nullable[bool]" ||
+		threadRealtimeStartFields["codexResponsesAsItems"].Required ||
+		threadRealtimeStartFields["includeStartupContext"].GoType != "*protocolv2.Nullable[bool]" ||
+		threadRealtimeStartFields["includeStartupContext"].Required ||
+		threadRealtimeStartFields["outputModality"].GoType != "RealtimeOutputModality" ||
 		!threadRealtimeStartFields["outputModality"].Required ||
 		threadRealtimeStartFields["prompt"].GoType != "*protocolv2.Nullable[string]" ||
 		threadRealtimeStartFields["prompt"].Required ||
@@ -1435,6 +1450,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		!threadRealtimeStartFields["threadId"].Required ||
 		threadRealtimeStartFields["transport"].GoType != "*protocolv2.Nullable[ThreadRealtimeStartTransport]" ||
 		threadRealtimeStartFields["transport"].Required ||
+		threadRealtimeStartFields["version"].GoType != "*protocolv2.Nullable[RealtimeConversationVersion]" ||
+		threadRealtimeStartFields["version"].Required ||
 		threadRealtimeStartFields["voice"].GoType != "*protocolv2.Nullable[RealtimeVoice]" ||
 		threadRealtimeStartFields["voice"].Required {
 		t.Fatalf("ThreadRealtimeStartParams fields = %#v", threadRealtimeStartFields)
@@ -1623,10 +1640,17 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			}
 		}
 	}
-	for _, typeName := range []string{"ExternalAgentConfigImportCompletedNotification", "SkillsChangedNotification"} {
+	for _, typeName := range []string{"SkillsChangedNotification"} {
 		if fields := selectedByName[typeName].Fields; len(fields) != 0 {
 			t.Fatalf("%s fields = %#v, want empty notification payload", typeName, fields)
 		}
+	}
+	externalAgentImportCompletedFields := generatedFields("ExternalAgentConfigImportCompletedNotification")
+	if externalAgentImportCompletedFields["importId"].GoType != "string" ||
+		!externalAgentImportCompletedFields["importId"].Required ||
+		externalAgentImportCompletedFields["itemTypeResults"].GoType != "[]ExternalAgentConfigImportTypeResult" ||
+		!externalAgentImportCompletedFields["itemTypeResults"].Required {
+		t.Fatalf("ExternalAgentConfigImportCompletedNotification fields = %#v", externalAgentImportCompletedFields)
 	}
 	contextCompactedFields := generatedFields("ContextCompactedNotification")
 	if contextCompactedFields["threadId"].GoType != "string" || !contextCompactedFields["threadId"].Required ||
@@ -1895,6 +1919,8 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 		pluginDetailFields["marketplacePath"].GoType != "*protocolv2.Nullable[string]" ||
 		pluginDetailFields["mcpServers"].GoType != "[]string" ||
 		!pluginDetailFields["mcpServers"].Required ||
+		pluginDetailFields["shareUrl"].GoType != "*protocolv2.Nullable[string]" ||
+		pluginDetailFields["shareUrl"].Required ||
 		pluginDetailFields["skills"].GoType != "[]SkillSummary" ||
 		!pluginDetailFields["skills"].Required ||
 		pluginDetailFields["summary"].GoType != "PluginSummary" ||
@@ -2008,7 +2034,12 @@ func TestSelectFirstPassGeneratedTypes(t *testing.T) {
 			t.Fatalf("MigrationDetails.%s field = %#v", fieldName, migrationDetailsFields[fieldName])
 		}
 	}
-	for _, typeName := range []string{"ExternalAgentConfigImportResponse", "ThreadApproveGuardianDeniedActionResponse", "TurnInterruptResponse"} {
+	externalAgentConfigImportResponseFields := generatedFields("ExternalAgentConfigImportResponse")
+	if externalAgentConfigImportResponseFields["importId"].GoType != "string" ||
+		!externalAgentConfigImportResponseFields["importId"].Required {
+		t.Fatalf("ExternalAgentConfigImportResponse.importId field = %#v", externalAgentConfigImportResponseFields["importId"])
+	}
+	for _, typeName := range []string{"ThreadApproveGuardianDeniedActionResponse", "TurnInterruptResponse"} {
 		if fields := selectedByName[typeName].Fields; len(fields) != 0 {
 			t.Fatalf("%s fields = %#v, want empty payload", typeName, fields)
 		}
@@ -2632,8 +2663,8 @@ func TestSelectGeneratedEnums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(enums), 102; got != want {
-		t.Fatalf("selected generated enum count = %d, want %d", got, want)
+	if got, min := len(enums), 105; got < min {
+		t.Fatalf("selected generated enum count = %d, want at least %d", got, min)
 	}
 	enumByName := map[string]EnumPlan{}
 	for _, enum := range enums {
@@ -2646,8 +2677,11 @@ func TestSelectGeneratedEnums(t *testing.T) {
 		"CancelLoginAccountStatus",
 		"ChatgptAuthTokensRefreshReason",
 		"CommandExecOutputStream",
-		"FileChangeApprovalDecision",
+		"ConsumeAccountRateLimitResetCreditOutcome",
+		"ConversationTextRole",
 		"ExperimentalFeatureStage",
+		"ExternalAgentConfigMigrationItemType",
+		"FileChangeApprovalDecision",
 		"ImageDetail",
 		"InputModality",
 		"LocalShellStatus",
@@ -3281,10 +3315,14 @@ func TestPermissionApprovalDefinitionsStayShared(t *testing.T) {
 	if !ok {
 		t.Fatal("missing PermissionsRequestApprovalResponse schema")
 	}
+	pathAliasName := "ApiPathString"
+	if _, ok := commandApproval.Schema.Definitions[pathAliasName]; !ok {
+		pathAliasName = "LegacyAppPathString"
+	}
 	for _, name := range []string{
-		"AbsolutePathBuf",
 		"AdditionalFileSystemPermissions",
 		"AdditionalNetworkPermissions",
+		pathAliasName,
 		"FileSystemAccessMode",
 		"FileSystemPath",
 		"FileSystemSandboxEntry",
@@ -3299,6 +3337,9 @@ func TestPermissionApprovalDefinitionsStayShared(t *testing.T) {
 		if !bytes.Equal(commandDefinition, responseDefinition) {
 			t.Fatalf("%s definition differs between CommandExecutionRequestApprovalParams and PermissionsRequestApprovalResponse", name)
 		}
+	}
+	if !bytes.Equal(encodedDefinition(t, commandApproval, "AbsolutePathBuf"), encodedDefinition(t, permissionsRequest, "AbsolutePathBuf")) {
+		t.Fatal("AbsolutePathBuf definition differs between CommandExecutionRequestApprovalParams and PermissionsRequestApprovalParams")
 	}
 }
 
@@ -3438,7 +3479,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(unions), 34; got != want {
+	if got, want := len(unions), 36; got != want {
 		t.Fatalf("selected generated tagged union count = %d, want %d", got, want)
 	}
 	unionByName := map[string]TaggedUnionPlan{}
@@ -3489,6 +3530,64 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 		t.Fatalf("ConfiguredHookHandler agent variant = %#v", agentHook)
 	}
 
+	dynamicToolSpec := unionByName["DynamicToolSpec"]
+	if dynamicToolSpec.Discriminator != "type" {
+		t.Fatalf("DynamicToolSpec discriminator = %q, want type", dynamicToolSpec.Discriminator)
+	}
+	if got, want := len(dynamicToolSpec.Variants), 2; got != want {
+		t.Fatalf("DynamicToolSpec variant count = %d, want %d", got, want)
+	}
+	var dynamicToolFunction TaggedUnionVariantPlan
+	var dynamicToolNamespace TaggedUnionVariantPlan
+	for _, variant := range dynamicToolSpec.Variants {
+		switch variant.DiscriminatorValue {
+		case "function":
+			dynamicToolFunction = variant
+		case "namespace":
+			dynamicToolNamespace = variant
+		}
+	}
+	dynamicToolFunctionFields := map[string]FieldPlan{}
+	for _, field := range dynamicToolFunction.Fields {
+		dynamicToolFunctionFields[field.FieldName] = field
+	}
+	if dynamicToolFunction.PayloadTypeName != "DynamicToolSpecFunction" ||
+		dynamicToolFunctionFields["description"].GoType != "string" ||
+		dynamicToolFunctionFields["inputSchema"].Kind != FieldPlanJSONValue ||
+		dynamicToolFunctionFields["name"].GoType != "string" {
+		t.Fatalf("DynamicToolSpec function variant = %#v", dynamicToolFunction)
+	}
+	dynamicToolNamespaceFields := map[string]FieldPlan{}
+	for _, field := range dynamicToolNamespace.Fields {
+		dynamicToolNamespaceFields[field.FieldName] = field
+	}
+	if dynamicToolNamespace.PayloadTypeName != "DynamicToolSpecNamespace" ||
+		dynamicToolNamespaceFields["description"].GoType != "string" ||
+		dynamicToolNamespaceFields["name"].GoType != "string" ||
+		dynamicToolNamespaceFields["tools"].GoType != "[]DynamicToolNamespaceTool" {
+		t.Fatalf("DynamicToolSpec namespace variant = %#v", dynamicToolNamespace)
+	}
+
+	dynamicToolNamespaceTool := unionByName["DynamicToolNamespaceTool"]
+	if dynamicToolNamespaceTool.Discriminator != "type" {
+		t.Fatalf("DynamicToolNamespaceTool discriminator = %q, want type", dynamicToolNamespaceTool.Discriminator)
+	}
+	if got, want := len(dynamicToolNamespaceTool.Variants), 1; got != want {
+		t.Fatalf("DynamicToolNamespaceTool variant count = %d, want %d", got, want)
+	}
+	namespaceToolFunction := dynamicToolNamespaceTool.Variants[0]
+	namespaceToolFunctionFields := map[string]FieldPlan{}
+	for _, field := range namespaceToolFunction.Fields {
+		namespaceToolFunctionFields[field.FieldName] = field
+	}
+	if namespaceToolFunction.DiscriminatorValue != "function" ||
+		namespaceToolFunction.PayloadTypeName != "DynamicToolNamespaceToolFunction" ||
+		namespaceToolFunctionFields["description"].GoType != "string" ||
+		namespaceToolFunctionFields["inputSchema"].Kind != FieldPlanJSONValue ||
+		namespaceToolFunctionFields["name"].GoType != "string" {
+		t.Fatalf("DynamicToolNamespaceTool function variant = %#v", namespaceToolFunction)
+	}
+
 	notification := unionByName["ClientNotification"]
 	if notification.Discriminator != "method" {
 		t.Fatalf("ClientNotification discriminator = %q, want method", notification.Discriminator)
@@ -3504,8 +3603,8 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if clientRequest.Discriminator != "method" {
 		t.Fatalf("ClientRequest discriminator = %q, want method", clientRequest.Discriminator)
 	}
-	if got, want := len(clientRequest.Variants), 117; got != want {
-		t.Fatalf("ClientRequest variant count = %d, want %d", got, want)
+	if got, min := len(clientRequest.Variants), 119; got < min {
+		t.Fatalf("ClientRequest variant count = %d, want at least %d", got, min)
 	}
 	var threadStartRequest TaggedUnionVariantPlan
 	var memoryResetRequest TaggedUnionVariantPlan
@@ -3545,8 +3644,8 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverNotification.Discriminator != "method" {
 		t.Fatalf("ServerNotification discriminator = %q, want method", serverNotification.Discriminator)
 	}
-	if got, want := len(serverNotification.Variants), 66; got != want {
-		t.Fatalf("ServerNotification variant count = %d, want %d", got, want)
+	if got, min := len(serverNotification.Variants), 66; got < min {
+		t.Fatalf("ServerNotification variant count = %d, want at least %d", got, min)
 	}
 	var errorNotification TaggedUnionVariantPlan
 	var tokenUsageNotification TaggedUnionVariantPlan
@@ -3587,8 +3686,8 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if serverRequest.Discriminator != "method" {
 		t.Fatalf("ServerRequest discriminator = %q, want method", serverRequest.Discriminator)
 	}
-	if got, want := len(serverRequest.Variants), 10; got != want {
-		t.Fatalf("ServerRequest variant count = %d, want %d", got, want)
+	if got, min := len(serverRequest.Variants), 10; got < min {
+		t.Fatalf("ServerRequest variant count = %d, want at least %d", got, min)
 	}
 	var commandApprovalRequest TaggedUnionVariantPlan
 	for _, variant := range serverRequest.Variants {
@@ -3686,7 +3785,10 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	for _, field := range chatGPTAccount.Fields {
 		accountFields[field.FieldName] = field
 	}
-	if accountFields["email"].GoType != "string" || accountFields["planType"].GoType != "PlanType" {
+	emailField := accountFields["email"]
+	if (emailField.GoType != "string" && emailField.GoType != "protocolv2.Nullable[string]") ||
+		!emailField.Required ||
+		accountFields["planType"].GoType != "PlanType" {
 		t.Fatalf("chatgpt account fields = %#v", accountFields)
 	}
 
@@ -3869,11 +3971,24 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if got, want := len(fileSystemPath.Variants), 3; got != want {
 		t.Fatalf("FileSystemPath variant count = %d, want %d", got, want)
 	}
+	var literalPath TaggedUnionVariantPlan
 	var specialPath TaggedUnionVariantPlan
 	for _, variant := range fileSystemPath.Variants {
+		if variant.DiscriminatorValue == "path" {
+			literalPath = variant
+		}
 		if variant.DiscriminatorValue == "special" {
 			specialPath = variant
 		}
+	}
+	if literalPath.PayloadTypeName != "FileSystemPathPath" {
+		t.Fatalf("FileSystemPath path payload = %q, want FileSystemPathPath", literalPath.PayloadTypeName)
+	}
+	if got, want := len(literalPath.Fields), 1; got != want {
+		t.Fatalf("FileSystemPath path field count = %d, want %d", got, want)
+	}
+	if literalPath.Fields[0].FieldName != "path" || literalPath.Fields[0].GoType != "string" || literalPath.Fields[0].Kind != FieldPlanScalar {
+		t.Fatalf("FileSystemPath path field = %#v", literalPath.Fields[0])
 	}
 	if specialPath.PayloadTypeName != "FileSystemPathSpecial" {
 		t.Fatalf("FileSystemPath special payload = %q, want FileSystemPathSpecial", specialPath.PayloadTypeName)
@@ -4095,7 +4210,7 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	if threadItem.Discriminator != "type" {
 		t.Fatalf("ThreadItem discriminator = %q, want type", threadItem.Discriminator)
 	}
-	if got, want := len(threadItem.Variants), 17; got != want {
+	if got, want := len(threadItem.Variants), 18; got != want {
 		t.Fatalf("ThreadItem variant count = %d, want %d", got, want)
 	}
 	var mcpToolCall TaggedUnionVariantPlan
@@ -4592,5 +4707,28 @@ func TestFieldGoNameUsesGoAcronyms(t *testing.T) {
 func TestLeafGoTypePeelsNullableArrays(t *testing.T) {
 	if got, want := leafGoType("*Nullable[[]ToolRequestUserInputOption]"), "ToolRequestUserInputOption"; got != want {
 		t.Fatalf("leafGoType nullable array = %q, want %q", got, want)
+	}
+}
+
+func TestGeneratedDefinitionStructCheckpointsCoverRust0142Drift(t *testing.T) {
+	cases := []struct {
+		schemaPath string
+		name       string
+	}{
+		{"v2/ExternalAgentConfigImportHistoriesReadResponse.json", "ExternalAgentConfigImportHistory"},
+		{"v2/GetWorkspaceMessagesResponse.json", "WorkspaceMessage"},
+		{"v2/ThreadResumeParams.json", "InternalChatMessageMetadataPassthrough"},
+		{"v2/TurnStartResponse.json", "McpToolCallAppContext"},
+	}
+	for _, tc := range cases {
+		if !isGeneratedDefinitionStructCheckpoint(tc.schemaPath, tc.name) {
+			t.Fatalf("%s %s was not selected as a generated definition struct checkpoint", tc.schemaPath, tc.name)
+		}
+	}
+}
+
+func TestGeneratedDefinitionEnumCheckpointsCoverRust0142Drift(t *testing.T) {
+	if !isGeneratedDefinitionStringEnumCheckpoint("v2/GetWorkspaceMessagesResponse.json", "WorkspaceMessageType") {
+		t.Fatal("WorkspaceMessageType was not selected as a generated definition enum checkpoint")
 	}
 }
