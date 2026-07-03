@@ -53,7 +53,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/ApiPathString"
+            "$ref": "#/definitions/LegacyAppPathString"
           }
         },
         "write": {
@@ -63,7 +63,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/ApiPathString"
+            "$ref": "#/definitions/LegacyAppPathString"
           }
         }
       }
@@ -78,9 +78,6 @@
           ]
         }
       }
-    },
-    "ApiPathString": {
-      "type": "string"
     },
     "FileSystemAccessMode": {
       "type": "string",
@@ -100,7 +97,7 @@
           ],
           "properties": {
             "path": {
-              "$ref": "#/definitions/ApiPathString"
+              "$ref": "#/definitions/LegacyAppPathString"
             },
             "type": {
               "type": "string",
@@ -302,6 +299,9 @@
           ]
         }
       }
+    },
+    "LegacyAppPathString": {
+      "type": "string"
     },
     "PermissionGrantScope": {
       "type": "string",
