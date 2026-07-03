@@ -4381,6 +4381,106 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	}
 }
 
+func TestDynamicToolSpecSupportsStructToTaggedUnionTransition(t *testing.T) {
+	objectParent := TypePlan{
+		SchemaPath: "v2/ThreadStartParams.json",
+		Stability:  "stable",
+		Schema: &Schema{
+			Definitions: map[string]*Schema{
+				"DynamicToolSpec": mustParseSchema(t, `{
+					"type": "object",
+					"required": ["description", "inputSchema", "name"],
+					"properties": {
+						"deferLoading": {"type": "boolean"},
+						"description": {"type": "string"},
+						"inputSchema": true,
+						"name": {"type": "string"},
+						"namespace": {"type": ["string", "null"]}
+					}
+				}`),
+			},
+		},
+	}
+	taggedCandidates, err := generatedDefinitionTaggedUnionCandidates(objectParent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(taggedCandidates) != 0 {
+		t.Fatalf("object DynamicToolSpec tagged candidate count = %d, want 0", len(taggedCandidates))
+	}
+	structCandidates, err := generatedDefinitionTypeCandidates(objectParent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(structCandidates), 1; got != want {
+		t.Fatalf("object DynamicToolSpec struct candidate count = %d, want %d", got, want)
+	}
+	if structCandidates[0].TypeName != "DynamicToolSpec" || structCandidates[0].Kind != TypePlanObjectStructCandidate {
+		t.Fatalf("object DynamicToolSpec candidate = %#v", structCandidates[0])
+	}
+	fields := map[string]FieldPlan{}
+	for _, field := range structCandidates[0].Fields {
+		fields[field.FieldName] = field
+	}
+	if fields["description"].GoType != "string" || !fields["description"].Required ||
+		fields["inputSchema"].Kind != FieldPlanJSONValue || !fields["inputSchema"].Required ||
+		fields["name"].GoType != "string" || !fields["name"].Required {
+		t.Fatalf("object DynamicToolSpec fields = %#v", fields)
+	}
+
+	unionParent := TypePlan{
+		SchemaPath: "v2/ThreadStartParams.json",
+		Stability:  "stable",
+		Schema: &Schema{
+			Definitions: map[string]*Schema{
+				"DynamicToolSpec": mustParseSchema(t, `{
+					"oneOf": [
+						{
+							"type": "object",
+							"title": "FunctionDynamicToolSpec",
+							"required": ["description", "inputSchema", "name", "type"],
+							"properties": {
+								"description": {"type": "string"},
+								"inputSchema": true,
+								"name": {"type": "string"},
+								"type": {"type": "string", "enum": ["function"], "title": "FunctionDynamicToolSpecType"}
+							}
+						},
+						{
+							"type": "object",
+							"title": "NamespaceDynamicToolSpec",
+							"required": ["description", "name", "tools", "type"],
+							"properties": {
+								"description": {"type": "string"},
+								"name": {"type": "string"},
+								"tools": {"type": "array", "items": {"$ref": "#/definitions/DynamicToolNamespaceTool"}},
+								"type": {"type": "string", "enum": ["namespace"], "title": "NamespaceDynamicToolSpecType"}
+							}
+						}
+					]
+				}`),
+			},
+		},
+	}
+	structCandidates, err = generatedDefinitionTypeCandidates(unionParent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(structCandidates) != 0 {
+		t.Fatalf("union DynamicToolSpec struct candidate count = %d, want 0", len(structCandidates))
+	}
+	taggedCandidates, err = generatedDefinitionTaggedUnionCandidates(unionParent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(taggedCandidates), 1; got != want {
+		t.Fatalf("union DynamicToolSpec tagged candidate count = %d, want %d", got, want)
+	}
+	if taggedCandidates[0].TypeName != "DynamicToolSpec" || taggedCandidates[0].Kind != TypePlanTaggedUnionCandidate {
+		t.Fatalf("union DynamicToolSpec candidate = %#v", taggedCandidates[0])
+	}
+}
+
 func TestGenerateProtocolTypesEmitsNullableDecoder(t *testing.T) {
 	generated, err := GenerateProtocolTypes(ProtocolTypePlan{Types: []TypePlan{{
 		Kind:       TypePlanObjectStructCandidate,
