@@ -479,7 +479,7 @@ jobs:
           target-dir: ${{ env.CODEXSDK_RUST_TARGET_DIR }}
 
       - name: Download sync candidate artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: codex-upstream-sync-candidate-${{ needs.detect.outputs.upstream_sha }}
           path: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
