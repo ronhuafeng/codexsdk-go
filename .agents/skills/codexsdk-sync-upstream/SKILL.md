@@ -30,6 +30,12 @@ A baseline sync is complete only when:
 - if solving a drift issue, pushed CI and the drift workflow pass and the issue closes
 - if a baseline sync commit is pushed, the upstream sync tag is created and pushed
 
+Every final response must state the highest completed layer:
+
+- `local sync complete`: files validate locally, but nothing was pushed
+- `commit pushed`: the sync commit was pushed, but tag/CI/drift workflow/issue closure are still pending
+- `drift issue fully resolved`: tag, pushed CI, drift workflow, and issue closure are complete when applicable
+
 ## Required Inputs
 
 Collect or infer:
@@ -60,29 +66,38 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 
    ```sh
    git status --short
+   git branch --show-current
    sed -n '1,80p' codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json
    ```
 
    Keep unrelated user changes intact.
 
+   Branch safety gate:
+
+   - if the current branch is `dependabot/*`, `renovate/*`, `release/*`, `release-*`, `hotfix/*`, or `hotfix-*`, do not commit sync work there unless the user explicitly asked to use that branch
+   - if the branch is clearly for an unrelated PR or feature, stop before editing and create a sync branch such as `codex/sync-upstream-rust-vX.Y.Z` after resolving the target
+   - if the user explicitly requested the current branch, mention that in the final response
+
 2. Resolve the target tag/ref and run the target policy gate.
 
-   Prepare the default cache locations:
+   Use the canonical resolver. Do not hand-roll `sort`, prerelease filtering, or annotated-tag peeling in shell.
 
    ```sh
    mkdir -p .cache
-   if [ ! -d .cache/openai-codex/.git ]; then
-     git clone https://github.com/openai/codex.git .cache/openai-codex
+   target_json=.cache/codexsdk-upstream-target.json
+   if [ -n "<requested_ref>" ]; then
+     python3 scripts/codexsdk_resolve_upstream.py --upstream-ref "<requested_ref>" --json > "$target_json"
    else
-     git -C .cache/openai-codex fetch origin
+     python3 scripts/codexsdk_resolve_upstream.py --latest-stable --json > "$target_json"
    fi
    ```
 
    Resolve the selected upstream target to:
 
-   - `target_ref`: original tag/ref/commit requested by the user or latest stable `rust-vX.Y.Z`
-   - `target_ref_kind`: `stable_rust_tag`, `manual_ref`, or `manual_commit`
-   - `target_sha`: peeled full commit SHA
+   - `upstream_ref`: original tag/ref/commit requested by the user or latest stable `rust-vX.Y.Z`
+   - `upstream_ref_kind`: `stable_rust_tag`, `manual_ref`, or `manual_commit`
+   - `tag_sha`: tag object SHA when the target is a tag; equal to the commit for lightweight tags
+   - `peeled_commit_sha` / `upstream_sha`: peeled full commit SHA used for generation
    - `target_explicit`: `true` only when the user explicitly supplied the target
 
    Before generating drift, run the policy gate:
@@ -90,9 +105,9 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    ```sh
    python3 scripts/codexsdk_target_policy.py \
      --baseline codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json \
-     --target-ref <target_ref> \
+     --target-ref <upstream_ref> \
      --target-kind <stable_rust_tag|manual_ref|manual_commit> \
-     --target-sha <target_sha> \
+     --target-sha <upstream_sha> \
      --target-explicit <true|false> \
      --mode <scheduled|manual> \
      --allow-downgrade false
@@ -112,11 +127,13 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    CARGO_TARGET_DIR="$PWD/.cache/cargo-target/codex" \
      scripts/codexsdk_track_upstream.sh \
      --codex-repo "$PWD/.cache/openai-codex" \
-     --commit <target_sha> \
-     --source-ref <target_ref> \
-     --source-ref-kind <target_ref_kind> \
+     --commit <upstream_sha> \
+     --source-ref <upstream_ref> \
+     --source-ref-kind <upstream_ref_kind> \
      --out "$PWD/.cache/codexsdk-upstream-<short-sha>"
    ```
+
+   Let `scripts/codexsdk_track_upstream.sh` fetch the selected target narrowly. Do not run broad `git fetch origin --tags` or broad upstream refreshes unless the cache is missing or the user explicitly asks to refresh it.
 
    The script is intentionally read-only for the checked-in baseline. It writes candidate schemas under `schema/` and review reports under `reports/`, delegating the schema comparison to `scripts/codexsdk_schema_diff.py`. Add `--verbose` during interactive runs if you want it to print artifact paths.
 
@@ -128,6 +145,13 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    - `.cache/codexsdk-upstream-<short-sha>/reports/drift_summary.json`
    - `.cache/codexsdk-upstream-<short-sha>/reports/matrix_update_skeleton.json`
 
+   Before overwriting checked-in clean reports, keep a short pre-sync drift summary for the issue comment, PR body, commit notes, or final response:
+
+   - files added, changed, and removed
+   - method deltas and added methods
+   - stable vs experimental classification for added methods
+   - handwritten SDK and coverage implications
+
    Treat any added, removed, or changed schema as review-required. Classify the drift before updating `manifest.json`, `coverage_matrix.json`, or handwritten SDK files:
 
    - method drift: added or removed request/notification method entries
@@ -136,6 +160,21 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    - SDK surface class: `metadata-only`, `generated-only`, `public-facade-required`, or `ignored-internal`
    - handwritten SDK impact: facade/client/type/test/docs changes needed beyond generated code, with a short reason for each file
    - coverage impact: `coverage_matrix.json` entries needed for new or changed surface
+
+   If new methods appear, generate a non-experimental schema from the same target once and compare method presence before deciding public SDK surface:
+
+   ```sh
+   repo="$PWD"
+   stable_out="$repo/.cache/codexsdk-upstream-<short-sha>-stable/schema"
+   stable_worktree="$repo/.cache/codexsdk-upstream-<short-sha>-stable/codex-worktree"
+   mkdir -p "$stable_out"
+   git -C "$repo/.cache/openai-codex" worktree add --detach "$stable_worktree" <upstream_sha>
+   (
+     cd "$stable_worktree/codex-rs"
+     CARGO_TARGET_DIR="$repo/.cache/cargo-target/codex" \
+       cargo run -p codex-cli -- app-server generate-json-schema --out "$stable_out"
+   )
+   ```
 
    For example, an optional nullable field added to an existing response type normally requires generated Go and focused tests, but no facade change unless handwritten SDK code exposes or interprets that field.
 
@@ -172,9 +211,9 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
      --compare-only \
      --baseline codexsdk/internal/protocolschema/appserver/v2 \
      --candidate "$PWD/.cache/codexsdk-upstream-<short-sha>/schema" \
-     --commit <target_sha> \
-     --source-ref <target_ref> \
-     --source-ref-kind <target_ref_kind> \
+     --commit <upstream_sha> \
+     --source-ref <upstream_ref> \
+     --source-ref-kind <upstream_ref_kind> \
      --out "$PWD/.cache/codexsdk-upstream-<short-sha>-clean" \
      --verbose
    ```
@@ -245,6 +284,16 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 
    If validation fails on missing coverage fields or generated constants, first check for stale manifest, coverage, or handwritten references to removed upstream methods, schemas, or fields before adding new abstractions.
 
+   If `protocolv2gen` fails, triage in this order:
+
+   | Symptom | Check first |
+   | --- | --- |
+   | Unknown scalar or alias type | scalar alias mapping in `codexsdk/internal/protocolgen` |
+   | Nullable `$ref` or pointer mismatch | nullable `$ref` dependency handling |
+   | Missing generated struct/field | generated struct checkpoint tests |
+   | Missing method constant or handler metadata | method registry count and manifest entries |
+   | Unexpected protocol type count | protocol type count tests and stale removed schemas |
+
    Review `git diff --name-status` against the drift classification before staging:
 
    - schema JSON, checked-in drift reports, metadata, manifest, coverage matrix, and generated `protocolv2` files are expected for real schema drift
@@ -263,12 +312,7 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 9. Before committing, check whether the selected upstream target moved.
 
    ```sh
-   git ls-remote --tags --refs https://github.com/openai/codex.git 'refs/tags/rust-v*' \
-     | awk '{print $2}' \
-     | sed 's#refs/tags/##' \
-     | grep -E '^rust-v[0-9]+[.][0-9]+[.][0-9]+$' \
-     | sort -V \
-     | tail -n 1
+   python3 scripts/codexsdk_resolve_upstream.py --latest-stable --json
    ```
 
    For the default scheduled workflow, compare against the latest stable `rust-vX.Y.Z` tag, not `main`. Apply these target-movement rules:
@@ -280,6 +324,16 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    - if it has real protocol drift, stop and explain the new target so the user can choose whether to continue
 
    Do not enter an unbounded loop chasing moving upstream refs.
+
+   If Cargo fails because crate downloads hit low-speed timeouts, rerun the failed generation command with the retry environment rather than changing code:
+
+   ```sh
+   CARGO_HTTP_TIMEOUT=600 \
+   CARGO_HTTP_LOW_SPEED_LIMIT=0 \
+   CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+   CARGO_TARGET_DIR="$PWD/.cache/cargo-target/codex" \
+     scripts/codexsdk_track_upstream.sh ...
+   ```
 
 10. Tag the codexsdk-go sync commit when a baseline sync was committed.
 
@@ -314,6 +368,8 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
    - if drift is clean, the workflow should close the existing drift issue
    - if drift remains, the workflow should update the existing drift issue rather than creating duplicates
    - if the selected upstream tag/ref moved or a newer stable tag exists, report the exact tag/ref and commit and whether the remaining drift is real or clean
+
+   Do not call the task complete at push time. Use the completion layers from the Completion Contract in the final response.
 
 ## Decision Rules
 

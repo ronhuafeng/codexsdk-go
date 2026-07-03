@@ -8,7 +8,7 @@ import json
 import re
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 
 DEFAULT_REMOTE = "https://github.com/openai/codex.git"
@@ -18,10 +18,36 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 @dataclass(frozen=True)
 class UpstreamTarget:
-    upstream_ref: str
-    upstream_ref_kind: str
-    upstream_sha: str
+    ref_name: str
+    ref_kind: str
+    tag_sha: str
+    peeled_commit_sha: str
     target_explicit: bool
+
+    @property
+    def upstream_ref(self) -> str:
+        return self.ref_name
+
+    @property
+    def upstream_ref_kind(self) -> str:
+        return self.ref_kind
+
+    @property
+    def upstream_sha(self) -> str:
+        return self.peeled_commit_sha
+
+    def to_json_dict(self) -> dict[str, object]:
+        return {
+            "ref_name": self.ref_name,
+            "ref_kind": self.ref_kind,
+            "tag_sha": self.tag_sha,
+            "peeled_commit_sha": self.peeled_commit_sha,
+            "target_explicit": self.target_explicit,
+            # Back-compatible keys used by workflows and existing scripts.
+            "upstream_ref": self.ref_name,
+            "upstream_ref_kind": self.ref_kind,
+            "upstream_sha": self.peeled_commit_sha,
+        }
 
 
 def trim_ref(value: str) -> str:
@@ -81,20 +107,35 @@ def first_remote_sha(ls_remote_output: str) -> str:
     return ""
 
 
-def resolve_remote_ref(remote: str, ref: str) -> str:
+def remote_ref_shas(ls_remote_output: str) -> dict[str, str]:
+    shas: dict[str, str] = {}
+    for line in ls_remote_output.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] and parts[1]:
+            shas.setdefault(parts[1], parts[0])
+    return shas
+
+
+def resolve_remote_ref(remote: str, ref: str) -> tuple[str, str]:
     if SHA_RE.fullmatch(ref):
-        return ref
+        return "", ref
+
+    tag_ref = f"refs/tags/{ref}"
+    tag_entries = remote_ref_shas(git_ls_remote(remote, tag_ref, f"{tag_ref}^{{}}"))
+    tag_sha = tag_entries.get(tag_ref, "")
+    peeled_sha = tag_entries.get(f"{tag_ref}^{{}}", "") or tag_sha
+    if peeled_sha:
+        return tag_sha or peeled_sha, peeled_sha
+
     candidates = [
-        f"refs/tags/{ref}^{{}}",
         f"{ref}^{{}}",
-        f"refs/tags/{ref}",
         f"refs/heads/{ref}",
         ref,
     ]
     for candidate in candidates:
         sha = first_remote_sha(git_ls_remote(remote, candidate))
         if sha:
-            return sha
+            return "", sha
     raise ValueError(f"unable to resolve upstream ref in openai/codex: {ref}")
 
 
@@ -106,10 +147,12 @@ def resolve_upstream(remote: str, requested_ref: str) -> UpstreamTarget:
     else:
         upstream_ref = latest_stable_rust_tag(git_ls_remote(remote, "refs/tags/rust-v*"))
         target_explicit = False
+    tag_sha, peeled_commit_sha = resolve_remote_ref(remote, upstream_ref)
     return UpstreamTarget(
-        upstream_ref=upstream_ref,
-        upstream_ref_kind=infer_ref_kind(upstream_ref),
-        upstream_sha=resolve_remote_ref(remote, upstream_ref),
+        ref_name=upstream_ref,
+        ref_kind=infer_ref_kind(upstream_ref),
+        tag_sha=tag_sha,
+        peeled_commit_sha=peeled_commit_sha,
         target_explicit=target_explicit,
     )
 
@@ -118,12 +161,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--remote", default=DEFAULT_REMOTE, help="upstream Codex git remote URL")
     parser.add_argument("--upstream-ref", default="", help="optional openai/codex tag, ref, or full SHA")
+    parser.add_argument("--latest-stable", action="store_true", help="resolve the latest stable rust-vX.Y.Z tag")
     parser.add_argument("--json", action="store_true", help="print machine-readable target metadata")
     args = parser.parse_args()
 
-    target = resolve_upstream(args.remote, args.upstream_ref)
+    requested_ref = trim_ref(args.upstream_ref)
+    if args.latest_stable and requested_ref:
+        parser.error("--latest-stable cannot be combined with --upstream-ref")
+
+    target = resolve_upstream(args.remote, "" if args.latest_stable else requested_ref)
     if args.json:
-        print(json.dumps(asdict(target), sort_keys=True))
+        print(json.dumps(target.to_json_dict(), sort_keys=True))
     return 0
 
 
