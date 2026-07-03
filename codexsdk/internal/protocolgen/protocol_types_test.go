@@ -519,6 +519,89 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	}
 }
 
+func TestGeneratedDefinitionClassifierUsesSchemaShape(t *testing.T) {
+	cases := map[string]struct {
+		schema string
+		kind   generatedDefinitionKind
+	}{
+		"object struct": {
+			schema: `{"type":"object","properties":{"name":{"type":"string"}}}`,
+			kind:   generatedDefinitionStruct,
+		},
+		"string enum": {
+			schema: `{"type":"string","enum":["allow","deny"]}`,
+			kind:   generatedDefinitionStringEnum,
+		},
+		"scalar alias": {
+			schema: `{"type":"string","minLength":1}`,
+			kind:   generatedDefinitionScalarAlias,
+		},
+		"scalar union": {
+			schema: `{
+				"anyOf": [
+					{"type":"string"},
+					{"type":"integer","format":"int64"}
+				]
+			}`,
+			kind: generatedDefinitionScalarUnion,
+		},
+		"tagged union": {
+			schema: `{
+				"oneOf": [
+					{
+						"type":"object",
+						"required":["type"],
+						"properties":{"type":{"type":"string","enum":["function"]}}
+					},
+					{
+						"type":"object",
+						"required":["type"],
+						"properties":{"type":{"type":"string","enum":["namespace"]}}
+					}
+				]
+			}`,
+			kind: generatedDefinitionTaggedUnion,
+		},
+		"mixed union": {
+			schema: `{
+				"oneOf": [
+					{"type":"string","enum":["auto"]},
+					{
+						"type":"object",
+						"required":["value"],
+						"properties":{"value":{"type":"string"}}
+					}
+				]
+			}`,
+			kind: generatedDefinitionMixedUnion,
+		},
+		"untagged object union": {
+			schema: `{
+				"anyOf": [
+					{"type":"object","properties":{"path":{"type":"string"}}},
+					{"type":"object","properties":{"url":{"type":"string"}}}
+				]
+			}`,
+			kind: generatedDefinitionUntaggedObjectUnion,
+		},
+		"unsupported true schema": {
+			schema: `true`,
+			kind:   generatedDefinitionUnsupported,
+		},
+		"unsupported array": {
+			schema: `{"type":"array","items":{"type":"string"}}`,
+			kind:   generatedDefinitionUnsupported,
+		},
+	}
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := classifyGeneratedDefinition(mustParseSchema(t, tt.schema)); got != tt.kind {
+				t.Fatalf("classifyGeneratedDefinition() = %s, want %s", got, tt.kind)
+			}
+		})
+	}
+}
+
 func TestGeneratedDefinitionSelectionFollowsSchemaShape(t *testing.T) {
 	objectParent := TypePlan{
 		SchemaPath: "v2/ThreadStartParams.json",
@@ -620,6 +703,35 @@ func TestGeneratedDefinitionSelectionFollowsSchemaShape(t *testing.T) {
 	}
 	if taggedCandidates[0].TypeName != "DynamicToolSpec" || taggedCandidates[0].Kind != TypePlanTaggedUnionCandidate {
 		t.Fatalf("union DynamicToolSpec candidate = %#v", taggedCandidates[0])
+	}
+}
+
+func TestGeneratedDefinitionNameResolverReusesSameNameSameShape(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"type": "string",
+		"minLength": 1
+	}`)
+	plan := ProtocolTypePlan{Types: []TypePlan{{
+		SchemaPath: "v2/ConfigReadResponse.json",
+		TypeName:   "ConfigReadResponse",
+		Schema: &Schema{Definitions: map[string]*Schema{
+			"ReasoningEffort": schema,
+		}},
+	}, {
+		SchemaPath: "v2/ThreadStartParams.json",
+		TypeName:   "ThreadStartParams",
+		Schema: &Schema{Definitions: map[string]*Schema{
+			"ReasoningEffort": schema,
+		}},
+	}}}
+	resolver, err := newGeneratedDefinitionNameResolver(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"v2/ConfigReadResponse.json", "v2/ThreadStartParams.json"} {
+		if got, ok := resolver.NameForDefinition(path, "ReasoningEffort"); !ok || got != "ReasoningEffort" {
+			t.Fatalf("%s ReasoningEffort resolved to %q, ok=%t", path, got, ok)
+		}
 	}
 }
 
