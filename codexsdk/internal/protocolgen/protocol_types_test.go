@@ -424,6 +424,15 @@ func selectedGeneratedDefinitionKindForTest(schemaPath string, name string, sche
 	return string(kind), true
 }
 
+func mustGeneratedDefinitionNameResolver(t *testing.T, types ...TypePlan) generatedDefinitionNameResolver {
+	t.Helper()
+	resolver, err := newGeneratedDefinitionNameResolver(ProtocolTypePlan{Types: types})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolver
+}
+
 func assertGeneratedFieldPlan(t *testing.T, owner string, field FieldPlan) {
 	t.Helper()
 	if field.FieldName == "" || field.Path == "" || field.GoType == "" || field.Kind == "" {
@@ -510,10 +519,11 @@ func TestSelectGeneratedTaggedUnions(t *testing.T) {
 	}
 }
 
-func TestDynamicToolSpecSupportsStructToTaggedUnionTransition(t *testing.T) {
+func TestGeneratedDefinitionSelectionFollowsSchemaShape(t *testing.T) {
 	objectParent := TypePlan{
 		SchemaPath: "v2/ThreadStartParams.json",
 		Stability:  "stable",
+		TypeName:   "ThreadStartParams",
 		Schema: &Schema{
 			Definitions: map[string]*Schema{
 				"DynamicToolSpec": mustParseSchema(t, `{
@@ -530,14 +540,15 @@ func TestDynamicToolSpecSupportsStructToTaggedUnionTransition(t *testing.T) {
 			},
 		},
 	}
-	taggedCandidates, err := generatedDefinitionTaggedUnionCandidates(objectParent)
+	objectResolver := mustGeneratedDefinitionNameResolver(t, objectParent)
+	taggedCandidates, err := generatedDefinitionTaggedUnionCandidates(objectParent, objectResolver)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(taggedCandidates) != 0 {
 		t.Fatalf("object DynamicToolSpec tagged candidate count = %d, want 0", len(taggedCandidates))
 	}
-	structCandidates, err := generatedDefinitionTypeCandidates(objectParent)
+	structCandidates, err := generatedDefinitionTypeCandidates(objectParent, objectResolver)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -560,6 +571,7 @@ func TestDynamicToolSpecSupportsStructToTaggedUnionTransition(t *testing.T) {
 	unionParent := TypePlan{
 		SchemaPath: "v2/ThreadStartParams.json",
 		Stability:  "stable",
+		TypeName:   "ThreadStartParams",
 		Schema: &Schema{
 			Definitions: map[string]*Schema{
 				"DynamicToolSpec": mustParseSchema(t, `{
@@ -591,14 +603,15 @@ func TestDynamicToolSpecSupportsStructToTaggedUnionTransition(t *testing.T) {
 			},
 		},
 	}
-	structCandidates, err = generatedDefinitionTypeCandidates(unionParent)
+	unionResolver := mustGeneratedDefinitionNameResolver(t, unionParent)
+	structCandidates, err = generatedDefinitionTypeCandidates(unionParent, unionResolver)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(structCandidates) != 0 {
 		t.Fatalf("union DynamicToolSpec struct candidate count = %d, want 0", len(structCandidates))
 	}
-	taggedCandidates, err = generatedDefinitionTaggedUnionCandidates(unionParent)
+	taggedCandidates, err = generatedDefinitionTaggedUnionCandidates(unionParent, unionResolver)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -607,6 +620,50 @@ func TestDynamicToolSpecSupportsStructToTaggedUnionTransition(t *testing.T) {
 	}
 	if taggedCandidates[0].TypeName != "DynamicToolSpec" || taggedCandidates[0].Kind != TypePlanTaggedUnionCandidate {
 		t.Fatalf("union DynamicToolSpec candidate = %#v", taggedCandidates[0])
+	}
+}
+
+func TestGeneratedDefinitionNameResolverSplitsSameNameDifferentShapes(t *testing.T) {
+	plan := ProtocolTypePlan{Types: []TypePlan{{
+		SchemaPath: "v2/ConfigReadResponse.json",
+		TypeName:   "ConfigReadResponse",
+		Schema: &Schema{Definitions: map[string]*Schema{
+			"ReasoningEffort": mustParseSchema(t, `{
+				"type": "object",
+				"required": ["value"],
+				"properties": {
+					"value": {"type": "string"}
+				}
+			}`),
+		}},
+	}, {
+		SchemaPath: "v2/ThreadStartParams.json",
+		TypeName:   "ThreadStartParams",
+		Schema: &Schema{Definitions: map[string]*Schema{
+			"ReasoningEffort": mustParseSchema(t, `{
+				"type": "string",
+				"minLength": 1
+			}`),
+		}},
+	}}}
+	resolver, err := newGeneratedDefinitionNameResolver(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := resolver.NameForDefinition("v2/ConfigReadResponse.json", "ReasoningEffort"); !ok || got != "ConfigReadResponseReasoningEffort" {
+		t.Fatalf("object ReasoningEffort resolved to %q, ok=%t", got, ok)
+	}
+	if got, ok := resolver.NameForDefinition("v2/ThreadStartParams.json", "ReasoningEffort"); !ok || got != "ThreadStartParamsReasoningEffort" {
+		t.Fatalf("alias ReasoningEffort resolved to %q, ok=%t", got, ok)
+	}
+	field := resolver.ResolveField(FieldPlan{
+		GoType:     "*[]ReasoningEffort",
+		Kind:       FieldPlanArrayRef,
+		RefPath:    "v2/ThreadStartParams.json#/definitions/ReasoningEffort",
+		SchemaPath: "v2/ThreadStartParams.json",
+	})
+	if field.GoType != "*[]ThreadStartParamsReasoningEffort" {
+		t.Fatalf("resolved field GoType = %q", field.GoType)
 	}
 }
 
@@ -891,7 +948,7 @@ func TestFirstPassSelectionRejectsRefMapLeafTypes(t *testing.T) {
 	}
 }
 
-func TestGeneratedTypeSelectionRejectsEnumStructNameCollision(t *testing.T) {
+func TestGeneratedTypeSelectionResolvesEnumStructNameCollision(t *testing.T) {
 	enumSchema := &Schema{
 		Type: SchemaTypeSet{Values: []string{"object"}},
 		Definitions: map[string]*Schema{
@@ -907,12 +964,26 @@ func TestGeneratedTypeSelectionRejectsEnumStructNameCollision(t *testing.T) {
 		SchemaPath: "Example.json",
 		TypeName:   "Example",
 	}
-	_, err := SelectFirstPassGeneratedTypes(ProtocolTypePlan{Types: []TypePlan{typ}})
-	if err == nil {
-		t.Fatal("expected generated enum/struct name collision to fail")
+	plan := ProtocolTypePlan{Types: []TypePlan{typ}}
+	enums, err := SelectGeneratedEnums(plan)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "conflicts with generated enum type") {
-		t.Fatalf("unexpected collision error: %v", err)
+	if got, want := len(enums), 1; got != want {
+		t.Fatalf("generated enum count = %d, want %d", got, want)
+	}
+	if enums[0].TypeName != "Example2" {
+		t.Fatalf("generated enum type name = %q, want Example2", enums[0].TypeName)
+	}
+	selected, err := SelectFirstPassGeneratedTypes(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(selected), 1; got != want {
+		t.Fatalf("selected generated type count = %d, want %d", got, want)
+	}
+	if selected[0].TypeName != "Example" {
+		t.Fatalf("selected generated type name = %q, want Example", selected[0].TypeName)
 	}
 }
 

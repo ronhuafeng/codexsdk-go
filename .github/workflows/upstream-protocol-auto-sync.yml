@@ -458,6 +458,7 @@ jobs:
       actions: write
       contents: write
       pull-requests: write
+      statuses: write
     outputs:
       landed_commit: ${{ steps.merge.outputs.landed_commit }}
       landed_ref: ${{ steps.merge.outputs.landed_ref }}
@@ -656,6 +657,20 @@ jobs:
           echo "ci_run_id=${run_id}" >> "$GITHUB_OUTPUT"
           echo "Dispatched sync PR CI run: ${run_id}" >> "$GITHUB_STEP_SUMMARY"
           gh run watch "${run_id}" --exit-status
+
+          ci_url="$(
+            gh run view "${run_id}" \
+              --json url \
+              --jq '.url'
+          )"
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${SYNC_COMMIT}" \
+            -f state=success \
+            -f context=Go \
+            -f target_url="${ci_url}" \
+            -f description="CI workflow_dispatch ${run_id} passed"
+          echo "Published required Go status for ${SYNC_COMMIT}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Merge sync PR
         id: merge
