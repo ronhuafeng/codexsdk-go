@@ -1,5 +1,5 @@
 name: Codex Upstream Protocol Auto Sync
-run-name: Protocol sync ${{ inputs.upstream_ref || 'latest stable' }} -> main
+run-name: Protocol sync ${{ inputs.upstream_ref || 'latest stable' }} -> PR
 
 on:
   schedule:
@@ -33,6 +33,7 @@ env:
   CODEXSDK_DRIFT_LABEL: protocol-drift
   CODEXSDK_RUST_TARGET_DIR: .cache/cargo-target/codex
   CODEXSDK_SCHEMA_BASELINE: codexsdk/internal/protocolschema/appserver/v2
+  CODEXSDK_SYNC_BRANCH_PREFIX: codex/sync-upstream
   CODEXSDK_SYNC_CANDIDATE_PREFIX: .cache/codexsdk-upstream
   CODEXSDK_SYNC_TAG_JSON: /tmp/codexsdk-sync-tag.json
   CODEXSDK_TARGET_POLICY_JSON: /tmp/codexsdk-target-policy.json
@@ -330,7 +331,7 @@ jobs:
 
           ## Automated Sync
 
-          This workflow will attempt a guarded Codex sync, rebase it onto the landing ref, validate it, and land it with a non-force push.
+          This workflow will attempt a guarded Codex sync, rebase it onto the landing ref, validate it, publish a sync PR, run the required `Go` check on the PR head, and merge through the protected-branch PR path.
           """
 
           comment = f"""Protocol drift is still present.
@@ -448,16 +449,22 @@ jobs:
           fi
 
   sync:
-    name: Sync and land
+    name: Sync and merge PR
     needs: detect
     if: needs.detect.outputs.policy_decision == 'allow' && needs.detect.outputs.drift_status == 'review-required'
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
+      actions: write
       contents: write
+      pull-requests: write
     outputs:
-      landed_commit: ${{ steps.land.outputs.landed_commit }}
-      landed_ref: ${{ steps.land.outputs.landed_ref }}
+      landed_commit: ${{ steps.merge.outputs.landed_commit }}
+      landed_ref: ${{ steps.merge.outputs.landed_ref }}
+      pr_number: ${{ steps.publish.outputs.pr_number }}
+      pr_url: ${{ steps.publish.outputs.pr_url }}
+      sync_branch: ${{ steps.publish.outputs.sync_branch }}
+      sync_commit: ${{ steps.publish.outputs.sync_commit }}
 
     steps:
       - name: Check out landing ref
@@ -543,7 +550,7 @@ jobs:
 
           Inspect the apply summary, compact drift reports, and git diff name-status. Confirm there is no obvious provenance, sanitization, manifest, coverage, or generated-code issue. Do not re-copy schemas, re-run the full Rust schema generator, or print large files. Do not try to manually review every generated JSON or Go line.
 
-          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not perform repository side effects. The workflow will validate, commit, and publish directly to the landing ref after you finish.
+          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not perform repository side effects. The workflow will validate, commit, publish a PR, dispatch the required CI on the PR head, and merge through the protected-branch PR path after you finish.
 
           Keep command output compact. Do not print full schema, report, manifest, coverage, or generated Go files. Avoid chained shell commands because the action sandbox may reject them; run separate focused commands instead.
 
@@ -597,8 +604,8 @@ jobs:
             -m "Upstream-ref-kind: ${UPSTREAM_REF_KIND}" \
             -m "Upstream-commit: ${UPSTREAM_SHA}"
 
-      - name: Publish sync
-        id: land
+      - name: Publish sync PR
+        id: publish
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
@@ -608,11 +615,96 @@ jobs:
           set -euo pipefail
           args=(
             --land-ref "${LAND_REF}"
+            --branch-prefix "${CODEXSDK_SYNC_BRANCH_PREFIX}"
             --target-ref "${UPSTREAM_REF}"
             --target-sha "${UPSTREAM_SHA}"
             --candidate "${CANDIDATE_DIR}/schema"
           )
-          scripts/codexsdk_land_sync.sh "${args[@]}"
+          scripts/codexsdk_publish_sync_pr.sh "${args[@]}"
+
+      - name: Dispatch sync PR CI
+        id: pr_ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SYNC_BRANCH: ${{ steps.publish.outputs.sync_branch }}
+          SYNC_COMMIT: ${{ steps.publish.outputs.sync_commit }}
+        run: |
+          set -euo pipefail
+          gh workflow run ci.yml --ref "${SYNC_BRANCH}"
+
+          run_id=""
+          for _ in $(seq 1 36); do
+            run_id="$(
+              gh run list \
+                --workflow ci.yml \
+                --branch "${SYNC_BRANCH}" \
+                --limit 20 \
+                --json databaseId,event,headSha \
+                --jq ".[] | select(.headSha == \"${SYNC_COMMIT}\" and .event == \"workflow_dispatch\") | .databaseId" |
+                head -n 1
+            )"
+            if [[ -n "${run_id}" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          if [[ -z "${run_id}" ]]; then
+            echo "Unable to find dispatched CI run for ${SYNC_BRANCH}@${SYNC_COMMIT}." >&2
+            exit 1
+          fi
+          echo "ci_run_id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "Dispatched sync PR CI run: ${run_id}" >> "$GITHUB_STEP_SUMMARY"
+          gh run watch "${run_id}" --exit-status
+
+      - name: Merge sync PR
+        id: merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAND_REF: ${{ needs.detect.outputs.land_ref }}
+          PR_NUMBER: ${{ steps.publish.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+
+          if ! gh pr merge "${PR_NUMBER}" --rebase; then
+            echo "Immediate PR merge failed; attempting auto or merge-queue merge." >&2
+            gh pr merge "${PR_NUMBER}" --auto --rebase
+          fi
+
+          for _ in $(seq 1 120); do
+            state="$(
+              gh pr view "${PR_NUMBER}" \
+                --json state \
+                --jq '.state'
+            )"
+            if [[ "${state}" == "MERGED" ]]; then
+              break
+            fi
+            sleep 15
+          done
+
+          state="$(
+            gh pr view "${PR_NUMBER}" \
+              --json state \
+              --jq '.state'
+          )"
+          if [[ "${state}" != "MERGED" ]]; then
+            echo "Sync PR #${PR_NUMBER} was not merged before the workflow timeout window." >&2
+            exit 1
+          fi
+
+          git fetch origin "refs/heads/${LAND_REF}:refs/remotes/origin/${LAND_REF}"
+          landed_commit="$(git rev-parse "origin/${LAND_REF}")"
+          echo "landed_commit=${landed_commit}" >> "$GITHUB_OUTPUT"
+          echo "landed_ref=${LAND_REF}" >> "$GITHUB_OUTPUT"
+          {
+            echo
+            echo "## Sync PR merged"
+            echo
+            echo "- PR: #${PR_NUMBER}"
+            echo "- Landing ref: \`${LAND_REF}\`"
+            echo "- Landed commit: \`${landed_commit}\`"
+            echo "- CI run: \`${{ steps.pr_ci.outputs.ci_run_id }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   finalize:
     name: Finalize landed sync
@@ -700,6 +792,7 @@ jobs:
         env:
           LANDED_COMMIT: ${{ needs.sync.outputs.landed_commit }}
           LANDED_REF: ${{ needs.sync.outputs.landed_ref }}
+          PR_URL: ${{ needs.sync.outputs.pr_url }}
           TAG_NAME: ${{ steps.tag.outputs.tag_name }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
@@ -710,6 +803,9 @@ jobs:
             echo
             echo "- Landing ref: \`${LANDED_REF}\`"
             echo "- Landed commit: \`${LANDED_COMMIT}\`"
+            if [[ -n "${PR_URL}" ]]; then
+              echo "- Sync PR: ${PR_URL}"
+            fi
             echo "- Upstream target: \`${UPSTREAM_REF}\`"
             echo "- Upstream commit: \`${UPSTREAM_SHA}\`"
             if [[ -n "${TAG_NAME}" ]]; then
