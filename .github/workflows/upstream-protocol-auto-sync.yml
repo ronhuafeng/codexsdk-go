@@ -34,6 +34,11 @@ on:
         required: false
         type: boolean
         default: true
+      auto_merge_fallback_pr:
+        description: "When landing requires a PR, wait for required checks and merge the fallback PR."
+        required: false
+        type: boolean
+        default: true
 
 defaults:
   run:
@@ -478,9 +483,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
+      checks: read
       contents: write
       pull-requests: write
+      statuses: read
     outputs:
+      fallback_pr_merged: ${{ steps.land.outputs.fallback_pr_merged }}
       fallback_pr_url: ${{ steps.land.outputs.fallback_pr_url }}
       landed_commit: ${{ steps.land.outputs.landed_commit }}
       landed_ref: ${{ steps.land.outputs.landed_ref }}
@@ -650,6 +658,8 @@ jobs:
         id: land
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
+          AUTO_MERGE_PR_ON_FAILURE: ${{ github.event_name == 'schedule' || inputs.auto_merge_fallback_pr }}
+          CODEXSDK_SYNC_BOT_TOKEN: ${{ secrets.CODEXSDK_SYNC_BOT_TOKEN }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
           OPEN_PR_ON_FAILURE: ${{ github.event_name == 'schedule' || inputs.open_pr_on_landing_failure }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
@@ -658,6 +668,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          if [[ -n "${CODEXSDK_SYNC_BOT_TOKEN}" ]]; then
+            export GH_TOKEN="${CODEXSDK_SYNC_BOT_TOKEN}"
+          fi
           args=(
             --land-ref "${LAND_REF}"
             --work-branch "${WORK_BRANCH}"
@@ -667,6 +680,9 @@ jobs:
           )
           if [[ "${OPEN_PR_ON_FAILURE}" == "true" ]]; then
             args+=(--open-pr-on-failure)
+          fi
+          if [[ "${AUTO_MERGE_PR_ON_FAILURE}" == "true" ]]; then
+            args+=(--auto-merge-pr-on-failure --merge-method rebase)
           fi
           scripts/codexsdk_land_sync.sh "${args[@]}"
 
@@ -756,6 +772,8 @@ jobs:
         env:
           LANDED_COMMIT: ${{ needs.sync.outputs.landed_commit }}
           LANDED_REF: ${{ needs.sync.outputs.landed_ref }}
+          FALLBACK_PR_MERGED: ${{ needs.sync.outputs.fallback_pr_merged }}
+          FALLBACK_PR_URL: ${{ needs.sync.outputs.fallback_pr_url }}
           TAG_NAME: ${{ steps.tag.outputs.tag_name }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
@@ -768,6 +786,10 @@ jobs:
             echo "- Landing ref: \`${LANDED_REF}\`"
             echo "- Landed commit: \`${LANDED_COMMIT}\`"
             echo "- Temporary branch: \`${WORK_BRANCH}\`"
+            if [[ -n "${FALLBACK_PR_URL}" ]]; then
+              echo "- Fallback PR: ${FALLBACK_PR_URL}"
+              echo "- Fallback PR merged: \`${FALLBACK_PR_MERGED:-false}\`"
+            fi
             echo "- Upstream target: \`${UPSTREAM_REF}\`"
             echo "- Upstream commit: \`${UPSTREAM_SHA}\`"
             if [[ -n "${TAG_NAME}" ]]; then

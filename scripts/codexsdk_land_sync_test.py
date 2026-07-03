@@ -111,6 +111,64 @@ class land_sync_repo:
         )
         hook.chmod(0o755)
 
+    def install_reject_tmp_push_until_merge_hook(self) -> None:
+        hook = self.origin / "hooks" / "pre-receive"
+        hook.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                while read -r _old _new ref; do
+                  if [ "$ref" = "refs/heads/tmp" ] && [ ! -f allow-tmp-merge ]; then
+                    exit 1
+                  fi
+                done
+                """
+            ),
+            encoding="utf-8",
+        )
+        hook.chmod(0o755)
+
+    def install_gh_stub(self) -> Path:
+        fake_bin = self.root / "fake-bin"
+        fake_bin.mkdir()
+        gh_log = self.root / "gh-log"
+        gh = fake_bin / "gh"
+        gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                printf '%s\\n' "$*" >> {gh_log}
+                case "$1 $2" in
+                  "pr list")
+                    exit 0
+                    ;;
+                  "pr create")
+                    printf '%s\\n' "https://github.com/example/codexsdk-go/pull/42"
+                    ;;
+                  "pr ready")
+                    exit 0
+                    ;;
+                  "pr checks")
+                    printf '%s\\n' '[{{"name":"Go","bucket":"pass","state":"SUCCESS","link":"https://github.com/example/checks/1"}}]'
+                    ;;
+                  "pr merge")
+                    touch {self.origin}/allow-tmp-merge
+                    git push origin HEAD:refs/heads/tmp
+                    git push origin :refs/heads/codex/sync-test >/dev/null 2>&1 || true
+                    ;;
+                  *)
+                    printf 'unexpected gh command: %s\\n' "$*" >&2
+                    exit 2
+                    ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        gh.chmod(0o755)
+        return fake_bin
+
 
 class LandSyncTest(unittest.TestCase):
     def test_lands_committed_sync_by_fast_forwarding_landing_ref(self) -> None:
@@ -166,6 +224,46 @@ class LandSyncTest(unittest.TestCase):
             self.assertEqual(repo.remote_commit("tmp"), repo.sync_commit)
             validate_lines = (repo.repo / ".validate-log").read_text(encoding="utf-8").splitlines()
             self.assertGreaterEqual(len(validate_lines), 3)
+
+    def test_auto_merges_ready_pr_when_direct_landing_is_rejected(self) -> None:
+        with land_sync_repo() as repo:
+            repo.install_reject_tmp_push_until_merge_hook()
+            fake_bin = repo.install_gh_stub()
+            output = repo.root / "github-output"
+            env = repo.env(output)
+            env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+            env["CODEXSDK_PR_CHECK_TIMEOUT_SECONDS"] = "5"
+            env["CODEXSDK_PR_CHECK_INTERVAL_SECONDS"] = "1"
+
+            completed = run(
+                [
+                    str(repo.script()),
+                    "--land-ref",
+                    "tmp",
+                    "--work-branch",
+                    "codex/sync-test",
+                    "--target-ref",
+                    "rust-v0.0.1",
+                    "--target-sha",
+                    TARGET_SHA,
+                    "--open-pr-on-failure",
+                    "--auto-merge-pr-on-failure",
+                ],
+                cwd=repo.repo,
+                env=env,
+            )
+
+            self.assertIn("Required PR checks passed", completed.stderr)
+            self.assertEqual(repo.remote_commit("tmp"), repo.sync_commit)
+            output_text = output.read_text(encoding="utf-8")
+            self.assertIn("fallback_pr_url=https://github.com/example/codexsdk-go/pull/42", output_text)
+            self.assertIn("fallback_pr_merged=true", output_text)
+            self.assertIn(f"landed_commit={repo.sync_commit}", output_text)
+            gh_log = (repo.root / "gh-log").read_text(encoding="utf-8")
+            self.assertIn("pr create --base tmp --head codex/sync-test", gh_log)
+            self.assertNotIn("pr create --draft", gh_log)
+            self.assertIn("pr checks https://github.com/example/codexsdk-go/pull/42 --required", gh_log)
+            self.assertIn("pr merge https://github.com/example/codexsdk-go/pull/42 --rebase --delete-branch", gh_log)
 
 
 if __name__ == "__main__":
