@@ -15,9 +15,10 @@ Options:
                             and merge it when direct fast-forward landing fails.
   --require-bot-token-for-auto-merge
                             Refuse auto-merge fallback unless CODEXSDK_SYNC_BOT_TOKEN
-                            is set. PRs created by GITHUB_TOKEN do not trigger
-                            pull_request CI, so protected branches cannot observe
-                            required checks from that token alone.
+                            is set from a bot token or generated GitHub App token.
+                            PRs created by GITHUB_TOKEN do not trigger pull_request
+                            CI, so protected branches cannot observe required
+                            checks from that token alone.
   --merge-method <method>   PR merge method for auto-merge fallback: rebase, merge,
                             or squash. Defaults to rebase.
 
@@ -282,7 +283,7 @@ merge_flag_for_method() {
 auto_merge_fallback_pr() {
   local pr_url merge_flag landed_commit
   if [[ "${require_bot_token_for_auto_merge}" -eq 1 && -z "${CODEXSDK_SYNC_BOT_TOKEN:-}" ]]; then
-    echo "auto-merge fallback requires CODEXSDK_SYNC_BOT_TOKEN." >&2
+    echo "auto-merge fallback requires CODEXSDK_SYNC_BOT_TOKEN or a generated GitHub App token." >&2
     echo "GitHub does not trigger pull_request CI for PRs created by the workflow GITHUB_TOKEN, so required checks would never appear." >&2
     return 1
   fi
