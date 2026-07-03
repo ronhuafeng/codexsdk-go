@@ -169,16 +169,16 @@ func TestGeneratedThreadTurnLifecycleParamsProtocolMarshalAndUnmarshal(t *testin
 	})
 	threadRaw, err := json.Marshal(ThreadStartParams{
 		Config: Null[map[string]JSONValue](),
-		DynamicTools: Value([]DynamicToolSpec{{
+		DynamicTools: Value([]DynamicToolSpec{NewDynamicToolSpecFunction(DynamicToolSpecFunction{
 			Description: "Search docs",
 			InputSchema: toolInputSchema,
 			Name:        "docs.search",
-		}}),
+		})}),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantThread := `{"config":null,"dynamicTools":[{"description":"Search docs","inputSchema":{"type":"object"},"name":"docs.search"}]}`
+	wantThread := `{"config":null,"dynamicTools":[{"description":"Search docs","inputSchema":{"type":"object"},"name":"docs.search","type":"function"}]}`
 	if got := string(threadRaw); got != wantThread {
 		t.Fatalf("ThreadStartParams JSON = %s, want %s", got, wantThread)
 	}
@@ -193,8 +193,12 @@ func TestGeneratedThreadTurnLifecycleParamsProtocolMarshalAndUnmarshal(t *testin
 	if decodedThread.DynamicTools == nil || decodedThread.DynamicTools.Value == nil || len(*decodedThread.DynamicTools.Value) != 1 {
 		t.Fatalf("decoded dynamic tools = %#v", decodedThread.DynamicTools)
 	}
-	if (*decodedThread.DynamicTools.Value)[0].InputSchema.Kind() != JSONKindObject {
-		t.Fatalf("decoded dynamic tool inputSchema = %#v", (*decodedThread.DynamicTools.Value)[0].InputSchema)
+	decodedTool, ok := (*decodedThread.DynamicTools.Value)[0].AsFunction()
+	if !ok {
+		t.Fatalf("decoded dynamic tool = %#v, want function", (*decodedThread.DynamicTools.Value)[0])
+	}
+	if decodedTool.InputSchema.Kind() != JSONKindObject {
+		t.Fatalf("decoded dynamic tool inputSchema = %#v", decodedTool.InputSchema)
 	}
 
 	forkRaw, err := json.Marshal(ThreadForkParams{
@@ -1174,7 +1178,14 @@ func TestGeneratedStableNotificationPayloadsProtocolMarshalAndUnmarshal(t *testi
 		{name: "agent message delta", value: AgentMessageDeltaNotification{Delta: "hello", ItemID: "item-1", ThreadID: "thread-1", TurnID: "turn-1"}, target: &AgentMessageDeltaNotification{}, want: `{"delta":"hello","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "context compacted", value: ContextCompactedNotification{ThreadID: "thread-1", TurnID: "turn-1"}, target: &ContextCompactedNotification{}, want: `{"threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "deprecation notice", value: DeprecationNoticeNotification{Details: Null[string](), Summary: "deprecated"}, target: &DeprecationNoticeNotification{}, want: `{"details":null,"summary":"deprecated"}`},
-		{name: "external agent config import completed", value: ExternalAgentConfigImportCompletedNotification{}, target: &ExternalAgentConfigImportCompletedNotification{}, want: `{}`},
+		{name: "external agent config import completed", value: ExternalAgentConfigImportCompletedNotification{
+			ImportID: "import-1",
+			ItemTypeResults: []ExternalAgentConfigImportTypeResult{{
+				Failures:  []ExternalAgentConfigImportItemTypeFailure{},
+				ItemType:  ExternalAgentConfigMigrationItemTypePLUGINS,
+				Successes: []ExternalAgentConfigImportItemTypeSuccess{},
+			}},
+		}, target: &ExternalAgentConfigImportCompletedNotification{}, want: `{"importId":"import-1","itemTypeResults":[{"failures":[],"itemType":"PLUGINS","successes":[]}]}`},
 		{name: "file change output delta", value: FileChangeOutputDeltaNotification{Delta: "patch", ItemID: "item-1", ThreadID: "thread-1", TurnID: "turn-1"}, target: &FileChangeOutputDeltaNotification{}, want: `{"delta":"patch","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "guardian warning", value: GuardianWarningNotification{Message: "guardian warning", ThreadID: "thread-1"}, target: &GuardianWarningNotification{}, want: `{"message":"guardian warning","threadId":"thread-1"}`},
 		{name: "hook started", value: HookStartedNotification{Run: hookRun, ThreadID: "thread-1", TurnID: Value("turn-1")}, target: &HookStartedNotification{}, want: `{"run":` + hookRunJSON + `,"threadId":"thread-1","turnId":"turn-1"}`},
@@ -1566,10 +1577,10 @@ func TestGeneratedThreadTurnLifecycleParamsRejectMalformedProtocol(t *testing.T)
 		t.Fatalf("unexpected unknown user input field error: %v", err)
 	}
 
-	_, err = json.Marshal(DynamicToolSpec{
+	_, err = json.Marshal(NewDynamicToolSpecFunction(DynamicToolSpecFunction{
 		Description: "Search docs",
 		Name:        "docs.search",
-	})
+	}))
 	if err == nil {
 		t.Fatal("expected invalid dynamic tool inputSchema to fail")
 	}
@@ -1764,17 +1775,14 @@ func TestGeneratedGetAccountParamsOmitOptionalFields(t *testing.T) {
 
 func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 	response := GetAccountResponse{
-		Account: Value(NewAccountChatGPT(AccountChatGPT{
-			Email:    "user@example.test",
-			PlanType: PlanTypePlus,
-		})),
+		Account:            Value(NewAccountAPIKey()),
 		RequiresOpenaiAuth: false,
 	}
 	raw, err := json.Marshal(response)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"account":{"email":"user@example.test","planType":"plus","type":"chatgpt"},"requiresOpenaiAuth":false}`
+	want := `{"account":{"type":"apiKey"},"requiresOpenaiAuth":false}`
 	if got := string(raw); got != want {
 		t.Fatalf("GetAccountResponse JSON = %s, want %s", got, want)
 	}
@@ -1789,24 +1797,24 @@ func TestGeneratedGetAccountResponsePreservesNullableAccount(t *testing.T) {
 }
 
 func TestGeneratedAccountUnionMarshalAndAccessors(t *testing.T) {
-	account := NewAccountAmazonBedrock()
-	if account.Kind() != AccountKindAmazonBedrock {
-		t.Fatalf("Account kind = %s, want %s", account.Kind(), AccountKindAmazonBedrock)
+	account := NewAccountAPIKey()
+	if account.Kind() != AccountKindAPIKey {
+		t.Fatalf("Account kind = %s, want %s", account.Kind(), AccountKindAPIKey)
 	}
 	if !account.IsValid() {
 		t.Fatal("constructed Account should be valid")
 	}
-	if _, ok := account.AsAmazonBedrock(); !ok {
-		t.Fatal("AsAmazonBedrock returned false for amazonBedrock variant")
+	if _, ok := account.AsAPIKey(); !ok {
+		t.Fatal("AsAPIKey returned false for apiKey variant")
 	}
 	if _, ok := account.AsChatGPT(); ok {
-		t.Fatal("AsChatGPT returned true for amazonBedrock variant")
+		t.Fatal("AsChatGPT returned true for apiKey variant")
 	}
 	raw, err := json.Marshal(account)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(raw), `{"type":"amazonBedrock"}`; got != want {
+	if got, want := string(raw), `{"type":"apiKey"}`; got != want {
 		t.Fatalf("Account JSON = %s, want %s", got, want)
 	}
 }
@@ -1820,18 +1828,15 @@ func TestGeneratedAccountUnionRejectsMalformedProtocol(t *testing.T) {
 		t.Fatalf("unexpected zero-value Account error: %v", err)
 	}
 
-	_, err = json.Marshal(NewAccountChatGPT(AccountChatGPT{
-		Email:    "user@example.test",
-		PlanType: PlanType("bogus"),
-	}))
+	var account Account
+	err = json.Unmarshal([]byte(`{"type":"chatgpt","email":"user@example.test","planType":"bogus"}`), &account)
 	if err == nil {
-		t.Fatal("expected invalid Account plan type marshal to fail")
+		t.Fatal("expected invalid Account plan type decode to fail")
 	}
 	if !strings.Contains(err.Error(), `invalid PlanType enum value "bogus"`) {
 		t.Fatalf("unexpected invalid Account plan type error: %v", err)
 	}
 
-	var account Account
 	err = json.Unmarshal([]byte(`{"type":"unknown"}`), &account)
 	if err == nil {
 		t.Fatal("expected unknown Account type to fail")
@@ -5300,7 +5305,7 @@ func TestGeneratedSmallUtilityPayloadsProtocolMarshalAndUnmarshal(t *testing.T) 
 		{name: "external agent config detect params", value: ExternalAgentConfigDetectParams{CWDs: Value([]string{"/repo"}), IncludeHome: boolPtr(true)}, target: &ExternalAgentConfigDetectParams{}, want: `{"cwds":["/repo"],"includeHome":true}`},
 		{name: "external agent config detect response", value: ExternalAgentConfigDetectResponse{Items: []ExternalAgentConfigMigrationItem{{CWD: Value("/repo"), Description: "Import command", Details: Value(MigrationDetails{Commands: &[]CommandMigration{{Name: "build"}}}), ItemType: ExternalAgentConfigMigrationItemTypeCOMMANDS}}}, target: &ExternalAgentConfigDetectResponse{}, want: `{"items":[{"cwd":"/repo","description":"Import command","details":{"commands":[{"name":"build"}]},"itemType":"COMMANDS"}]}`},
 		{name: "external agent config import params", value: ExternalAgentConfigImportParams{MigrationItems: []ExternalAgentConfigMigrationItem{{CWD: Null[string](), Description: "Import plugins", Details: Value(MigrationDetails{Plugins: &[]PluginsMigration{{MarketplaceName: "local", PluginNames: []string{"plugin-a"}}}}), ItemType: ExternalAgentConfigMigrationItemTypePLUGINS}}}, target: &ExternalAgentConfigImportParams{}, want: `{"migrationItems":[{"cwd":null,"description":"Import plugins","details":{"plugins":[{"marketplaceName":"local","pluginNames":["plugin-a"]}]},"itemType":"PLUGINS"}]}`},
-		{name: "external agent config import response", value: ExternalAgentConfigImportResponse{}, target: &ExternalAgentConfigImportResponse{}, want: `{}`},
+		{name: "external agent config import response", value: ExternalAgentConfigImportResponse{ImportID: "import-1"}, target: &ExternalAgentConfigImportResponse{}, want: `{"importId":"import-1"}`},
 		{name: "hooks list params", value: HooksListParams{CWDs: &[]string{"/repo"}}, target: &HooksListParams{}, want: `{"cwds":["/repo"]}`},
 		{name: "hooks list response", value: HooksListResponse{Data: []HooksListEntry{{
 			CWD:    "/repo",
@@ -6338,6 +6343,7 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 		MarketplaceName: "market",
 		MarketplacePath: Null[string](),
 		MCPServers:      []string{"mcp-1"},
+		ShareURL:        Value("https://example.test/plugin"),
 		Skills:          []SkillSummary{{Description: "review", Enabled: true, Name: "review"}},
 		Summary:         summary,
 	}
@@ -6349,7 +6355,7 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 	}{
 		{name: "install response", value: PluginInstallResponse{AppsNeedingAuth: []AppSummary{{ID: "app-1", Name: "App One"}}, AuthPolicy: PluginAuthPolicyONINSTALL}, target: &PluginInstallResponse{}, want: `{"appsNeedingAuth":[{"id":"app-1","name":"App One"}],"authPolicy":"ON_INSTALL"}`},
 		{name: "list response", value: PluginListResponse{Marketplaces: []PluginMarketplaceEntry{{Name: "market", Plugins: []PluginSummary{summary}}}}, target: &PluginListResponse{}, want: `{"marketplaces":[{"name":"market","plugins":[{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}]}]}`},
-		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}, want: `{"plugin":{"appTemplates":[],"apps":[{"id":"app-1","name":"App One"}],"hooks":[{"eventName":"preToolUse","key":"hook-1"}],"marketplaceName":"market","marketplacePath":null,"mcpServers":["mcp-1"],"skills":[{"description":"review","enabled":true,"name":"review"}],"summary":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}}`},
+		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}, want: `{"plugin":{"appTemplates":[],"apps":[{"id":"app-1","name":"App One"}],"hooks":[{"eventName":"preToolUse","key":"hook-1"}],"marketplaceName":"market","marketplacePath":null,"mcpServers":["mcp-1"],"shareUrl":"https://example.test/plugin","skills":[{"description":"review","enabled":true,"name":"review"}],"summary":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}}`},
 		{name: "share delete params", value: PluginShareDeleteParams{RemotePluginID: "remote-1"}, target: &PluginShareDeleteParams{}, want: `{"remotePluginId":"remote-1"}`},
 		{name: "share delete response", value: PluginShareDeleteResponse{}, target: &PluginShareDeleteResponse{}, want: `{}`},
 		{name: "share list params", value: PluginShareListParams{}, target: &PluginShareListParams{}, want: `{}`},
@@ -8333,9 +8339,10 @@ func TestGeneratedChatgptAuthTokensRefreshResponseRejectsMalformedProtocol(t *te
 func TestGeneratedToolRequestUserInputParamsMarshal(t *testing.T) {
 	isOther := true
 	params := ToolRequestUserInputParams{
-		ItemID:   "item-1",
-		ThreadID: "thread-1",
-		TurnID:   "turn-1",
+		AutoResolutionMS: Value(uint64(1500)),
+		ItemID:           "item-1",
+		ThreadID:         "thread-1",
+		TurnID:           "turn-1",
 		Questions: []ToolRequestUserInputQuestion{{
 			Header:  "Auth",
 			ID:      "token",
@@ -8351,7 +8358,7 @@ func TestGeneratedToolRequestUserInputParamsMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"itemId":"item-1","questions":[{"header":"Auth","id":"token","isOther":true,"options":[{"description":"Use the configured account.","label":"Configured"}],"question":"Which account should be used?"}],"threadId":"thread-1","turnId":"turn-1"}`
+	want := `{"autoResolutionMs":1500,"itemId":"item-1","questions":[{"header":"Auth","id":"token","isOther":true,"options":[{"description":"Use the configured account.","label":"Configured"}],"question":"Which account should be used?"}],"threadId":"thread-1","turnId":"turn-1"}`
 	if got := string(raw); got != want {
 		t.Fatalf("ToolRequestUserInputParams JSON = %s, want %s", got, want)
 	}
@@ -8701,6 +8708,35 @@ func TestGeneratedClientRequestMarshalAndUnmarshal(t *testing.T) {
 	}
 	if payload, ok := decodedReset.AsMemoryReset(); !ok || payload.ID.Kind() != RequestIdKindInt64 {
 		t.Fatalf("decoded ClientRequest memory/reset = %#v, ok=%t", payload, ok)
+	}
+
+	enable := NewClientRequestRemoteControlEnable(ClientRequestRemoteControlEnable{
+		ID:     NewRequestIdString("remote-1"),
+		Params: Value(RemoteControlEnableParams{Ephemeral: boolPtr(true)}),
+	})
+	enableRaw, err := json.Marshal(enable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(enableRaw), `{"id":"remote-1","method":"remoteControl/enable","params":{"ephemeral":true}}`; got != want {
+		t.Fatalf("ClientRequest remoteControl/enable JSON = %s, want %s", got, want)
+	}
+	var decodedEnable ClientRequest
+	if err := json.Unmarshal(enableRaw, &decodedEnable); err != nil {
+		t.Fatal(err)
+	}
+	enablePayload, ok := decodedEnable.AsRemoteControlEnable()
+	if !ok || enablePayload.Params == nil || enablePayload.Params.Value == nil || enablePayload.Params.Value.Ephemeral == nil || !*enablePayload.Params.Value.Ephemeral {
+		t.Fatalf("decoded ClientRequest remoteControl/enable = %#v, ok=%t", enablePayload, ok)
+	}
+
+	var decodedDisable ClientRequest
+	if err := json.Unmarshal([]byte(`{"id":"remote-2","method":"remoteControl/disable","params":null}`), &decodedDisable); err != nil {
+		t.Fatal(err)
+	}
+	disablePayload, ok := decodedDisable.AsRemoteControlDisable()
+	if !ok || disablePayload.Params == nil || disablePayload.Params.Value != nil {
+		t.Fatalf("decoded ClientRequest remoteControl/disable = %#v, ok=%t", disablePayload, ok)
 	}
 }
 

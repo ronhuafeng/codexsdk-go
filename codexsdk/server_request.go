@@ -628,11 +628,11 @@ func fileChangeDecisionFromApprovalDecision(decision ApprovalDecision) (protocol
 	}
 }
 
-func nullableString(value *protocolv2.Nullable[string]) string {
+func nullableString[T ~string](value *protocolv2.Nullable[T]) string {
 	if value == nil || value.Value == nil {
 		return ""
 	}
-	return *value.Value
+	return string(*value.Value)
 }
 
 func singletonCommand(command string) []string {

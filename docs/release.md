@@ -51,10 +51,10 @@ git ls-files -z -- '*.go' ':!:vendor/**' | xargs -0 gofmt -w
 GOWORK=off go vet ./...
 GOWORK=off go test ./...
 
-tmp="$(mktemp -d)"
-GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -out "$tmp"
-diff -u codexsdk/protocolv2/method_registry.gen.go "$tmp/method_registry.gen.go"
-diff -u codexsdk/protocolv2/protocol_types.gen.go "$tmp/protocol_types.gen.go"
+GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -stdout method-registry |
+  diff -u codexsdk/protocolv2/method_registry.gen.go -
+GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
+  diff -u codexsdk/protocolv2/protocol_types.gen.go -
 ```
 
 Check for public-readiness leaks:

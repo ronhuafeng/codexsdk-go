@@ -223,6 +223,26 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 		t.Fatal("root Client missing Close")
 	}
 
+	threadClient := reflect.TypeOf((*ThreadClient)(nil)).Elem()
+	wantThreadClientMethods := map[string]struct{}{
+		"ForkThread":         {},
+		"ResumeThread":       {},
+		"ResumeThreadStream": {},
+		"StartThread":        {},
+		"StartThreadStream":  {},
+	}
+	if threadClient.NumMethod() != len(wantThreadClientMethods) {
+		t.Fatalf("ThreadClient method count = %d, want %d", threadClient.NumMethod(), len(wantThreadClientMethods))
+	}
+	for name := range wantThreadClientMethods {
+		if _, ok := threadClient.MethodByName(name); !ok {
+			t.Fatalf("ThreadClient missing %s method", name)
+		}
+	}
+	if _, ok := threadClient.MethodByName("Close"); ok {
+		t.Fatal("ThreadClient exposes Close; root Client owns app-server lifecycle")
+	}
+
 	commands := reflect.TypeOf((*Commands)(nil)).Elem()
 	wantCommandMethods := map[string]struct{}{
 		"Exec":          {},
@@ -515,6 +535,7 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 		"NameSet":                     {},
 		"Read":                        {},
 		"RealtimeAppendAudio":         {},
+		"RealtimeAppendSpeech":        {},
 		"RealtimeAppendText":          {},
 		"RealtimeListVoices":          {},
 		"RealtimeStart":               {},
@@ -1333,7 +1354,7 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 		detect.Items[0].Details.Value.Commands == nil || len(*detect.Items[0].Details.Value.Commands) != 1 {
 		t.Fatalf("externalAgentConfig/detect response = %#v", detect)
 	}
-	_, err = externalAgentConfigs.Import(context.Background(), protocolv2.ExternalAgentConfigImportParams{
+	importResponse, err := externalAgentConfigs.Import(context.Background(), protocolv2.ExternalAgentConfigImportParams{
 		MigrationItems: []protocolv2.ExternalAgentConfigMigrationItem{{
 			CWD:         protocolv2.Null[string](),
 			Description: "Import plugins",
@@ -1349,7 +1370,9 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 	if err != nil {
 		t.Fatalf("ExternalAgentConfigs().Import returned error: %v", err)
 	}
-
+	if importResponse.ImportID != "import-1" {
+		t.Fatalf("externalAgentConfig/import response = %#v", importResponse)
+	}
 	records := readRecords(t, record)
 	detectParams := firstRecord(records, "recv", protocolv2.MethodExternalAgentConfigDetect)["params"].(map[string]any)
 	cwds := detectParams["cwds"].([]any)
@@ -2235,6 +2258,13 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	if rateLimits.RateLimits.PlanType == nil || rateLimits.RateLimits.PlanType.Value == nil || *rateLimits.RateLimits.PlanType.Value != protocolv2.PlanTypePlus {
 		t.Fatalf("account/rateLimits/read response = %#v", rateLimits)
 	}
+	resetCredit, err := accounts.RateLimitResetCreditConsume(context.Background(), protocolv2.ConsumeAccountRateLimitResetCreditParams{IdempotencyKey: "reset-1"})
+	if err != nil {
+		t.Fatalf("Accounts().RateLimitResetCreditConsume returned error: %v", err)
+	}
+	if resetCredit.Outcome != protocolv2.ConsumeAccountRateLimitResetCreditOutcomeReset {
+		t.Fatalf("account/rateLimitResetCredit/consume response = %#v", resetCredit)
+	}
 	account, err := accounts.Read(context.Background(), protocolv2.GetAccountParams{RefreshToken: Bool(true)})
 	if err != nil {
 		t.Fatalf("Accounts().Read returned error: %v", err)
@@ -2242,8 +2272,7 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	if account.RequiresOpenaiAuth || account.Account == nil || account.Account.Value == nil {
 		t.Fatalf("account/read response = %#v", account)
 	}
-	accountChatGPT, ok := account.Account.Value.AsChatGPT()
-	if !ok || accountChatGPT.Email != "user@example.test" || accountChatGPT.PlanType != protocolv2.PlanTypePlus {
+	if account.Account.Value.Kind() != protocolv2.AccountKindAPIKey {
 		t.Fatalf("account/read account variant = %#v", account.Account.Value)
 	}
 	nudge, err := accounts.SendAddCreditsNudgeEmail(context.Background(), protocolv2.SendAddCreditsNudgeEmailParams{
@@ -2262,6 +2291,7 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		protocolv2.MethodAccountLoginStart,
 		protocolv2.MethodAccountLogout,
 		protocolv2.MethodAccountRateLimitsRead,
+		protocolv2.MethodAccountRateLimitResetCreditConsume,
 		protocolv2.MethodAccountRead,
 		protocolv2.MethodAccountSendAddCreditsNudgeEmail,
 	}
@@ -2283,6 +2313,10 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	}
 	if params := firstRecord(records, "recv", protocolv2.MethodAccountRateLimitsRead)["params"]; params != nil {
 		t.Fatalf("account/rateLimits/read params = %#v, want omitted", params)
+	}
+	resetCreditParams := firstRecord(records, "recv", protocolv2.MethodAccountRateLimitResetCreditConsume)["params"].(map[string]any)
+	if resetCreditParams["idempotencyKey"] != "reset-1" {
+		t.Fatalf("account/rateLimitResetCredit/consume params = %#v", resetCreditParams)
 	}
 	readParams := firstRecord(records, "recv", protocolv2.MethodAccountRead)["params"].(map[string]any)
 	if readParams["refreshToken"] != true {
@@ -3349,6 +3383,12 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 	}); err != nil {
 		t.Fatalf("Threads().RealtimeAppendAudio returned error after experimental opt-in: %v", err)
 	}
+	if _, err := threads.RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
+		Text:     "voice",
+		ThreadID: "thread-1",
+	}); err != nil {
+		t.Fatalf("Threads().RealtimeAppendSpeech returned error after experimental opt-in: %v", err)
+	}
 	if _, err := threads.RealtimeAppendText(context.Background(), protocolv2.ThreadRealtimeAppendTextParams{
 		Text:     "hello",
 		ThreadID: "thread-1",
@@ -3372,6 +3412,7 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 	for _, method := range []string{
 		protocolv2.MethodThreadRealtimeStart,
 		protocolv2.MethodThreadRealtimeAppendAudio,
+		protocolv2.MethodThreadRealtimeAppendSpeech,
 		protocolv2.MethodThreadRealtimeAppendText,
 		protocolv2.MethodThreadRealtimeListVoices,
 		protocolv2.MethodThreadRealtimeStop,
@@ -3393,6 +3434,10 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 		audio["numChannels"] != float64(2) || audio["sampleRate"] != float64(24000) ||
 		audio["samplesPerChannel"] != float64(480) {
 		t.Fatalf("thread/realtime/appendAudio params = %#v", audioParams)
+	}
+	speechParams := firstRecord(records, "recv", protocolv2.MethodThreadRealtimeAppendSpeech)["params"].(map[string]any)
+	if speechParams["threadId"] != "thread-1" || speechParams["text"] != "voice" {
+		t.Fatalf("thread/realtime/appendSpeech params = %#v", speechParams)
 	}
 	textParams := firstRecord(records, "recv", protocolv2.MethodThreadRealtimeAppendText)["params"].(map[string]any)
 	if textParams["threadId"] != "thread-1" || textParams["text"] != "hello" {
@@ -3450,6 +3495,17 @@ func TestThreadRealtimeProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWrite
 			call: func() error {
 				_, err := root.Threads().RealtimeAppendText(context.Background(), protocolv2.ThreadRealtimeAppendTextParams{
 					Text:     "hello",
+					ThreadID: "thread-1",
+				})
+				return err
+			},
+		},
+		{
+			name:   "appendSpeech",
+			method: protocolv2.MethodThreadRealtimeAppendSpeech,
+			call: func() error {
+				_, err := root.Threads().RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
+					Text:     "voice",
 					ThreadID: "thread-1",
 				})
 				return err
@@ -3568,6 +3624,18 @@ func TestThreadRealtimeProtocolFamilyFacadeRejectsMalformedTypedResponses(t *tes
 				return err
 			},
 			wantSub: `ThreadRealtimeAppendTextResponse: unknown field "extra"`,
+		},
+		{
+			name:   "appendSpeech",
+			method: protocolv2.MethodThreadRealtimeAppendSpeech,
+			call: func(threads Threads) error {
+				_, err := threads.RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
+					Text:     "voice",
+					ThreadID: "thread-1",
+				})
+				return err
+			},
+			wantSub: `ThreadRealtimeAppendSpeechResponse: unknown field "extra"`,
 		},
 		{
 			name:   "listVoices",
@@ -4045,7 +4113,7 @@ func TestThreadClientOptionsDefaultModelCWDAndEffort(t *testing.T) {
 		DefaultCWD:    "/workspace/thread",
 		DefaultEffort: ReasoningEffortHigh,
 	})
-	defer client.Close()
+	defer root.Close()
 
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{Input: Text("defaults")}); err != nil {
 		t.Fatalf("StartThread returned error: %v", err)
@@ -4105,6 +4173,33 @@ func TestThreadClientRejectsUnsupportedInputTypeBeforeThreadStart(t *testing.T) 
 	}
 	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodThreadStart) != nil {
 		t.Fatal("thread/start was sent after unsupported input preflight failure")
+	}
+}
+
+func TestThreadClientRejectsBlankFileInputBeforeThreadStart(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
+	_, err = client.StartThread(context.Background(), StartThreadRequest{
+		Input: []InputItem{
+			{Type: InputItemText, Text: "read this"},
+			{Type: InputItemFile, Path: "  "},
+		},
+	})
+	if err == nil {
+		t.Fatal("StartThread accepted blank file input path")
+	}
+	if !strings.Contains(err.Error(), "InputItem[1].Path is required for file input") {
+		t.Fatalf("blank file input error = %v", err)
+	}
+	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodThreadStart) != nil {
+		t.Fatal("thread/start was sent after blank file input preflight failure")
 	}
 }
 
@@ -4287,7 +4382,7 @@ func TestRequestMappingSteeringForkAndAggregateInputStats(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	result, err := client.StartThread(context.Background(), StartThreadRequest{
 		Input:             TextAndFiles("hello", []string{"/tmp/a.txt", "/tmp/b.txt"}),
@@ -4368,7 +4463,7 @@ func TestStreamingCompletedResultAndFinalAPIDrainsSamePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	stream, err := client.StartThreadStream(context.Background(), StartThreadRequest{Input: Text("stream")})
 	if err != nil {
@@ -4471,7 +4566,7 @@ func TestOutputSchemaMappingStartResumeAndStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	startFinalSchema := mustOutputSchema(t, `{"type":"object","properties":{"startFinal":{"type":"string"}},"required":["startFinal"],"additionalProperties":false}`)
 	startStreamSchema := mustOutputSchema(t, `{"type":"object","properties":{"startStream":{"type":"boolean"}},"required":["startStream"],"additionalProperties":false}`)
@@ -4539,7 +4634,7 @@ func TestEmptyOutputSchemaOmitted(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
-	defer client.Close()
+	defer root.Close()
 
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{
 		Input: Text("empty schema"),
@@ -5382,7 +5477,7 @@ func TestTurnErrorsAndLocalCancellationAreDistinct(t *testing.T) {
 	if !waitForRecord(t, record, "recv", "turn/interrupt", time.Second) {
 		t.Fatalf("context deadline did not best-effort interrupt turn; records=%#v", readRecords(t, record))
 	}
-	_ = hanging.Close()
+	_ = root.Close()
 }
 
 func TestTransportErrorDoesNotExposeStderrTail(t *testing.T) {
@@ -5429,7 +5524,7 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{Input: Text("approval")}); err != nil {
 		t.Fatalf("nil handler approval should be denied safely without SDK error: %v", err)
 	}
-	_ = client.Close()
+	_ = root.Close()
 	approvalResponse := firstRecord(readRecords(t, record), "recv-response", "")
 	if decision := approvalResponse["result"].(map[string]any)["decision"]; decision != "decline" {
 		t.Fatalf("nil handler decision = %#v", approvalResponse)
@@ -5457,7 +5552,7 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 	if _, err := client.StartThread(context.Background(), StartThreadRequest{Input: Text("approval")}); err != nil {
 		t.Fatal(err)
 	}
-	_ = client.Close()
+	_ = root.Close()
 	approvalResponse = firstRecord(readRecords(t, record), "recv-response", "")
 	if decision := approvalResponse["result"].(map[string]any)["decision"]; decision != "acceptForSession" {
 		t.Fatalf("handler decision = %#v", approvalResponse)
@@ -5866,7 +5961,16 @@ func TestCloseIdempotencyAndConcurrentRouting(t *testing.T) {
 	}
 }
 
-func newFakeClient(t *testing.T, mode string, handler ServerRequestHandler) ThreadClient {
+type testThreadClient struct {
+	ThreadClient
+	close func() error
+}
+
+func (c testThreadClient) Close() error {
+	return c.close()
+}
+
+func newFakeClient(t *testing.T, mode string, handler ServerRequestHandler) testThreadClient {
 	t.Helper()
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
@@ -5877,7 +5981,10 @@ func newFakeClient(t *testing.T, mode string, handler ServerRequestHandler) Thre
 	if err != nil {
 		t.Fatalf("New(%s) error: %v", mode, err)
 	}
-	return root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"})
+	return testThreadClient{
+		ThreadClient: root.ThreadClient(ThreadClientOptions{DefaultModel: "client-model"}),
+		close:        root.Close,
+	}
 }
 
 func fakeCommand(mode string, extra ...string) []string {
@@ -6072,13 +6179,18 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			send(map[string]any{"id": id, "result": map[string]any{"rateLimits": map[string]any{"planType": "plus"}}})
+		case "account/rateLimitResetCredit/consume":
+			if mode == "facade" {
+				sendProtocolResult(id, protocolv2.ConsumeAccountRateLimitResetCreditResponse{
+					Outcome: protocolv2.ConsumeAccountRateLimitResetCreditOutcomeReset,
+				})
+				continue
+			}
+			send(map[string]any{"id": id, "result": map[string]any{"outcome": "reset"}})
 		case "account/read":
 			if mode == "facade" {
 				sendProtocolResult(id, protocolv2.GetAccountResponse{
-					Account: protocolv2.Value(protocolv2.NewAccountChatGPT(protocolv2.AccountChatGPT{
-						Email:    "user@example.test",
-						PlanType: protocolv2.PlanTypePlus,
-					})),
+					Account:            protocolv2.Value(protocolv2.NewAccountAPIKey()),
 					RequiresOpenaiAuth: false,
 				})
 				continue
@@ -6213,10 +6325,10 @@ func runFakeAppServer(mode string, extra []string) {
 			send(map[string]any{"id": id, "result": map[string]any{"items": []map[string]any{}}})
 		case "externalAgentConfig/import":
 			if mode == "facade" {
-				sendProtocolResult(id, protocolv2.ExternalAgentConfigImportResponse{})
+				sendProtocolResult(id, protocolv2.ExternalAgentConfigImportResponse{ImportID: "import-1"})
 				continue
 			}
-			send(map[string]any{"id": id, "result": map[string]any{}})
+			send(map[string]any{"id": id, "result": map[string]any{"importId": "import-1"}})
 		case "feedback/upload":
 			if mode == "feedback-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{}})
@@ -6771,6 +6883,12 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			sendProtocolResult(id, protocolv2.ThreadRealtimeAppendAudioResponse{})
+		case "thread/realtime/appendSpeech":
+			if mode == "thread-realtime-malformed-response" {
+				send(map[string]any{"id": id, "result": map[string]any{"extra": true}})
+				continue
+			}
+			sendProtocolResult(id, protocolv2.ThreadRealtimeAppendSpeechResponse{})
 		case "thread/realtime/appendText":
 			if mode == "thread-realtime-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{"extra": true}})

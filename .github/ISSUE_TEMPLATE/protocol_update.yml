@@ -1,13 +1,13 @@
 name: Protocol update
 description: Track an upstream Codex app-server protocol baseline update.
-title: "protocol: update baseline to <commit>"
+title: "protocol: update baseline to <tag-or-ref>"
 labels: ["protocol", "maintenance"]
 body:
   - type: input
-    id: upstream_commit
+    id: upstream_ref
     attributes:
-      label: Upstream Codex commit
-      placeholder: 3da89d4831251b704ac40d1357d26ad518abaf1d
+      label: Upstream Codex tag, ref, or commit
+      placeholder: rust-v0.140.0
     validations:
       required: true
   - type: textarea
@@ -22,8 +22,14 @@ body:
     attributes:
       label: Checklist
       value: |
+        - [ ] Ran `scripts/codexsdk_target_policy.py --json` and confirmed the target is allowed.
         - [ ] Generated schema with `scripts/codexsdk_track_upstream.sh`.
+        - [ ] Recorded upstream tag/ref provenance and peeled commit.
+        - [ ] Classified drift as metadata-only, generated-only, public-facade-required, or ignored-internal.
         - [ ] Reviewed manifest and coverage matrix changes.
         - [ ] Updated generated protocolv2 Go files.
-        - [ ] Updated provenance metadata and NOTICE if needed.
+        - [ ] Kept handwritten SDK changes limited to reviewed public surface or compatibility fixes.
+        - [ ] Updated NOTICE if needed.
+        - [ ] Audited `git diff --name-status` for unrelated files and stale entries.
         - [ ] Ran tests and generated-code reproducibility checks.
+        - [ ] Created or intentionally skipped the annotated upstream sync tag with `scripts/codexsdk_sync_tag.py --json`.

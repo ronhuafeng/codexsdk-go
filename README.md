@@ -167,8 +167,9 @@ Normal CI does not run this test.
 baseline, not by shelling out to Codex during normal builds. The baseline is
 tracked with:
 
-- `baseline_metadata.json`: upstream commit, Codex version, generation command,
-  source license, file count, and schema bundle checksum.
+- `baseline_metadata.json`: upstream tag/ref name, target kind, peeled commit,
+  Codex version, generation command, source license, file count, and schema
+  bundle checksum.
 - `manifest.json`: classified method surface, request/notification direction,
   response schema mapping, facade target, and stable-vs-experimental marking.
 - `coverage_matrix.json`: reviewed support status for methods, types, and key
@@ -185,10 +186,10 @@ go run ./codexsdk/internal/cmd/protocolv2gen
 Check generated code reproducibility without modifying the tree:
 
 ```sh
-tmp="$(mktemp -d)"
-go run ./codexsdk/internal/cmd/protocolv2gen -out "$tmp"
-diff -u codexsdk/protocolv2/method_registry.gen.go "$tmp/method_registry.gen.go"
-diff -u codexsdk/protocolv2/protocol_types.gen.go "$tmp/protocol_types.gen.go"
+go run ./codexsdk/internal/cmd/protocolv2gen -stdout method-registry |
+  diff -u codexsdk/protocolv2/method_registry.gen.go -
+go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
+  diff -u codexsdk/protocolv2/protocol_types.gen.go -
 ```
 
 ## Maintenance
@@ -197,17 +198,50 @@ Use the upstream tracking script to generate review artifacts for a Codex
 schema update. The script is read-only for the checked-in baseline unless a
 maintainer copies reviewed files back into the SDK tree.
 
+Check the target policy before generating drift artifacts. Scheduled automation
+tracks stable `rust-vX.Y.Z` tags only when the current baseline is already on
+that stable tag track; manual commits and track switches must be explicit.
+
+```sh
+python3 scripts/codexsdk_target_policy.py \
+  --baseline codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json \
+  --target-ref rust-v0.140.0 \
+  --target-kind stable_rust_tag \
+  --target-sha <peeled-target-commit> \
+  --target-explicit true \
+  --mode manual \
+  --json
+```
+
 ```sh
 scripts/codexsdk_track_upstream.sh \
   --codex-repo /path/to/openai/codex \
-  --commit <codex-commit> \
+  --commit <peeled-target-commit> \
+  --source-ref rust-v0.140.0 \
+  --source-ref-kind stable_rust_tag \
   --out /tmp/codexsdk-upstream
 ```
 
 Then review the generated `reports/SUMMARY.md`, schema drift summary, and matrix
 update skeleton before updating the baseline, manifest, coverage matrix, and
-generated Go code. See `docs/release.md` for the release and schema baseline
-checklists.
+generated Go code. Keep handwritten SDK changes limited to reviewed public
+surface or compatibility fixes. See `docs/release.md` for the release and
+schema baseline checklists.
+
+After committing a successful baseline sync, tag the codexsdk-go commit with an
+annotated upstream sync tag. These tags intentionally live outside the Go module
+release namespace.
+
+```sh
+python3 scripts/codexsdk_sync_tag.py --json
+python3 scripts/codexsdk_sync_tag.py --create --push origin --json
+```
+
+Stable upstream Codex tags use `upstream-codex-rust-vX.Y.Z`. Existing upstream
+sync tags are never moved; use `--next-suffix` to create
+`upstream-codex-rust-vX.Y.Z-sync.N` for follow-up SDK fixes against the same
+upstream tag. Manual upstream commits and refs intentionally do not get fallback
+sync tags.
 
 ## Compatibility Policy
 
