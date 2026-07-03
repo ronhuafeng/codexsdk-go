@@ -62,10 +62,12 @@ Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at 
 
 ## Repository Automation Contract
 
-The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine drift repair. Both `schedule` and `workflow_dispatch` events use the same direct-main publish path:
+The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine drift repair. Both `schedule` and `workflow_dispatch` events use the same protected-branch PR path:
 
 - landing ref is `main`
-- the sync commit is validated, rebased onto `origin/main`, and pushed directly to `main`
+- the sync commit is validated, rebased onto `origin/main`, and pushed to a `codex/sync-upstream-*` branch
+- the workflow creates or updates a PR against `main`, dispatches the required `Go` CI check on the PR head, and merges the PR through GitHub's protected-branch path
+- if merge queue is enabled for the repository, GitHub may enqueue the PR instead of merging it immediately
 - after a landed stable-tag sync, the workflow creates an upstream sync tag and optionally dispatches drift verification
 
 ## Workflow
@@ -343,9 +345,9 @@ The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine
      scripts/codexsdk_track_upstream.sh ...
    ```
 
-10. Tag the codexsdk-go sync commit when a baseline sync was committed.
+10. Tag the codexsdk-go sync commit when a baseline sync has landed on `main`.
 
-   Do this only after a successful baseline sync commit exists. Do not tag drift-check-only work, failed sync attempts, or uncommitted changes.
+   Do this only after a successful baseline sync commit exists on the landing ref. Do not tag drift-check-only work, failed sync attempts, unmerged PR heads, or uncommitted changes.
 
    ```sh
    python3 scripts/codexsdk_sync_tag.py --json
@@ -360,12 +362,12 @@ The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine
    - do not move existing upstream sync tags
    - if the same upstream tag needs a follow-up codexsdk-go fix, use `python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin` to create `-sync.N`
 
-11. After pushing, monitor repository automation when the task is to solve a drift issue.
+11. After publishing a sync PR, monitor repository automation when the task is to solve a drift issue.
 
-   Watch the push CI run first. The Codex Upstream Protocol Drift workflow runs on schedule or `workflow_dispatch`, not ordinary pushes. After push CI passes, dispatch it for the selected upstream ref and watch the run:
+   Watch the required `Go` check on the PR head first. After the PR merges into `main`, the Codex Upstream Protocol Drift workflow runs on schedule or `workflow_dispatch`, not ordinary pushes. After the landed `main` CI passes, dispatch it for the selected upstream ref and watch the run:
 
    ```sh
-   gh workflow run upstream-protocol-drift.yml --ref <branch> -f upstream_ref=<target_ref>
+   gh workflow run upstream-protocol-drift.yml --ref main -f upstream_ref=<target_ref>
    gh run watch <run-id> --exit-status
    ```
 
