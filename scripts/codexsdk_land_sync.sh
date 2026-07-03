@@ -13,6 +13,11 @@ Options:
   --auto-merge-pr-on-failure
                             Create or reuse a ready PR, wait for required checks,
                             and merge it when direct fast-forward landing fails.
+  --require-bot-token-for-auto-merge
+                            Refuse auto-merge fallback unless CODEXSDK_SYNC_BOT_TOKEN
+                            is set. PRs created by GITHUB_TOKEN do not trigger
+                            pull_request CI, so protected branches cannot observe
+                            required checks from that token alone.
   --merge-method <method>   PR merge method for auto-merge fallback: rebase, merge,
                             or squash. Defaults to rebase.
 
@@ -31,6 +36,7 @@ target_sha=""
 candidate=""
 open_pr_on_failure=0
 auto_merge_pr_on_failure=0
+require_bot_token_for_auto_merge=0
 merge_method="rebase"
 
 while [[ $# -gt 0 ]]; do
@@ -50,6 +56,10 @@ while [[ $# -gt 0 ]]; do
     --auto-merge-pr-on-failure)
       open_pr_on_failure=1
       auto_merge_pr_on_failure=1
+      shift
+      ;;
+    --require-bot-token-for-auto-merge)
+      require_bot_token_for_auto_merge=1
       shift
       ;;
     --merge-method)
@@ -271,6 +281,11 @@ merge_flag_for_method() {
 
 auto_merge_fallback_pr() {
   local pr_url merge_flag landed_commit
+  if [[ "${require_bot_token_for_auto_merge}" -eq 1 && -z "${CODEXSDK_SYNC_BOT_TOKEN:-}" ]]; then
+    echo "auto-merge fallback requires CODEXSDK_SYNC_BOT_TOKEN." >&2
+    echo "GitHub does not trigger pull_request CI for PRs created by the workflow GITHUB_TOKEN, so required checks would never appear." >&2
+    return 1
+  fi
   pr_url="$(open_or_reuse_pr ready)"
   wait_for_required_pr_checks "${pr_url}"
   merge_flag="$(merge_flag_for_method)"

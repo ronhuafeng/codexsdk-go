@@ -26,6 +26,20 @@ def run(args: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> sub
     )
 
 
+def run_unchecked(
+    args: list[str], *, cwd: Path, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        env=env,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
 class land_sync_repo:
     def __enter__(self) -> "land_sync_repo":
         self.tempdir = tempfile.TemporaryDirectory()
@@ -264,6 +278,35 @@ class LandSyncTest(unittest.TestCase):
             self.assertNotIn("pr create --draft", gh_log)
             self.assertIn("pr checks https://github.com/example/codexsdk-go/pull/42 --required", gh_log)
             self.assertIn("pr merge https://github.com/example/codexsdk-go/pull/42 --rebase --delete-branch", gh_log)
+
+    def test_auto_merge_requires_bot_token_when_requested(self) -> None:
+        with land_sync_repo() as repo:
+            repo.install_reject_tmp_push_until_merge_hook()
+            output = repo.root / "github-output"
+            env = repo.env(output)
+            env.pop("CODEXSDK_SYNC_BOT_TOKEN", None)
+
+            completed = run_unchecked(
+                [
+                    str(repo.script()),
+                    "--land-ref",
+                    "tmp",
+                    "--work-branch",
+                    "codex/sync-test",
+                    "--target-ref",
+                    "rust-v0.0.1",
+                    "--target-sha",
+                    TARGET_SHA,
+                    "--auto-merge-pr-on-failure",
+                    "--require-bot-token-for-auto-merge",
+                ],
+                cwd=repo.repo,
+                env=env,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("requires CODEXSDK_SYNC_BOT_TOKEN", completed.stderr)
+            self.assertIn("required checks would never appear", completed.stderr)
 
 
 if __name__ == "__main__":

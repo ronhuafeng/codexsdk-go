@@ -682,7 +682,11 @@ jobs:
             args+=(--open-pr-on-failure)
           fi
           if [[ "${AUTO_MERGE_PR_ON_FAILURE}" == "true" ]]; then
-            args+=(--auto-merge-pr-on-failure --merge-method rebase)
+            args+=(
+              --auto-merge-pr-on-failure
+              --require-bot-token-for-auto-merge
+              --merge-method rebase
+            )
           fi
           scripts/codexsdk_land_sync.sh "${args[@]}"
 
