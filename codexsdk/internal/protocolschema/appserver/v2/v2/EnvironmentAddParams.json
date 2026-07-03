@@ -7,15 +7,6 @@
     "execServerUrl"
   ],
   "properties": {
-    "connectTimeoutMs": {
-      "description": "Optional WebSocket connection timeout. The server default applies when omitted.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0.0
-    },
     "environmentId": {
       "type": "string"
     },
