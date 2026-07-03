@@ -239,122 +239,19 @@ jobs:
         id: drift
         env:
           BASELINE_SHA: ${{ steps.refs.outputs.baseline_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           UPSTREAM_REF: ${{ steps.refs.outputs.upstream_ref }}
           UPSTREAM_REF_KIND: ${{ steps.refs.outputs.upstream_ref_kind }}
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-
-          reports = Path(os.environ["CODEXSDK_DRIFT_ARTIFACT_DIR"], "reports")
-          drift_path = reports / "drift_summary.json"
-          drift = json.loads(drift_path.read_text())
-          drift_sha = hashlib.sha256(drift_path.read_bytes()).hexdigest()
-
-          baseline = os.environ["BASELINE_SHA"]
-          upstream_ref = os.environ["UPSTREAM_REF"]
-          upstream_ref_kind = os.environ["UPSTREAM_REF_KIND"]
-          upstream = os.environ["UPSTREAM_SHA"]
-          run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
-          status = drift["status"]
-          file_diff = drift["file_diff"]
-          method_diff = drift["method_diff"]
-
-          def short_list(items, limit=20):
-              if not items:
-                  return "_none_"
-              lines = [f"- `{item}`" for item in items[:limit]]
-              if len(items) > limit:
-                  lines.append(f"- ...and {len(items) - limit} more")
-              return "\n".join(lines)
-
-          method_lines = []
-          for schema, diff in method_diff.items():
-              if diff["added"] or diff["removed"]:
-                  method_lines.append(f"### {schema}")
-                  method_lines.append("")
-                  method_lines.append("Added:")
-                  method_lines.append(short_list(diff["added"]))
-                  method_lines.append("")
-                  method_lines.append("Removed:")
-                  method_lines.append(short_list(diff["removed"]))
-                  method_lines.append("")
-          if not method_lines:
-              method_lines.append("_No aggregate method additions or removals._")
-
-          upstream_display = f"`{upstream_ref}` (`{upstream}`)"
-          title = f"Protocol drift detected against openai/codex {upstream_ref}"
-          body = f"""<!-- codexsdk-upstream-sync
-          baseline_commit: {baseline}
-          upstream_ref: {upstream_ref}
-          upstream_ref_kind: {upstream_ref_kind}
-          upstream_commit: {upstream}
-          drift_sha256: {drift_sha}
-          -->
-
-          ## Protocol Drift Detected
-
-          The checked-in Codex app-server schema baseline no longer matches upstream `openai/codex`.
-
-          - Baseline: `openai/codex@{baseline}`
-          - Upstream target: {upstream_display}
-          - Upstream target kind: `{upstream_ref_kind}`
-          - Drift status: `{status}`
-          - Drift fingerprint: `{drift_sha}`
-          - Workflow run: {run_url}
-
-          ## File Diff
-
-          - Added: {len(file_diff["added"])}
-          - Changed: {len(file_diff["changed"])}
-          - Removed: {len(file_diff["removed"])}
-
-          ### Added Schemas
-
-          {short_list(file_diff["added"])}
-
-          ### Changed Schemas
-
-          {short_list(file_diff["changed"])}
-
-          ### Removed Schemas
-
-          {short_list(file_diff["removed"])}
-
-          ## Method Diff
-
-          {chr(10).join(method_lines)}
-
-          ## Automated Sync
-
-          This workflow will attempt a guarded Codex sync, rebase it onto the landing ref, validate it, publish a sync PR, run the required `Go` check on the PR head, and merge through the protected-branch PR path.
-
-          Sync PRs created by `GITHUB_TOKEN` may require one maintainer approval or rerun before GitHub schedules the required `Go` pull request check. If the first PR CI run is `action_required` with no jobs, rerun that run once; auto-merge should continue after the real `Go` check passes.
-          """
-
-          comment = f"""Protocol drift is still present.
-
-          - Baseline: `openai/codex@{baseline}`
-          - Upstream target: {upstream_display}
-          - Upstream target kind: `{upstream_ref_kind}`
-          - Drift status: `{status}`
-          - Drift fingerprint: `{drift_sha}`
-          - Workflow run: {run_url}
-          """
-
-          artifact_dir = Path(os.environ["CODEXSDK_DRIFT_ARTIFACT_DIR"])
-          Path(artifact_dir, "issue-title.txt").write_text(title + "\n")
-          Path(artifact_dir, "issue-body.md").write_text(body)
-          Path(artifact_dir, "issue-comment.md").write_text(comment)
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"status={status}\n")
-              output.write(f"drift_sha={drift_sha}\n")
-          PY
+          python3 scripts/codexsdk_write_drift_issue_artifacts.py \
+            --artifact-dir "${CODEXSDK_DRIFT_ARTIFACT_DIR}" \
+            --baseline-sha "${BASELINE_SHA}" \
+            --run-url "${RUN_URL}" \
+            --upstream-ref "${UPSTREAM_REF}" \
+            --upstream-ref-kind "${UPSTREAM_REF_KIND}" \
+            --upstream-sha "${UPSTREAM_SHA}"
 
       - name: Upload sync candidate artifacts
         if: steps.target_policy.outputs.decision == 'allow'
@@ -526,37 +423,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${CODEXSDK_AUTO_SYNC_DIR}"
-          cat > "${CODEXSDK_AUTO_SYNC_DIR}/prompt.md" <<EOF
-          You are maintaining codexsdk-go.
-
-          Read and follow .agents/skills/codexsdk-sync-upstream/SKILL.md completely before editing.
-
-          This workflow has already applied the large mechanical sync with scripts/codexsdk_apply_sync_candidate.py. Perform a bounded maintainer review of the resulting worktree for this already-resolved upstream target:
-
-          - upstream ref: ${UPSTREAM_REF}
-          - upstream ref kind: ${UPSTREAM_REF_KIND}
-          - upstream commit: ${UPSTREAM_SHA}
-          - landing ref: ${LAND_REF}
-
-          Candidate schema and drift artifacts from this workflow's detect job are already available under:
-
-          - ${CANDIDATE_DIR}/schema
-          - ${CANDIDATE_DIR}/reports
-          - ${CANDIDATE_DIR}/common.rs
-
-          Mechanical apply summary:
-
-          - ${CODEXSDK_AUTO_SYNC_DIR}/apply-result.json
-          - ${CODEXSDK_AUTO_SYNC_DIR}/diff-name-status.txt
-
-          Inspect the apply summary, compact drift reports, and git diff name-status. Confirm there is no obvious provenance, sanitization, manifest, coverage, or generated-code issue. Do not re-copy schemas, re-run the full Rust schema generator, or print large files. Do not try to manually review every generated JSON or Go line.
-
-          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not perform repository side effects. The workflow will validate, commit, publish a PR, dispatch the required CI on the PR head, and merge through the protected-branch PR path after you finish.
-
-          Keep command output compact. Do not print full schema, report, manifest, coverage, or generated Go files. Avoid chained shell commands because the action sandbox may reject them; run separate focused commands instead.
-
-          Keep handwritten SDK changes minimal and justify them through reviewed drift. Leave newly discovered experimental or internal upstream surface in generated protocolv2 unless the manifest rules require public SDK exposure.
-          EOF
+          python3 scripts/codexsdk_write_sync_prompt.py \
+            --out "${CODEXSDK_AUTO_SYNC_DIR}/prompt.md" \
+            --auto-sync-dir "${CODEXSDK_AUTO_SYNC_DIR}" \
+            --candidate-dir "${CANDIDATE_DIR}" \
+            --land-ref "${LAND_REF}" \
+            --upstream-ref "${UPSTREAM_REF}" \
+            --upstream-ref-kind "${UPSTREAM_REF_KIND}" \
+            --upstream-sha "${UPSTREAM_SHA}"
 
       - name: Run Codex upstream sync
         uses: openai/codex-action@v1
@@ -633,59 +507,10 @@ jobs:
           SYNC_BRANCH: ${{ steps.publish.outputs.sync_branch }}
         run: |
           set -euo pipefail
-
-          gh pr merge "${PR_NUMBER}" --auto --rebase
-          {
-            echo "Auto-merge requested for sync PR #${PR_NUMBER}."
-            echo
-            echo "If the required \`Go\` pull request check is \`action_required\` with no jobs, a maintainer should approve or rerun that CI run once. This is an expected GitHub Actions safety gate for PRs created by \`GITHUB_TOKEN\`; auto-merge should continue after the real \`Go\` check passes."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          for _ in $(seq 1 120); do
-            state="$(
-              gh pr view "${PR_NUMBER}" \
-                --json state \
-                --jq '.state'
-            )"
-            if [[ "${state}" == "MERGED" ]]; then
-              break
-            fi
-            sleep 15
-          done
-
-          state="$(
-            gh pr view "${PR_NUMBER}" \
-              --json state \
-              --jq '.state'
-          )"
-          if [[ "${state}" != "MERGED" ]]; then
-            echo "Sync PR #${PR_NUMBER} was not merged before the workflow timeout window." >&2
-            echo "If the required Go check is action_required with no jobs, rerun that CI run once with maintainer permissions; auto-merge should continue after the real Go check passes." >&2
-            gh pr view "${PR_NUMBER}" \
-              --json state,mergeStateStatus,reviewDecision,statusCheckRollup \
-              --jq '.'
-            gh pr checks "${PR_NUMBER}" || true
-            gh run list \
-              --workflow ci.yml \
-              --branch "${SYNC_BRANCH}" \
-              --limit 10 \
-              --json databaseId,event,status,conclusion,headSha,url \
-              --jq '.'
-            exit 1
-          fi
-
-          git fetch origin "refs/heads/${LAND_REF}:refs/remotes/origin/${LAND_REF}"
-          landed_commit="$(git rev-parse "origin/${LAND_REF}")"
-          echo "landed_commit=${landed_commit}" >> "$GITHUB_OUTPUT"
-          echo "landed_ref=${LAND_REF}" >> "$GITHUB_OUTPUT"
-          {
-            echo
-            echo "## Sync PR merged"
-            echo
-            echo "- PR: #${PR_NUMBER}"
-            echo "- Landing ref: \`${LAND_REF}\`"
-            echo "- Landed commit: \`${landed_commit}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          scripts/codexsdk_wait_sync_pr_merge.sh \
+            --pr-number "${PR_NUMBER}" \
+            --sync-branch "${SYNC_BRANCH}" \
+            --land-ref "${LAND_REF}"
 
   finalize:
     name: Finalize landed sync
