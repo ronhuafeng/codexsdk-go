@@ -60,6 +60,14 @@ Use this cache topology unless the user provides an explicit alternative:
 
 Treat `.cache/` as disposable generated state: it may be deleted and rebuilt at any time.
 
+## Repository Automation Contract
+
+The `upstream-protocol-auto-sync.yml` workflow is the preferred path for routine drift repair. Both `schedule` and `workflow_dispatch` events use the same direct-main publish path:
+
+- landing ref is `main`
+- the sync commit is validated, rebased onto `origin/main`, and pushed directly to `main`
+- after a landed stable-tag sync, the workflow creates an upstream sync tag and optionally dispatches drift verification
+
 ## Workflow
 
 1. Inspect the current repository state.

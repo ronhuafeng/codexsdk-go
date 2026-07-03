@@ -98,36 +98,6 @@ class land_sync_repo:
         output = run(["git", "ls-remote", "origin", f"refs/heads/{branch}"], cwd=self.repo).stdout.strip()
         return bool(output)
 
-    def install_gh_stub(self) -> Path:
-        fake_bin = self.root / "fake-bin"
-        fake_bin.mkdir()
-        gh_log = self.root / "gh-log"
-        gh = fake_bin / "gh"
-        gh.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/usr/bin/env bash
-                set -euo pipefail
-                printf '%s\\n' "$*" >> {gh_log}
-                case "$1 $2" in
-                  "pr list")
-                    exit 0
-                    ;;
-                  "pr create")
-                    printf '%s\\n' "https://github.com/example/codexsdk-go/pull/42"
-                    ;;
-                  *)
-                    printf 'unexpected gh command: %s\\n' "$*" >&2
-                    exit 2
-                    ;;
-                esac
-                """
-            ),
-            encoding="utf-8",
-        )
-        gh.chmod(0o755)
-        return fake_bin
-
     def install_reject_first_tmp_push_hook(self) -> None:
         hook = self.origin / "hooks" / "pre-receive"
         hook.write_text(
@@ -154,8 +124,6 @@ class LandSyncTest(unittest.TestCase):
             completed = run(
                 [
                     str(repo.script()),
-                    "--mode",
-                    "direct",
                     "--land-ref",
                     "refs/heads/tmp",
                     "--target-ref",
@@ -172,7 +140,6 @@ class LandSyncTest(unittest.TestCase):
             self.assertFalse(repo.remote_branch_exists("codex/sync-test"))
             self.assertIn(f"landed_commit={repo.sync_commit}", output.read_text(encoding="utf-8"))
             self.assertIn("landed_ref=tmp", output.read_text(encoding="utf-8"))
-            self.assertNotIn("work_branch=", output.read_text(encoding="utf-8"))
             validate_lines = (repo.repo / ".validate-log").read_text(encoding="utf-8").splitlines()
             self.assertGreaterEqual(len(validate_lines), 2)
 
@@ -183,8 +150,6 @@ class LandSyncTest(unittest.TestCase):
             completed = run(
                 [
                     str(repo.script()),
-                    "--mode",
-                    "direct",
                     "--land-ref",
                     "tmp",
                     "--target-ref",
@@ -201,40 +166,6 @@ class LandSyncTest(unittest.TestCase):
             self.assertEqual(repo.remote_commit("tmp"), repo.sync_commit)
             validate_lines = (repo.repo / ".validate-log").read_text(encoding="utf-8").splitlines()
             self.assertGreaterEqual(len(validate_lines), 3)
-
-    def test_pr_mode_pushes_work_branch_and_opens_draft_pr(self) -> None:
-        with land_sync_repo() as repo:
-            fake_bin = repo.install_gh_stub()
-            output = repo.root / "github-output"
-            env = repo.env(output)
-            env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
-
-            run(
-                [
-                    str(repo.script()),
-                    "--mode",
-                    "pr",
-                    "--land-ref",
-                    "tmp",
-                    "--work-branch",
-                    "codex/sync-test",
-                    "--target-ref",
-                    "rust-v0.0.1",
-                    "--target-sha",
-                    TARGET_SHA,
-                ],
-                cwd=repo.repo,
-                env=env,
-            )
-
-            self.assertEqual(repo.remote_commit("tmp"), repo.base_commit)
-            self.assertEqual(repo.remote_commit("codex/sync-test"), repo.sync_commit)
-            output_text = output.read_text(encoding="utf-8")
-            self.assertIn("fallback_pr_url=https://github.com/example/codexsdk-go/pull/42", output_text)
-            self.assertIn("work_branch=codex/sync-test", output_text)
-            self.assertNotIn("landed_commit=", output_text)
-            gh_log = (repo.root / "gh-log").read_text(encoding="utf-8")
-            self.assertIn("pr create --draft --base tmp --head codex/sync-test", gh_log)
 
 
 if __name__ == "__main__":

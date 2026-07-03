@@ -1,5 +1,5 @@
 name: Codex Upstream Protocol Auto Sync
-run-name: Protocol sync ${{ inputs.upstream_ref || 'latest stable' }} -> ${{ inputs.land_ref || github.ref_name }}
+run-name: Protocol sync ${{ inputs.upstream_ref || 'latest stable' }} -> main
 
 on:
   schedule:
@@ -10,17 +10,8 @@ on:
         description: "Optional openai/codex tag, ref, or full SHA. Defaults to the latest stable rust-vX.Y.Z tag."
         required: false
         type: string
-      land_ref:
-        description: "Branch to update. Defaults to the workflow ref, so manual tmp-branch tests do not have to target main."
-        required: false
-        type: string
       allow_downgrade:
         description: "Allow an explicit stable rust-vX.Y.Z target older than the current stable-tag baseline."
-        required: false
-        type: boolean
-        default: false
-      create_sync_tag:
-        description: "Create and push an upstream sync tag after a manual stable-tag sync. Scheduled syncs tag by default."
         required: false
         type: boolean
         default: false
@@ -49,7 +40,7 @@ env:
   CODEXSDK_UPSTREAM_TARGET_JSON: /tmp/codexsdk-upstream-target.json
 
 concurrency:
-  group: codex-upstream-protocol-auto-sync-${{ inputs.land_ref || github.ref_name }}
+  group: codex-upstream-protocol-auto-sync-main
   queue: max
   cancel-in-progress: false
 
@@ -76,20 +67,10 @@ jobs:
     steps:
       - name: Resolve landing ref
         id: landing
-        env:
-          REQUESTED_LAND_REF: ${{ inputs.land_ref || '' }}
-          WORKFLOW_REF: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          land_ref="${REQUESTED_LAND_REF}"
-          land_ref="${land_ref#"${land_ref%%[![:space:]]*}"}"
-          land_ref="${land_ref%"${land_ref##*[![:space:]]}"}"
-          land_ref="${land_ref#refs/heads/}"
-          if [[ -z "${land_ref}" ]]; then
-            land_ref="${WORKFLOW_REF}"
-          fi
-          echo "land_ref=${land_ref}" >> "$GITHUB_OUTPUT"
-          echo "Landing ref: ${land_ref}" >> "$GITHUB_STEP_SUMMARY"
+          echo "land_ref=main" >> "$GITHUB_OUTPUT"
+          echo "Landing ref: main" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check out landing ref
         uses: actions/checkout@v7
@@ -349,7 +330,7 @@ jobs:
 
           ## Automated Sync
 
-          This workflow will attempt a guarded Codex sync on a temporary branch, rebase it onto the landing ref, validate it, and land it with a non-force push.
+          This workflow will attempt a guarded Codex sync, rebase it onto the landing ref, validate it, and land it with a non-force push.
           """
 
           comment = f"""Protocol drift is still present.
@@ -474,12 +455,9 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: write
-      pull-requests: write
     outputs:
-      fallback_pr_url: ${{ steps.land.outputs.fallback_pr_url }}
       landed_commit: ${{ steps.land.outputs.landed_commit }}
       landed_ref: ${{ steps.land.outputs.landed_ref }}
-      work_branch: ${{ steps.branch.outputs.work_branch }}
 
     steps:
       - name: Check out landing ref
@@ -511,27 +489,6 @@ jobs:
           git config user.name "codexsdk-sync-bot"
           git config user.email "codexsdk-sync-bot@users.noreply.github.com"
 
-      - name: Create manual sync PR branch
-        id: branch
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
-        run: |
-          set -euo pipefail
-          safe_ref="$(
-            python3 - <<'PY'
-          import os
-          import re
-          ref = os.environ["UPSTREAM_REF"]
-          safe = re.sub(r"[^A-Za-z0-9._-]+", "-", ref).strip("-")
-          print(safe or "manual-target")
-          PY
-          )"
-          work_branch="codex/sync-openai-codex-${safe_ref}-${GITHUB_RUN_ID}"
-          git switch -c "${work_branch}"
-          echo "work_branch=${work_branch}" >> "$GITHUB_OUTPUT"
-          echo "Temporary work branch: \`${work_branch}\`" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Apply sync candidate mechanically
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
@@ -555,11 +512,9 @@ jobs:
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
-          SYNC_MODE: ${{ github.event_name == 'schedule' && 'direct' || 'pr' }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_REF_KIND: ${{ needs.detect.outputs.upstream_ref_kind }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
-          WORK_BRANCH: ${{ steps.branch.outputs.work_branch || '' }}
         run: |
           set -euo pipefail
           mkdir -p "${CODEXSDK_AUTO_SYNC_DIR}"
@@ -574,8 +529,6 @@ jobs:
           - upstream ref kind: ${UPSTREAM_REF_KIND}
           - upstream commit: ${UPSTREAM_SHA}
           - landing ref: ${LAND_REF}
-          - publish mode: ${SYNC_MODE}
-          - manual PR branch: ${WORK_BRANCH:-<none>}
 
           Candidate schema and drift artifacts from this workflow's detect job are already available under:
 
@@ -590,7 +543,7 @@ jobs:
 
           Inspect the apply summary, compact drift reports, and git diff name-status. Confirm there is no obvious provenance, sanitization, manifest, coverage, or generated-code issue. Do not re-copy schemas, re-run the full Rust schema generator, or print large files. Do not try to manually review every generated JSON or Go line.
 
-          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not commit, tag, push, create a PR, dispatch workflows, or close issues. The workflow will validate, commit, and publish after you finish. Scheduled runs publish directly to the landing ref; manual runs publish a draft PR branch.
+          Leave the current worktree changes in place. Make only small, clearly necessary fixes if the review finds a concrete issue. Do not perform repository side effects. The workflow will validate, commit, and publish directly to the landing ref after you finish.
 
           Keep command output compact. Do not print full schema, report, manifest, coverage, or generated Go files. Avoid chained shell commands because the action sandbox may reject them; run separate focused commands instead.
 
@@ -649,23 +602,16 @@ jobs:
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
-          SYNC_MODE: ${{ github.event_name == 'schedule' && 'direct' || 'pr' }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
-          WORK_BRANCH: ${{ steps.branch.outputs.work_branch || '' }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           args=(
-            --mode "${SYNC_MODE}"
             --land-ref "${LAND_REF}"
             --target-ref "${UPSTREAM_REF}"
             --target-sha "${UPSTREAM_SHA}"
             --candidate "${CANDIDATE_DIR}/schema"
           )
-          if [[ "${SYNC_MODE}" == "pr" ]]; then
-            args+=(--work-branch "${WORK_BRANCH}")
-          fi
           scripts/codexsdk_land_sync.sh "${args[@]}"
 
   finalize:
@@ -693,7 +639,7 @@ jobs:
 
       - name: Create upstream sync tag
         id: tag
-        if: needs.detect.outputs.upstream_ref_kind == 'stable_rust_tag' && (github.event_name == 'schedule' || inputs.create_sync_tag)
+        if: needs.detect.outputs.upstream_ref_kind == 'stable_rust_tag'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -757,7 +703,6 @@ jobs:
           TAG_NAME: ${{ steps.tag.outputs.tag_name }}
           UPSTREAM_REF: ${{ needs.detect.outputs.upstream_ref }}
           UPSTREAM_SHA: ${{ needs.detect.outputs.upstream_sha }}
-          WORK_BRANCH: ${{ needs.sync.outputs.work_branch }}
         run: |
           {
             echo
@@ -765,7 +710,6 @@ jobs:
             echo
             echo "- Landing ref: \`${LANDED_REF}\`"
             echo "- Landed commit: \`${LANDED_COMMIT}\`"
-            echo "- Temporary branch: \`${WORK_BRANCH}\`"
             echo "- Upstream target: \`${UPSTREAM_REF}\`"
             echo "- Upstream commit: \`${UPSTREAM_SHA}\`"
             if [[ -n "${TAG_NAME}" ]]; then
