@@ -77,7 +77,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/AbsolutePathBuf"
           }
         },
         "write": {
@@ -87,7 +87,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/LegacyAppPathString"
+            "$ref": "#/definitions/AbsolutePathBuf"
           }
         }
       }
@@ -121,7 +121,7 @@
           ],
           "properties": {
             "path": {
-              "$ref": "#/definitions/LegacyAppPathString"
+              "$ref": "#/definitions/AbsolutePathBuf"
             },
             "type": {
               "type": "string",
@@ -298,9 +298,6 @@
           }
         }
       ]
-    },
-    "LegacyAppPathString": {
-      "type": "string"
     },
     "RequestPermissionProfile": {
       "type": "object",
