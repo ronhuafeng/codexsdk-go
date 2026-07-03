@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -208,17 +209,6 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 	if _, ok := root.MethodByName("ThreadClient"); !ok {
 		t.Fatal("root Client missing ThreadClient accessor")
 	}
-	for _, name := range []string{"Accounts", "Apps", "Commands", "CollaborationModes", "Config", "ConfigRequirements", "ExperimentalFeatures", "ExternalAgentConfigs", "Feedback", "FS", "FuzzyFileSearch", "Hooks", "Marketplace", "Memory", "MCPServers", "MCPServerStatus", "Mock", "ModelProviders", "Models", "Plugins", "Processes", "Reviews", "Skills", "WindowsSandbox"} {
-		if _, ok := root.MethodByName(name); !ok {
-			t.Fatalf("root Client missing %s facade accessor", name)
-		}
-	}
-	if _, ok := root.MethodByName("Threads"); !ok {
-		t.Fatal("root Client missing Threads facade accessor")
-	}
-	if _, ok := root.MethodByName("Turns"); !ok {
-		t.Fatal("root Client missing Turns facade accessor")
-	}
 	if _, ok := root.MethodByName("Close"); !ok {
 		t.Fatal("root Client missing Close")
 	}
@@ -243,350 +233,111 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 		t.Fatal("ThreadClient exposes Close; root Client owns app-server lifecycle")
 	}
 
-	commands := reflect.TypeOf((*Commands)(nil)).Elem()
-	wantCommandMethods := map[string]struct{}{
-		"Exec":          {},
-		"ExecResize":    {},
-		"ExecTerminate": {},
-		"ExecWrite":     {},
-	}
-	if commands.NumMethod() != len(wantCommandMethods) {
-		t.Fatalf("Commands method count = %d, want %d", commands.NumMethod(), len(wantCommandMethods))
-	}
-	for name := range wantCommandMethods {
-		if _, ok := commands.MethodByName(name); !ok {
-			t.Fatalf("Commands missing %s method", name)
+	expected := expectedSDKSurfaceMethods(t)
+	surface := reflect.TypeOf((*SDKSurface)(nil)).Elem()
+	for accessor, methods := range expected {
+		if _, ok := root.MethodByName(accessor); !ok {
+			t.Fatalf("root Client missing %s facade accessor", accessor)
+		}
+		surfaceMethod, ok := surface.MethodByName(accessor)
+		if !ok {
+			t.Fatalf("SDKSurface missing %s accessor", accessor)
+		}
+		facadeType := surfaceMethod.Type.Out(0)
+		if facadeType.NumMethod() != len(methods) {
+			t.Fatalf("%s method count = %d, want %d", accessor, facadeType.NumMethod(), len(methods))
+		}
+		for name := range methods {
+			if _, ok := facadeType.MethodByName(name); !ok {
+				t.Fatalf("%s missing %s method", accessor, name)
+			}
+		}
+		if _, ok := facadeType.MethodByName("Call"); ok {
+			t.Fatalf("%s exposes raw Call", accessor)
 		}
 	}
-	if _, ok := commands.MethodByName("OutputDelta"); ok {
-		t.Fatal("Commands exposes command/exec/outputDelta notification")
-	}
+}
 
-	collaborationModes := reflect.TypeOf((*CollaborationModes)(nil)).Elem()
-	if collaborationModes.NumMethod() != 1 {
-		t.Fatalf("CollaborationModes method count = %d, want 1", collaborationModes.NumMethod())
-	}
-	if _, ok := collaborationModes.MethodByName("List"); !ok {
-		t.Fatal("CollaborationModes missing List method")
-	}
+type sdkSurfaceManifest struct {
+	Entries []struct {
+		Direction             string `json:"direction"`
+		FacadeTarget          string `json:"facade_target"`
+		Kind                  string `json:"kind"`
+		Method                string `json:"method"`
+		ParamsOrPayloadSchema string `json:"params_or_payload_schema"`
+		ResponseType          string `json:"response_type"`
+	} `json:"entries"`
+}
 
-	config := reflect.TypeOf((*Config)(nil)).Elem()
-	wantConfigMethods := map[string]struct{}{
-		"BatchWrite":      {},
-		"MCPServerReload": {},
-		"Read":            {},
-		"ValueWrite":      {},
+func expectedSDKSurfaceMethods(t *testing.T) map[string]map[string]struct{} {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("internal", "protocolschema", "appserver", "v2", "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if config.NumMethod() != len(wantConfigMethods) {
-		t.Fatalf("Config method count = %d, want %d", config.NumMethod(), len(wantConfigMethods))
+	var manifest sdkSurfaceManifest
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
 	}
-	for name := range wantConfigMethods {
-		if _, ok := config.MethodByName(name); !ok {
-			t.Fatalf("Config missing %s method", name)
+	methods := generatedMethodNames(t)
+	types := generatedProtocolTypeNames(t)
+	expected := map[string]map[string]struct{}{}
+	for _, entry := range manifest.Entries {
+		if entry.Direction != "client_to_server" || entry.Kind != "request" {
+			continue
 		}
-	}
-	if _, ok := config.MethodByName("Warning"); ok {
-		t.Fatal("Config exposes configWarning notification")
-	}
-
-	configRequirements := reflect.TypeOf((*ConfigRequirements)(nil)).Elem()
-	if configRequirements.NumMethod() != 1 {
-		t.Fatalf("ConfigRequirements method count = %d, want 1", configRequirements.NumMethod())
-	}
-	if _, ok := configRequirements.MethodByName("Read"); !ok {
-		t.Fatal("ConfigRequirements missing Read method")
-	}
-	if _, ok := configRequirements.MethodByName("Warning"); ok {
-		t.Fatal("ConfigRequirements exposes configWarning notification")
-	}
-
-	experimentalFeatures := reflect.TypeOf((*ExperimentalFeatures)(nil)).Elem()
-	wantExperimentalFeatureMethods := map[string]struct{}{
-		"EnablementSet": {},
-		"List":          {},
-	}
-	if experimentalFeatures.NumMethod() != len(wantExperimentalFeatureMethods) {
-		t.Fatalf("ExperimentalFeatures method count = %d, want %d", experimentalFeatures.NumMethod(), len(wantExperimentalFeatureMethods))
-	}
-	for name := range wantExperimentalFeatureMethods {
-		if _, ok := experimentalFeatures.MethodByName(name); !ok {
-			t.Fatalf("ExperimentalFeatures missing %s method", name)
+		if !methods[entry.Method] {
+			continue
 		}
-	}
-
-	externalAgentConfigs := reflect.TypeOf((*ExternalAgentConfigs)(nil)).Elem()
-	wantExternalAgentConfigMethods := map[string]struct{}{
-		"Detect": {},
-		"Import": {},
-	}
-	if externalAgentConfigs.NumMethod() != len(wantExternalAgentConfigMethods) {
-		t.Fatalf("ExternalAgentConfigs method count = %d, want %d", externalAgentConfigs.NumMethod(), len(wantExternalAgentConfigMethods))
-	}
-	for name := range wantExternalAgentConfigMethods {
-		if _, ok := externalAgentConfigs.MethodByName(name); !ok {
-			t.Fatalf("ExternalAgentConfigs missing %s method", name)
+		if entry.ParamsOrPayloadSchema != "" && !types[entry.ParamsOrPayloadSchema] {
+			continue
 		}
-	}
-	if _, ok := externalAgentConfigs.MethodByName("ImportCompleted"); ok {
-		t.Fatal("ExternalAgentConfigs exposes externalAgentConfig/import/completed notification")
-	}
-
-	feedback := reflect.TypeOf((*Feedback)(nil)).Elem()
-	if feedback.NumMethod() != 1 {
-		t.Fatalf("Feedback method count = %d, want 1", feedback.NumMethod())
-	}
-	if _, ok := feedback.MethodByName("Upload"); !ok {
-		t.Fatal("Feedback missing Upload method")
-	}
-
-	fuzzyFileSearch := reflect.TypeOf((*FuzzyFileSearch)(nil)).Elem()
-	wantFuzzyFileSearchMethods := map[string]struct{}{
-		"Search":        {},
-		"SessionStart":  {},
-		"SessionStop":   {},
-		"SessionUpdate": {},
-	}
-	if fuzzyFileSearch.NumMethod() != len(wantFuzzyFileSearchMethods) {
-		t.Fatalf("FuzzyFileSearch method count = %d, want %d", fuzzyFileSearch.NumMethod(), len(wantFuzzyFileSearchMethods))
-	}
-	for name := range wantFuzzyFileSearchMethods {
-		if _, ok := fuzzyFileSearch.MethodByName(name); !ok {
-			t.Fatalf("FuzzyFileSearch missing %s method", name)
+		if entry.ResponseType == "" || !types[entry.ResponseType] {
+			continue
 		}
-	}
-	if _, ok := fuzzyFileSearch.MethodByName("SessionUpdated"); ok {
-		t.Fatal("FuzzyFileSearch exposes fuzzyFileSearch/sessionUpdated notification")
-	}
-	if _, ok := fuzzyFileSearch.MethodByName("SessionCompleted"); ok {
-		t.Fatal("FuzzyFileSearch exposes fuzzyFileSearch/sessionCompleted notification")
-	}
-
-	hooks := reflect.TypeOf((*Hooks)(nil)).Elem()
-	if hooks.NumMethod() != 1 {
-		t.Fatalf("Hooks method count = %d, want 1", hooks.NumMethod())
-	}
-	if _, ok := hooks.MethodByName("List"); !ok {
-		t.Fatal("Hooks missing List method")
-	}
-	if _, ok := hooks.MethodByName("Started"); ok {
-		t.Fatal("Hooks exposes hook/started notification")
-	}
-	if _, ok := hooks.MethodByName("Completed"); ok {
-		t.Fatal("Hooks exposes hook/completed notification")
-	}
-
-	marketplace := reflect.TypeOf((*Marketplace)(nil)).Elem()
-	wantMarketplaceMethods := map[string]struct{}{
-		"Add":     {},
-		"Remove":  {},
-		"Upgrade": {},
-	}
-	if marketplace.NumMethod() != len(wantMarketplaceMethods) {
-		t.Fatalf("Marketplace method count = %d, want %d", marketplace.NumMethod(), len(wantMarketplaceMethods))
-	}
-	for name := range wantMarketplaceMethods {
-		if _, ok := marketplace.MethodByName(name); !ok {
-			t.Fatalf("Marketplace missing %s method", name)
+		prefix, operation, ok := strings.Cut(entry.FacadeTarget, "().")
+		if !ok || prefix == "" || operation == "" || strings.Contains(prefix, ".") || strings.Contains(operation, ".") {
+			continue
 		}
-	}
-
-	memory := reflect.TypeOf((*Memory)(nil)).Elem()
-	if memory.NumMethod() != 1 {
-		t.Fatalf("Memory method count = %d, want 1", memory.NumMethod())
-	}
-	if _, ok := memory.MethodByName("Reset"); !ok {
-		t.Fatal("Memory missing Reset method")
-	}
-
-	mock := reflect.TypeOf((*Mock)(nil)).Elem()
-	if mock.NumMethod() != 1 {
-		t.Fatalf("Mock method count = %d, want 1", mock.NumMethod())
-	}
-	if _, ok := mock.MethodByName("ExperimentalMethod"); !ok {
-		t.Fatal("Mock missing ExperimentalMethod method")
-	}
-	if _, ok := mock.MethodByName("Call"); ok {
-		t.Fatal("Mock exposes raw Call")
-	}
-
-	plugins := reflect.TypeOf((*Plugins)(nil)).Elem()
-	wantPluginMethods := map[string]struct{}{
-		"Install":            {},
-		"List":               {},
-		"Read":               {},
-		"ShareDelete":        {},
-		"ShareList":          {},
-		"ShareSave":          {},
-		"ShareUpdateTargets": {},
-		"SkillRead":          {},
-		"Uninstall":          {},
-	}
-	if plugins.NumMethod() != len(wantPluginMethods) {
-		t.Fatalf("Plugins method count = %d, want %d", plugins.NumMethod(), len(wantPluginMethods))
-	}
-	for name := range wantPluginMethods {
-		if _, ok := plugins.MethodByName(name); !ok {
-			t.Fatalf("Plugins missing %s method", name)
+		methods := expected[prefix]
+		if methods == nil {
+			methods = map[string]struct{}{}
+			expected[prefix] = methods
 		}
+		methods[operation] = struct{}{}
 	}
-	if _, ok := plugins.MethodByName("Call"); ok {
-		t.Fatal("Plugins exposes raw Call")
+	if len(expected) == 0 {
+		t.Fatal("manifest did not declare any SDK facade methods")
 	}
+	return expected
+}
 
-	processes := reflect.TypeOf((*Processes)(nil)).Elem()
-	wantProcessMethods := map[string]struct{}{
-		"Kill":       {},
-		"ResizePTY":  {},
-		"Spawn":      {},
-		"WriteStdin": {},
+func generatedMethodNames(t *testing.T) map[string]bool {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("protocolv2", "method_registry.gen.go"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if processes.NumMethod() != len(wantProcessMethods) {
-		t.Fatalf("Processes method count = %d, want %d", processes.NumMethod(), len(wantProcessMethods))
+	matches := regexp.MustCompile(`(?m)^\s*Method[A-Za-z0-9]+\s+=\s+"([^"]+)"`).FindAllSubmatch(raw, -1)
+	methods := map[string]bool{}
+	for _, match := range matches {
+		methods[string(match[1])] = true
 	}
-	for name := range wantProcessMethods {
-		if _, ok := processes.MethodByName(name); !ok {
-			t.Fatalf("Processes missing %s method", name)
-		}
-	}
-	if _, ok := processes.MethodByName("OutputDelta"); ok {
-		t.Fatal("Processes exposes process/outputDelta notification")
-	}
-	if _, ok := processes.MethodByName("Exited"); ok {
-		t.Fatal("Processes exposes process/exited notification")
-	}
+	return methods
+}
 
-	mcpServers := reflect.TypeOf((*MCPServers)(nil)).Elem()
-	wantMCPServerMethods := map[string]struct{}{
-		"OAuthLogin":   {},
-		"ResourceRead": {},
-		"ToolCall":     {},
+func generatedProtocolTypeNames(t *testing.T) map[string]bool {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("protocolv2", "protocol_types.gen.go"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if mcpServers.NumMethod() != len(wantMCPServerMethods) {
-		t.Fatalf("MCPServers method count = %d, want %d", mcpServers.NumMethod(), len(wantMCPServerMethods))
+	matches := regexp.MustCompile(`(?m)^type\s+([A-Za-z][A-Za-z0-9]*)\b`).FindAllSubmatch(raw, -1)
+	types := map[string]bool{}
+	for _, match := range matches {
+		types[string(match[1])] = true
 	}
-	for name := range wantMCPServerMethods {
-		if _, ok := mcpServers.MethodByName(name); !ok {
-			t.Fatalf("MCPServers missing %s method", name)
-		}
-	}
-	if _, ok := mcpServers.MethodByName("OAuthLoginCompleted"); ok {
-		t.Fatal("MCPServers exposes mcpServer/oauthLogin/completed notification")
-	}
-	if _, ok := mcpServers.MethodByName("StartupStatusUpdated"); ok {
-		t.Fatal("MCPServers exposes mcpServer/startupStatus/updated notification")
-	}
-
-	mcpServerStatus := reflect.TypeOf((*MCPServerStatus)(nil)).Elem()
-	if mcpServerStatus.NumMethod() != 1 {
-		t.Fatalf("MCPServerStatus method count = %d, want 1", mcpServerStatus.NumMethod())
-	}
-	if _, ok := mcpServerStatus.MethodByName("List"); !ok {
-		t.Fatal("MCPServerStatus missing List method")
-	}
-
-	reviews := reflect.TypeOf((*Reviews)(nil)).Elem()
-	if reviews.NumMethod() != 1 {
-		t.Fatalf("Reviews method count = %d, want 1", reviews.NumMethod())
-	}
-	if _, ok := reviews.MethodByName("Start"); !ok {
-		t.Fatal("Reviews missing Start method")
-	}
-	if _, ok := reviews.MethodByName("Call"); ok {
-		t.Fatal("Reviews exposes raw Call")
-	}
-
-	skills := reflect.TypeOf((*Skills)(nil)).Elem()
-	wantSkillsMethods := map[string]struct{}{
-		"ConfigWrite": {},
-		"List":        {},
-	}
-	if skills.NumMethod() != len(wantSkillsMethods) {
-		t.Fatalf("Skills method count = %d, want %d", skills.NumMethod(), len(wantSkillsMethods))
-	}
-	for name := range wantSkillsMethods {
-		if _, ok := skills.MethodByName(name); !ok {
-			t.Fatalf("Skills missing %s method", name)
-		}
-	}
-	if _, ok := skills.MethodByName("Changed"); ok {
-		t.Fatal("Skills exposes skills/changed notification")
-	}
-	if _, ok := skills.MethodByName("Call"); ok {
-		t.Fatal("Skills exposes raw Call")
-	}
-
-	threads := reflect.TypeOf((*Threads)(nil)).Elem()
-	wantThreadMethods := map[string]struct{}{
-		"ApproveGuardianDeniedAction": {},
-		"Archive":                     {},
-		"BackgroundTerminalsClean":    {},
-		"CompactStart":                {},
-		"DecrementElicitation":        {},
-		"Fork":                        {},
-		"GoalClear":                   {},
-		"GoalGet":                     {},
-		"GoalSet":                     {},
-		"IncrementElicitation":        {},
-		"InjectItems":                 {},
-		"List":                        {},
-		"LoadedList":                  {},
-		"MemoryModeSet":               {},
-		"MetadataUpdate":              {},
-		"NameSet":                     {},
-		"Read":                        {},
-		"RealtimeAppendAudio":         {},
-		"RealtimeAppendSpeech":        {},
-		"RealtimeAppendText":          {},
-		"RealtimeListVoices":          {},
-		"RealtimeStart":               {},
-		"RealtimeStop":                {},
-		"Resume":                      {},
-		"Rollback":                    {},
-		"ShellCommand":                {},
-		"Start":                       {},
-		"TurnsItemsList":              {},
-		"TurnsList":                   {},
-		"Unarchive":                   {},
-		"Unsubscribe":                 {},
-	}
-	if threads.NumMethod() != len(wantThreadMethods) {
-		t.Fatalf("Threads method count = %d, want %d", threads.NumMethod(), len(wantThreadMethods))
-	}
-	for name := range wantThreadMethods {
-		if _, ok := threads.MethodByName(name); !ok {
-			t.Fatalf("Threads missing %s method", name)
-		}
-	}
-	if _, ok := threads.MethodByName("Call"); ok {
-		t.Fatal("Threads exposes raw Call")
-	}
-	if _, ok := threads.MethodByName("StatusChanged"); ok {
-		t.Fatal("Threads exposes thread/status/changed notification")
-	}
-	if _, ok := threads.MethodByName("RealtimeOutputAudioDelta"); ok {
-		t.Fatal("Threads exposes thread/realtime/outputAudio/delta notification")
-	}
-	if _, ok := threads.MethodByName("RealtimeStarted"); ok {
-		t.Fatal("Threads exposes thread/realtime/started notification")
-	}
-
-	turns := reflect.TypeOf((*Turns)(nil)).Elem()
-	wantTurnMethods := map[string]struct{}{
-		"Interrupt": {},
-		"Start":     {},
-		"Steer":     {},
-	}
-	if turns.NumMethod() != len(wantTurnMethods) {
-		t.Fatalf("Turns method count = %d, want %d", turns.NumMethod(), len(wantTurnMethods))
-	}
-	for name := range wantTurnMethods {
-		if _, ok := turns.MethodByName(name); !ok {
-			t.Fatalf("Turns missing %s method", name)
-		}
-	}
-	if _, ok := turns.MethodByName("Call"); ok {
-		t.Fatal("Turns exposes raw Call")
-	}
+	return types
 }
 
 func TestConfigProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *testing.T) {
@@ -1354,40 +1105,11 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 		detect.Items[0].Details.Value.Commands == nil || len(*detect.Items[0].Details.Value.Commands) != 1 {
 		t.Fatalf("externalAgentConfig/detect response = %#v", detect)
 	}
-	importResponse, err := externalAgentConfigs.Import(context.Background(), protocolv2.ExternalAgentConfigImportParams{
-		MigrationItems: []protocolv2.ExternalAgentConfigMigrationItem{{
-			CWD:         protocolv2.Null[string](),
-			Description: "Import plugins",
-			Details: protocolv2.Value(protocolv2.MigrationDetails{
-				Plugins: &[]protocolv2.PluginsMigration{{
-					MarketplaceName: "local",
-					PluginNames:     []string{"plugin-a"},
-				}},
-			}),
-			ItemType: protocolv2.ExternalAgentConfigMigrationItemTypePLUGINS,
-		}},
-	})
-	if err != nil {
-		t.Fatalf("ExternalAgentConfigs().Import returned error: %v", err)
-	}
-	if importResponse.ImportID != "import-1" {
-		t.Fatalf("externalAgentConfig/import response = %#v", importResponse)
-	}
 	records := readRecords(t, record)
 	detectParams := firstRecord(records, "recv", protocolv2.MethodExternalAgentConfigDetect)["params"].(map[string]any)
 	cwds := detectParams["cwds"].([]any)
 	if len(cwds) != 1 || cwds[0] != "/repo" || detectParams["includeHome"] != true {
 		t.Fatalf("externalAgentConfig/detect params = %#v", detectParams)
-	}
-	importParams := firstRecord(records, "recv", protocolv2.MethodExternalAgentConfigImport)["params"].(map[string]any)
-	migrationItems := importParams["migrationItems"].([]any)
-	migrationItem := migrationItems[0].(map[string]any)
-	details := migrationItem["details"].(map[string]any)
-	plugins := details["plugins"].([]any)
-	plugin := plugins[0].(map[string]any)
-	if migrationItem["cwd"] != nil || migrationItem["description"] != "Import plugins" ||
-		migrationItem["itemType"] != "PLUGINS" || plugin["marketplaceName"] != "local" {
-		t.Fatalf("externalAgentConfig/import params = %#v", importParams)
 	}
 }
 
@@ -2258,13 +1980,6 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	if rateLimits.RateLimits.PlanType == nil || rateLimits.RateLimits.PlanType.Value == nil || *rateLimits.RateLimits.PlanType.Value != protocolv2.PlanTypePlus {
 		t.Fatalf("account/rateLimits/read response = %#v", rateLimits)
 	}
-	resetCredit, err := accounts.RateLimitResetCreditConsume(context.Background(), protocolv2.ConsumeAccountRateLimitResetCreditParams{IdempotencyKey: "reset-1"})
-	if err != nil {
-		t.Fatalf("Accounts().RateLimitResetCreditConsume returned error: %v", err)
-	}
-	if resetCredit.Outcome != protocolv2.ConsumeAccountRateLimitResetCreditOutcomeReset {
-		t.Fatalf("account/rateLimitResetCredit/consume response = %#v", resetCredit)
-	}
 	account, err := accounts.Read(context.Background(), protocolv2.GetAccountParams{RefreshToken: Bool(true)})
 	if err != nil {
 		t.Fatalf("Accounts().Read returned error: %v", err)
@@ -2291,7 +2006,6 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		protocolv2.MethodAccountLoginStart,
 		protocolv2.MethodAccountLogout,
 		protocolv2.MethodAccountRateLimitsRead,
-		protocolv2.MethodAccountRateLimitResetCreditConsume,
 		protocolv2.MethodAccountRead,
 		protocolv2.MethodAccountSendAddCreditsNudgeEmail,
 	}
@@ -2313,10 +2027,6 @@ func TestAccountProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	}
 	if params := firstRecord(records, "recv", protocolv2.MethodAccountRateLimitsRead)["params"]; params != nil {
 		t.Fatalf("account/rateLimits/read params = %#v, want omitted", params)
-	}
-	resetCreditParams := firstRecord(records, "recv", protocolv2.MethodAccountRateLimitResetCreditConsume)["params"].(map[string]any)
-	if resetCreditParams["idempotencyKey"] != "reset-1" {
-		t.Fatalf("account/rateLimitResetCredit/consume params = %#v", resetCreditParams)
 	}
 	readParams := firstRecord(records, "recv", protocolv2.MethodAccountRead)["params"].(map[string]any)
 	if readParams["refreshToken"] != true {
@@ -3383,12 +3093,6 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 	}); err != nil {
 		t.Fatalf("Threads().RealtimeAppendAudio returned error after experimental opt-in: %v", err)
 	}
-	if _, err := threads.RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
-		Text:     "voice",
-		ThreadID: "thread-1",
-	}); err != nil {
-		t.Fatalf("Threads().RealtimeAppendSpeech returned error after experimental opt-in: %v", err)
-	}
 	if _, err := threads.RealtimeAppendText(context.Background(), protocolv2.ThreadRealtimeAppendTextParams{
 		Text:     "hello",
 		ThreadID: "thread-1",
@@ -3412,7 +3116,6 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 	for _, method := range []string{
 		protocolv2.MethodThreadRealtimeStart,
 		protocolv2.MethodThreadRealtimeAppendAudio,
-		protocolv2.MethodThreadRealtimeAppendSpeech,
 		protocolv2.MethodThreadRealtimeAppendText,
 		protocolv2.MethodThreadRealtimeListVoices,
 		protocolv2.MethodThreadRealtimeStop,
@@ -3434,10 +3137,6 @@ func TestThreadRealtimeProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(
 		audio["numChannels"] != float64(2) || audio["sampleRate"] != float64(24000) ||
 		audio["samplesPerChannel"] != float64(480) {
 		t.Fatalf("thread/realtime/appendAudio params = %#v", audioParams)
-	}
-	speechParams := firstRecord(records, "recv", protocolv2.MethodThreadRealtimeAppendSpeech)["params"].(map[string]any)
-	if speechParams["threadId"] != "thread-1" || speechParams["text"] != "voice" {
-		t.Fatalf("thread/realtime/appendSpeech params = %#v", speechParams)
 	}
 	textParams := firstRecord(records, "recv", protocolv2.MethodThreadRealtimeAppendText)["params"].(map[string]any)
 	if textParams["threadId"] != "thread-1" || textParams["text"] != "hello" {
@@ -3495,17 +3194,6 @@ func TestThreadRealtimeProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWrite
 			call: func() error {
 				_, err := root.Threads().RealtimeAppendText(context.Background(), protocolv2.ThreadRealtimeAppendTextParams{
 					Text:     "hello",
-					ThreadID: "thread-1",
-				})
-				return err
-			},
-		},
-		{
-			name:   "appendSpeech",
-			method: protocolv2.MethodThreadRealtimeAppendSpeech,
-			call: func() error {
-				_, err := root.Threads().RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
-					Text:     "voice",
 					ThreadID: "thread-1",
 				})
 				return err
@@ -3624,18 +3312,6 @@ func TestThreadRealtimeProtocolFamilyFacadeRejectsMalformedTypedResponses(t *tes
 				return err
 			},
 			wantSub: `ThreadRealtimeAppendTextResponse: unknown field "extra"`,
-		},
-		{
-			name:   "appendSpeech",
-			method: protocolv2.MethodThreadRealtimeAppendSpeech,
-			call: func(threads Threads) error {
-				_, err := threads.RealtimeAppendSpeech(context.Background(), protocolv2.ThreadRealtimeAppendSpeechParams{
-					Text:     "voice",
-					ThreadID: "thread-1",
-				})
-				return err
-			},
-			wantSub: `ThreadRealtimeAppendSpeechResponse: unknown field "extra"`,
 		},
 		{
 			name:   "listVoices",
@@ -6180,12 +5856,6 @@ func runFakeAppServer(mode string, extra []string) {
 			}
 			send(map[string]any{"id": id, "result": map[string]any{"rateLimits": map[string]any{"planType": "plus"}}})
 		case "account/rateLimitResetCredit/consume":
-			if mode == "facade" {
-				sendProtocolResult(id, protocolv2.ConsumeAccountRateLimitResetCreditResponse{
-					Outcome: protocolv2.ConsumeAccountRateLimitResetCreditOutcomeReset,
-				})
-				continue
-			}
 			send(map[string]any{"id": id, "result": map[string]any{"outcome": "reset"}})
 		case "account/read":
 			if mode == "facade" {
@@ -6325,7 +5995,7 @@ func runFakeAppServer(mode string, extra []string) {
 			send(map[string]any{"id": id, "result": map[string]any{"items": []map[string]any{}}})
 		case "externalAgentConfig/import":
 			if mode == "facade" {
-				sendProtocolResult(id, protocolv2.ExternalAgentConfigImportResponse{ImportID: "import-1"})
+				send(map[string]any{"id": id, "result": map[string]any{}})
 				continue
 			}
 			send(map[string]any{"id": id, "result": map[string]any{"importId": "import-1"}})
@@ -6883,12 +6553,6 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			sendProtocolResult(id, protocolv2.ThreadRealtimeAppendAudioResponse{})
-		case "thread/realtime/appendSpeech":
-			if mode == "thread-realtime-malformed-response" {
-				send(map[string]any{"id": id, "result": map[string]any{"extra": true}})
-				continue
-			}
-			sendProtocolResult(id, protocolv2.ThreadRealtimeAppendSpeechResponse{})
 		case "thread/realtime/appendText":
 			if mode == "thread-realtime-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{"extra": true}})

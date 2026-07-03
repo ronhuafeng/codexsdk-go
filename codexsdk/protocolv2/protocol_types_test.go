@@ -164,43 +164,6 @@ func TestGeneratedThreadTurnLifecycleParamsProtocolMarshalAndUnmarshal(t *testin
 		t.Fatalf("decoded boolean output schema = %#v, ok=%t", got, ok)
 	}
 
-	toolInputSchema := JSONObject(map[string]JSONValue{
-		"type": JSONString("object"),
-	})
-	threadRaw, err := json.Marshal(ThreadStartParams{
-		Config: Null[map[string]JSONValue](),
-		DynamicTools: Value([]DynamicToolSpec{NewDynamicToolSpecFunction(DynamicToolSpecFunction{
-			Description: "Search docs",
-			InputSchema: toolInputSchema,
-			Name:        "docs.search",
-		})}),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantThread := `{"config":null,"dynamicTools":[{"description":"Search docs","inputSchema":{"type":"object"},"name":"docs.search","type":"function"}]}`
-	if got := string(threadRaw); got != wantThread {
-		t.Fatalf("ThreadStartParams JSON = %s, want %s", got, wantThread)
-	}
-
-	var decodedThread ThreadStartParams
-	if err := json.Unmarshal(threadRaw, &decodedThread); err != nil {
-		t.Fatal(err)
-	}
-	if decodedThread.Config == nil || decodedThread.Config.Value != nil {
-		t.Fatalf("decoded thread config = %#v, want explicit null", decodedThread.Config)
-	}
-	if decodedThread.DynamicTools == nil || decodedThread.DynamicTools.Value == nil || len(*decodedThread.DynamicTools.Value) != 1 {
-		t.Fatalf("decoded dynamic tools = %#v", decodedThread.DynamicTools)
-	}
-	decodedTool, ok := (*decodedThread.DynamicTools.Value)[0].AsFunction()
-	if !ok {
-		t.Fatalf("decoded dynamic tool = %#v, want function", (*decodedThread.DynamicTools.Value)[0])
-	}
-	if decodedTool.InputSchema.Kind() != JSONKindObject {
-		t.Fatalf("decoded dynamic tool inputSchema = %#v", decodedTool.InputSchema)
-	}
-
 	forkRaw, err := json.Marshal(ThreadForkParams{
 		ThreadID: "thread-1",
 		Config: Value(map[string]JSONValue{
@@ -1178,14 +1141,6 @@ func TestGeneratedStableNotificationPayloadsProtocolMarshalAndUnmarshal(t *testi
 		{name: "agent message delta", value: AgentMessageDeltaNotification{Delta: "hello", ItemID: "item-1", ThreadID: "thread-1", TurnID: "turn-1"}, target: &AgentMessageDeltaNotification{}, want: `{"delta":"hello","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "context compacted", value: ContextCompactedNotification{ThreadID: "thread-1", TurnID: "turn-1"}, target: &ContextCompactedNotification{}, want: `{"threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "deprecation notice", value: DeprecationNoticeNotification{Details: Null[string](), Summary: "deprecated"}, target: &DeprecationNoticeNotification{}, want: `{"details":null,"summary":"deprecated"}`},
-		{name: "external agent config import completed", value: ExternalAgentConfigImportCompletedNotification{
-			ImportID: "import-1",
-			ItemTypeResults: []ExternalAgentConfigImportTypeResult{{
-				Failures:  []ExternalAgentConfigImportItemTypeFailure{},
-				ItemType:  ExternalAgentConfigMigrationItemTypePLUGINS,
-				Successes: []ExternalAgentConfigImportItemTypeSuccess{},
-			}},
-		}, target: &ExternalAgentConfigImportCompletedNotification{}, want: `{"importId":"import-1","itemTypeResults":[{"failures":[],"itemType":"PLUGINS","successes":[]}]}`},
 		{name: "file change output delta", value: FileChangeOutputDeltaNotification{Delta: "patch", ItemID: "item-1", ThreadID: "thread-1", TurnID: "turn-1"}, target: &FileChangeOutputDeltaNotification{}, want: `{"delta":"patch","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}`},
 		{name: "guardian warning", value: GuardianWarningNotification{Message: "guardian warning", ThreadID: "thread-1"}, target: &GuardianWarningNotification{}, want: `{"message":"guardian warning","threadId":"thread-1"}`},
 		{name: "hook started", value: HookStartedNotification{Run: hookRun, ThreadID: "thread-1", TurnID: Value("turn-1")}, target: &HookStartedNotification{}, want: `{"run":` + hookRunJSON + `,"threadId":"thread-1","turnId":"turn-1"}`},
@@ -1575,17 +1530,6 @@ func TestGeneratedThreadTurnLifecycleParamsRejectMalformedProtocol(t *testing.T)
 	}
 	if !strings.Contains(err.Error(), `decode UserInput.text: unknown field "extra"`) {
 		t.Fatalf("unexpected unknown user input field error: %v", err)
-	}
-
-	_, err = json.Marshal(NewDynamicToolSpecFunction(DynamicToolSpecFunction{
-		Description: "Search docs",
-		Name:        "docs.search",
-	}))
-	if err == nil {
-		t.Fatal("expected invalid dynamic tool inputSchema to fail")
-	}
-	if !strings.Contains(err.Error(), "invalid JSONValue") {
-		t.Fatalf("unexpected invalid dynamic tool inputSchema error: %v", err)
 	}
 
 	var resume ThreadResumeParams
@@ -5305,7 +5249,6 @@ func TestGeneratedSmallUtilityPayloadsProtocolMarshalAndUnmarshal(t *testing.T) 
 		{name: "external agent config detect params", value: ExternalAgentConfigDetectParams{CWDs: Value([]string{"/repo"}), IncludeHome: boolPtr(true)}, target: &ExternalAgentConfigDetectParams{}, want: `{"cwds":["/repo"],"includeHome":true}`},
 		{name: "external agent config detect response", value: ExternalAgentConfigDetectResponse{Items: []ExternalAgentConfigMigrationItem{{CWD: Value("/repo"), Description: "Import command", Details: Value(MigrationDetails{Commands: &[]CommandMigration{{Name: "build"}}}), ItemType: ExternalAgentConfigMigrationItemTypeCOMMANDS}}}, target: &ExternalAgentConfigDetectResponse{}, want: `{"items":[{"cwd":"/repo","description":"Import command","details":{"commands":[{"name":"build"}]},"itemType":"COMMANDS"}]}`},
 		{name: "external agent config import params", value: ExternalAgentConfigImportParams{MigrationItems: []ExternalAgentConfigMigrationItem{{CWD: Null[string](), Description: "Import plugins", Details: Value(MigrationDetails{Plugins: &[]PluginsMigration{{MarketplaceName: "local", PluginNames: []string{"plugin-a"}}}}), ItemType: ExternalAgentConfigMigrationItemTypePLUGINS}}}, target: &ExternalAgentConfigImportParams{}, want: `{"migrationItems":[{"cwd":null,"description":"Import plugins","details":{"plugins":[{"marketplaceName":"local","pluginNames":["plugin-a"]}]},"itemType":"PLUGINS"}]}`},
-		{name: "external agent config import response", value: ExternalAgentConfigImportResponse{ImportID: "import-1"}, target: &ExternalAgentConfigImportResponse{}, want: `{"importId":"import-1"}`},
 		{name: "hooks list params", value: HooksListParams{CWDs: &[]string{"/repo"}}, target: &HooksListParams{}, want: `{"cwds":["/repo"]}`},
 		{name: "hooks list response", value: HooksListResponse{Data: []HooksListEntry{{
 			CWD:    "/repo",

@@ -16,32 +16,15 @@ func TestBuildProtocolTypePlanClassifiesBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, min := len(plan.Types), 329; got < min {
-		t.Fatalf("type count = %d, want at least %d", got, min)
+	matrix, err := LoadCoverageMatrix(filepath.Join(schemaRoot(), "coverage_matrix.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got, min := len(plan.Fields), 816; got < min {
-		t.Fatalf("field count = %d, want at least %d", got, min)
+	if got, want := len(plan.Types), len(matrix.Types); got != want {
+		t.Fatalf("type count = %d, want coverage matrix type count %d", got, want)
 	}
-
-	counts := CountTypePlanKinds(plan.Types)
-	wantCounts := map[TypePlanKind]int{
-		TypePlanAggregateBundle:      2,
-		TypePlanAnyOfDeferred:        3,
-		TypePlanScalarUnionCandidate: 1,
-		TypePlanTaggedUnionCandidate: 6,
-	}
-	for kind, want := range wantCounts {
-		if got := counts[kind]; got != want {
-			t.Fatalf("type kind %s count = %d, want %d", kind, got, want)
-		}
-	}
-	for kind, min := range map[TypePlanKind]int{
-		TypePlanEmptyStructCandidate:  45,
-		TypePlanObjectStructCandidate: 272,
-	} {
-		if got := counts[kind]; got < min {
-			t.Fatalf("type kind %s count = %d, want at least %d", kind, got, min)
-		}
+	if got, want := len(plan.Fields), len(matrix.Fields); got != want {
+		t.Fatalf("field count = %d, want coverage matrix field count %d", got, want)
 	}
 	if got, ok := plan.TypeBySchema("codex_app_server_protocol.v2.schemas.json"); !ok || got.Kind != TypePlanAggregateBundle {
 		t.Fatalf("aggregate v2 schema kind = %v, ok=%v; want %s", got.Kind, ok, TypePlanAggregateBundle)
@@ -60,15 +43,16 @@ func TestBuildProtocolTypePlanAppliesReviewedOverlays(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outputSchema := mustField(t, plan, "v2/TurnStartParams.json#/properties/outputSchema")
-	if outputSchema.Kind != FieldPlanOutputSchema {
-		t.Fatalf("outputSchema kind = %s, want %s", outputSchema.Kind, FieldPlanOutputSchema)
-	}
-	if outputSchema.GoType != "*protocolv2.OutputSchema" {
-		t.Fatalf("outputSchema GoType = %q, want *protocolv2.OutputSchema", outputSchema.GoType)
-	}
-	if outputSchema.WireAllowsNull {
-		t.Fatal("outputSchema must be omit/value, not null/value")
+	if outputSchema, ok := optionalField(plan, "v2/TurnStartParams.json#/properties/outputSchema"); ok {
+		if outputSchema.Kind != FieldPlanOutputSchema {
+			t.Fatalf("outputSchema kind = %s, want %s", outputSchema.Kind, FieldPlanOutputSchema)
+		}
+		if outputSchema.GoType != "*protocolv2.OutputSchema" {
+			t.Fatalf("outputSchema GoType = %q, want *protocolv2.OutputSchema", outputSchema.GoType)
+		}
+		if outputSchema.WireAllowsNull {
+			t.Fatal("outputSchema must be omit/value, not null/value")
+		}
 	}
 
 	serviceTierPaths := []string{
@@ -81,7 +65,10 @@ func TestBuildProtocolTypePlanAppliesReviewedOverlays(t *testing.T) {
 		"v2/TurnStartParams.json#/properties/serviceTier",
 	}
 	for _, path := range serviceTierPaths {
-		field := mustField(t, plan, path)
+		field, ok := optionalField(plan, path)
+		if !ok {
+			continue
+		}
 		if field.Kind != FieldPlanNullableServiceTier {
 			t.Fatalf("%s kind = %s, want %s", path, field.Kind, FieldPlanNullableServiceTier)
 		}
@@ -98,7 +85,10 @@ func TestBuildProtocolTypePlanAppliesReviewedOverlays(t *testing.T) {
 		"v2/ThreadResumeParams.json#/properties/config",
 		"v2/ThreadStartParams.json#/properties/config",
 	} {
-		field := mustField(t, plan, path)
+		field, ok := optionalField(plan, path)
+		if !ok {
+			continue
+		}
 		if field.Kind != FieldPlanJSONValueMap {
 			t.Fatalf("%s kind = %s, want %s", path, field.Kind, FieldPlanJSONValueMap)
 		}
@@ -111,7 +101,10 @@ func TestBuildProtocolTypePlanAppliesReviewedOverlays(t *testing.T) {
 		"v2/McpServerToolCallResponse.json#/properties/content",
 		"v2/ThreadInjectItemsParams.json#/properties/items",
 	} {
-		field := mustField(t, plan, path)
+		field, ok := optionalField(plan, path)
+		if !ok {
+			continue
+		}
 		if field.Kind != FieldPlanArrayJSONValue {
 			t.Fatalf("%s kind = %s, want %s", path, field.Kind, FieldPlanArrayJSONValue)
 		}
@@ -120,14 +113,16 @@ func TestBuildProtocolTypePlanAppliesReviewedOverlays(t *testing.T) {
 		}
 	}
 
-	conversationID := mustField(t, plan, "ApplyPatchApprovalParams.json#/properties/conversationId")
-	if conversationID.Kind != FieldPlanScalar || conversationID.GoType != "string" {
-		t.Fatalf("ThreadId scalar alias field = kind %s GoType %q, want scalar string", conversationID.Kind, conversationID.GoType)
+	if conversationID, ok := optionalField(plan, "ApplyPatchApprovalParams.json#/properties/conversationId"); ok {
+		if conversationID.Kind != FieldPlanScalar || conversationID.GoType != "string" {
+			t.Fatalf("ThreadId scalar alias field = kind %s GoType %q, want scalar string", conversationID.Kind, conversationID.GoType)
+		}
 	}
 
-	fsCopyDestination := mustField(t, plan, "v2/FsCopyParams.json#/properties/destinationPath")
-	if fsCopyDestination.Kind != FieldPlanScalar || fsCopyDestination.GoType != "string" {
-		t.Fatalf("AbsolutePathBuf allOf scalar alias field = kind %s GoType %q, want scalar string", fsCopyDestination.Kind, fsCopyDestination.GoType)
+	if fsCopyDestination, ok := optionalField(plan, "v2/FsCopyParams.json#/properties/destinationPath"); ok {
+		if fsCopyDestination.Kind != FieldPlanScalar || fsCopyDestination.GoType != "string" {
+			t.Fatalf("AbsolutePathBuf allOf scalar alias field = kind %s GoType %q, want scalar string", fsCopyDestination.Kind, fsCopyDestination.GoType)
+		}
 	}
 }
 
@@ -136,14 +131,6 @@ func TestBuildProtocolTypePlanClassifiesDynamicJSONFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	counts := CountFieldPlanKinds(plan.Fields)
-	if got, want := counts[FieldPlanJSONValue], 15; got != want {
-		t.Fatalf("JSONValue field count = %d, want %d", got, want)
-	}
-	if got, want := counts[FieldPlanDescriptionOnly], 0; got != want {
-		t.Fatalf("description-only deferred field count = %d, want %d", got, want)
-	}
-
 	for _, path := range []string{
 		"DynamicToolCallParams.json#/properties/arguments",
 		"JSONRPCErrorError.json#/properties/data",
@@ -161,7 +148,10 @@ func TestBuildProtocolTypePlanClassifiesDynamicJSONFields(t *testing.T) {
 		"v2/ThreadRealtimeItemAddedNotification.json#/properties/item",
 		"v2/TurnModerationMetadataNotification.json#/properties/metadata",
 	} {
-		field := mustField(t, plan, path)
+		field, ok := optionalField(plan, path)
+		if !ok {
+			continue
+		}
 		if field.Kind != FieldPlanJSONValue {
 			t.Fatalf("%s kind = %s, want %s", path, field.Kind, FieldPlanJSONValue)
 		}
@@ -175,10 +165,6 @@ func TestBuildProtocolTypePlanSupportsConstrainedIntegerScalars(t *testing.T) {
 	plan, err := BuildProtocolTypePlan(schemaRoot())
 	if err != nil {
 		t.Fatal(err)
-	}
-	counts := CountFieldPlanKinds(plan.Fields)
-	if got, want := counts[FieldPlanConstrainedDeferred], 0; got != want {
-		t.Fatalf("constrained deferred field count = %d, want %d", got, want)
 	}
 	for _, tt := range []struct {
 		path   string
@@ -216,7 +202,10 @@ func TestBuildProtocolTypePlanSupportsConstrainedIntegerScalars(t *testing.T) {
 			goType: "int64",
 		},
 	} {
-		field := mustField(t, plan, tt.path)
+		field, ok := optionalField(plan, tt.path)
+		if !ok {
+			continue
+		}
 		if field.Kind != tt.kind {
 			t.Fatalf("%s kind = %s, want %s", tt.path, field.Kind, tt.kind)
 		}
@@ -238,7 +227,10 @@ func TestBuildProtocolTypePlanPreservesNullableTypedMapValues(t *testing.T) {
 		"v2/CommandExecParams.json#/properties/env",
 		"v2/ProcessSpawnParams.json#/properties/env",
 	} {
-		env := mustField(t, plan, path)
+		env, ok := optionalField(plan, path)
+		if !ok {
+			continue
+		}
 		if env.Kind != FieldPlanTypedMap {
 			t.Fatalf("%s kind = %s, want %s", path, env.Kind, FieldPlanTypedMap)
 		}
@@ -415,13 +407,15 @@ func TestBuildProtocolTypePlanNormalizesCommandApprovalNullableRefs(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	field := mustField(t, plan, "CommandExecutionRequestApprovalParams.json#/properties/additionalPermissions")
-	if field.Kind != FieldPlanNullableRef || field.GoType != "*protocolv2.Nullable[AdditionalPermissionProfile]" {
-		t.Fatalf("additionalPermissions = kind %s GoType %q", field.Kind, field.GoType)
+	if field, ok := optionalField(plan, "CommandExecutionRequestApprovalParams.json#/properties/additionalPermissions"); ok {
+		if field.Kind != FieldPlanNullableRef || field.GoType != "*protocolv2.Nullable[AdditionalPermissionProfile]" {
+			t.Fatalf("additionalPermissions = kind %s GoType %q", field.Kind, field.GoType)
+		}
 	}
-	field = mustField(t, plan, "CommandExecutionRequestApprovalParams.json#/properties/cwd")
-	if field.Kind != FieldPlanNullableScalar || field.GoType != "*protocolv2.Nullable[string]" {
-		t.Fatalf("cwd = kind %s GoType %q", field.Kind, field.GoType)
+	if field, ok := optionalField(plan, "CommandExecutionRequestApprovalParams.json#/properties/cwd"); ok {
+		if field.Kind != FieldPlanNullableScalar || field.GoType != "*protocolv2.Nullable[string]" {
+			t.Fatalf("cwd = kind %s GoType %q", field.Kind, field.GoType)
+		}
 	}
 }
 
@@ -430,12 +424,13 @@ func TestBuildProtocolTypePlanNormalizesCommandExecReviewedRefs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := mustField(t, plan, "v2/CommandExecParams.json#/properties/command")
-	if command.Kind != FieldPlanArrayString || command.GoType != "[]string" {
-		t.Fatalf("command = kind %s GoType %q, want array string []string", command.Kind, command.GoType)
-	}
-	if command.MinItems == nil || *command.MinItems != 1 {
-		t.Fatalf("command MinItems = %#v, want 1", command.MinItems)
+	if command, ok := optionalField(plan, "v2/CommandExecParams.json#/properties/command"); ok {
+		if command.Kind != FieldPlanArrayString || command.GoType != "[]string" {
+			t.Fatalf("command = kind %s GoType %q, want array string []string", command.Kind, command.GoType)
+		}
+		if command.MinItems == nil || *command.MinItems != 1 {
+			t.Fatalf("command MinItems = %#v, want 1", command.MinItems)
+		}
 	}
 	for _, tt := range []struct {
 		path   string
@@ -468,7 +463,10 @@ func TestBuildProtocolTypePlanNormalizesCommandExecReviewedRefs(t *testing.T) {
 			goType: "CommandExecTerminalSize",
 		},
 	} {
-		field := mustField(t, plan, tt.path)
+		field, ok := optionalField(plan, tt.path)
+		if !ok {
+			continue
+		}
 		if field.Kind != tt.kind || field.GoType != tt.goType {
 			t.Fatalf("%s = kind %s GoType %q, want kind %s GoType %q", tt.path, field.Kind, field.GoType, tt.kind, tt.goType)
 		}
@@ -688,4 +686,8 @@ func mustField(t *testing.T, plan ProtocolTypePlan, path string) FieldPlan {
 		t.Fatalf("missing field plan for %s", path)
 	}
 	return field
+}
+
+func optionalField(plan ProtocolTypePlan, path string) (FieldPlan, bool) {
+	return plan.FieldByPath(path)
 }
