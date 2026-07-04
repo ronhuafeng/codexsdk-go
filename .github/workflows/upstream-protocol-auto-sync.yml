@@ -39,6 +39,9 @@ env:
   CODEX_UPSTREAM_REPO: https://github.com/openai/codex.git
   CODEXSDK_AUTO_SYNC_DIR: .cache/codexsdk-auto-sync
   CODEXSDK_DRIFT_ARTIFACT_DIR: /tmp/codexsdk-upstream
+  CODEXSDK_GO_CACHE_DIR: .cache/go-build
+  CODEXSDK_GO_MOD_CACHE_DIR: .cache/go-mod
+  CODEXSDK_GO_PATH_DIR: .cache/go
   CODEXSDK_RUST_TARGET_DIR: .cache/cargo-target/codex
   CODEXSDK_SCHEMA_BASELINE: codexsdk/internal/protocolschema/appserver/v2
   CODEXSDK_SYNC_BRANCH_PREFIX: codex/sync-upstream
@@ -424,11 +427,25 @@ jobs:
             --upstream-ref-kind "${UPSTREAM_REF_KIND}" \
             --upstream-sha "${UPSTREAM_SHA}"
 
+      - name: Prepare Go validation cache for Codex repair
+        if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
+        env:
+          GOCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_CACHE_DIR }}
+          GOMODCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_MOD_CACHE_DIR }}
+          GOPATH: ${{ github.workspace }}/${{ env.CODEXSDK_GO_PATH_DIR }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${GOCACHE}" "${GOMODCACHE}" "${GOPATH}"
+          GOWORK=off go list -deps -test ./... >/dev/null
+
       - name: Run Codex drift repair agent
         if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
         uses: openai/codex-action@v1
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/${{ env.CODEXSDK_RUST_TARGET_DIR }}
+          GOCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_CACHE_DIR }}
+          GOMODCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_MOD_CACHE_DIR }}
+          GOPATH: ${{ github.workspace }}/${{ env.CODEXSDK_GO_PATH_DIR }}
         with:
           openai-api-key: ${{ secrets.AZURE_OPENAI_API_KEY }}
           responses-api-endpoint: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
@@ -443,6 +460,9 @@ jobs:
         if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_DRIFT_ARTIFACT_DIR }}
+          GOCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_CACHE_DIR }}
+          GOMODCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_MOD_CACHE_DIR }}
+          GOPATH: ${{ github.workspace }}/${{ env.CODEXSDK_GO_PATH_DIR }}
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
         run: |
           set -euo pipefail
