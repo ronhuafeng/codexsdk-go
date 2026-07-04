@@ -1,64 +1,78 @@
 # Recovery Reference
 
-Use these recipes before adding more automation. Keep recovery actions on the protected PR path, and do not delete tags, delete branches, write synthetic required statuses, force-push `main`, or bypass branch protection.
-
-These recipes are selected by failure state. Do not treat the whole file as a linear playbook, and do not continue past the narrow recovered state without a matching command boundary.
+Use recovery recipes before adding automation. Keep recovery on the protected PR path. Never weaken branch protection, bypass required checks, synthesize statuses, force-push `main`, or move/delete tags.
 
 ## Sync PR `Go` Check Is `action_required`
 
-This is expected for sync PRs created by `GITHUB_TOKEN`. Confirm the first run has no jobs, then have a maintainer with write access approve or rerun it once:
+Trigger:
+- A sync PR created by `GITHUB_TOKEN` has a required `Go` run in `action_required`.
 
-```sh
-gh run view <run-id> --attempt 1 --json conclusion,jobs,actor,triggeringActor
-gh run rerun <run-id>
-```
+Evidence:
+- First run has no jobs or shows GitHub's maintainer rerun/approval gate.
 
-After the real `Go` check passes, auto-merge should continue. Do not manually merge just to bypass this gate.
+Allowed action:
+- A maintainer with write access may approve or rerun the check once.
+
+Stop:
+- Do not manually merge around this gate. After the real `Go` check passes, protected auto-merge should continue.
 
 ## Sync PR Does Not Merge Before Timeout
 
-Inspect the PR state, required checks, and recent CI runs on the sync branch:
+Trigger:
+- Auto-merge wait times out.
 
-```sh
-gh pr view <pr-number> --json state,mergeStateStatus,reviewDecision,statusCheckRollup
-gh pr checks <pr-number>
-gh run list --branch <sync-branch> --limit 10 \
-  --json databaseId,event,status,conclusion,headSha,url
-```
+Evidence:
+- PR state, merge state, review decision, status rollup, required checks, and recent CI runs on the sync branch.
 
-If the required `Go` run is `action_required`, rerun it once as above. If a real check failed, inspect logs and fix the sync branch with a normal follow-up commit or rerun the caller-owned automation; do not force a merge around the failed required check.
+Allowed action:
+- If the blocker is `action_required`, use that recipe.
+- If a real check failed, inspect logs and fix with a normal follow-up commit or rerun caller-owned automation.
+
+Stop:
+- Do not force a merge around failed required checks.
 
 ## Finalize Failed After PR Merged
 
-If the sync PR merged but tag creation or drift dispatch failed, recover from the landed `main` commit:
+Trigger:
+- Sync PR merged, but tag creation or drift dispatch failed.
 
-```sh
-git fetch origin main --tags
-git checkout --detach origin/main
-python3 scripts/codexsdk_sync_tag.py --json
-python3 scripts/codexsdk_sync_tag.py --create --push origin
-```
+Evidence:
+- Landed `main` commit, intended upstream target, existing sync tags, and finalize logs.
 
-If the base upstream sync tag already exists at another commit, use the suffix path instead:
+Allowed action:
+- Recover from the exact landed commit.
+- Create a stable sync tag through `scripts/codexsdk_sync_tag.py`.
+- If the base tag already exists at another commit, use the documented suffix path.
+- Run caller-owned drift verification after tagging when required.
 
-```sh
-python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin
-```
-
-Then run the caller-owned drift verification path for the landed baseline target and watch it to completion.
+Stop:
+- Do not tag unmerged PR heads, failed attempts, or manual upstream refs/commits.
 
 ## Drift Verification Fails After Main CI Passes
 
-Treat this as incomplete until the cause is understood. Check whether landed `baseline_metadata.json` still matches the intended upstream target, then inspect drift run logs.
+Trigger:
+- Main CI passed but dispatched drift verification failed or still reports drift.
 
-If the failure is transient, rerun the drift verification path. If drift is real, keep or update the protocol-drift issue and run another sync. Do not report `drift issue fully resolved`.
+Evidence:
+- Landed `baseline_metadata.json`, target provenance, drift run logs, and issue state.
+
+Allowed action:
+- Rerun if transient.
+- If drift is real, keep/update the protocol-drift issue and start another sync.
+
+Stop:
+- Do not report `drift issue fully resolved` until drift verification is clean and issue closure is complete when applicable.
 
 ## Sync Tag Already Exists
 
-The base tag `upstream-codex-rust-vX.Y.Z` is used for the first landed sync to a stable upstream tag. Follow-up syncs to the same upstream tag must use `-sync.N` through:
+Trigger:
+- Base tag `upstream-codex-rust-vX.Y.Z` already exists.
 
-```sh
-python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin
-```
+Evidence:
+- Existing tag target and current landed commit.
 
-Never move or delete an existing upstream sync tag.
+Allowed action:
+- Use `scripts/codexsdk_sync_tag.py --next-suffix --create --push origin` for follow-up syncs to the same upstream tag.
+
+Stop:
+- Never move or delete an existing upstream sync tag.
