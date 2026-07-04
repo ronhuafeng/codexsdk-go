@@ -15,7 +15,7 @@ Tool output contract:
 
 - successful commands are quiet by default
 - use `--verbose` for human-readable paths, progress, and counts on stderr
-- use `--json` when another command or workflow needs machine-readable stdout
+- use `--json` when another command or caller needs machine-readable stdout
 - treat exit code as the success/failure signal
 
 ## Completion Layers
@@ -25,8 +25,8 @@ A baseline sync is complete only when checked-in schemas match the selected upst
 Every final response must state the highest completed layer:
 
 - `local sync complete`: files validate locally, but nothing was pushed
-- `commit pushed`: the sync commit was pushed, but tag/CI/drift workflow/issue closure are still pending
-- `drift issue fully resolved`: tag, pushed CI, drift workflow, and issue closure are complete when applicable
+- `commit pushed`: the sync commit was pushed, but tag, CI, drift verification, or issue closure are still pending
+- `drift issue fully resolved`: tag, pushed CI, drift verification, and issue closure are complete when applicable
 
 Do not call a drift issue solved at push time.
 
@@ -46,21 +46,40 @@ Do not call a drift issue solved at push time.
 Read only the references needed for the task:
 
 - For a local baseline sync, target resolution, drift review, checked-in baseline updates, regeneration, validation, or tagging, read [references/local-sync.md](references/local-sync.md).
-- For the GitHub Actions auto-sync workflow, protected PR path, drift issue behavior, auto-merge behavior, or remote completion layers, read [references/automation.md](references/automation.md).
 - For failed sync PR checks, auto-merge timeouts, finalize failures, drift verification failures, or existing sync tags, read [references/recovery.md](references/recovery.md).
 
 If a failure occurs, use the recovery reference before adding automation.
 
-## Default Workflow
+## Command Routing
 
-1. Inspect `git status --short`, the current branch, and current baseline metadata.
-2. Resolve the upstream target with `scripts/codexsdk_resolve_upstream.py`; default to the latest stable `rust-vX.Y.Z` tag only when no target is specified.
-3. Run `scripts/codexsdk_target_policy.py` before generating drift. Stop on `block`; do not convert a policy block into a drift issue.
-4. Generate drift artifacts with `scripts/codexsdk_track_upstream.sh` after policy allows the target.
-5. Review compact drift reports before updating checked-in files.
-6. Apply reviewed baseline changes, regenerate generated Go, and reconcile handwritten SDK only when reviewed drift requires it.
-7. Run validation from the local sync reference before staging or publishing.
-8. If publishing, use the protected PR path and report the correct completion layer.
+Commands live under [commands/](commands/). A caller may invoke one command directly; that command's inputs, side effects, forbidden side effects, validation, and stop rules override any broader sequence.
+
+- [resolve-target](commands/resolve-target.md): resolve the selected upstream Codex target and baseline provenance.
+- [detect-drift](commands/detect-drift.md): run target policy, then generate local drift artifacts only when policy allows.
+- [review-drift](commands/review-drift.md): review compact drift evidence before checked-in baseline changes.
+- [apply-candidate](commands/apply-candidate.md): mechanically apply an already-reviewed candidate through canonical scripts.
+- [repair-applied-candidate](commands/repair-applied-candidate.md): perform a bounded local repair pass after detect and apply have completed.
+- [validate-local](commands/validate-local.md): validate local sync state without publishing remote state.
+- [publish-protected-pr](commands/publish-protected-pr.md): publish through the protected PR path only when explicitly requested.
+- [finalize-landed-sync](commands/finalize-landed-sync.md): tag and optionally verify a sync after the PR has landed.
+- [recover-failure](commands/recover-failure.md): recover failed checks, merge waits, finalize failures, drift verification failures, or tag conflicts.
+
+## Common Workflow Composition
+
+Local baseline sync:
+
+1. `resolve-target`
+2. `detect-drift`
+3. `review-drift`
+4. `apply-candidate`
+5. `repair-applied-candidate` when reviewed drift or validation shows local repair is needed
+6. `validate-local`
+7. `publish-protected-pr` only when the user explicitly asks to publish
+
+Recovery:
+
+1. Start with `recover-failure`.
+2. Resume with the narrow command that matches the recovered state, usually `validate-local`, `publish-protected-pr`, or `finalize-landed-sync`.
 
 ## Required Inputs
 

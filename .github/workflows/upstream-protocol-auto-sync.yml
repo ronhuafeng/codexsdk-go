@@ -413,7 +413,7 @@ jobs:
             --json | tee "${CODEXSDK_AUTO_SYNC_DIR}/apply-result.json"
           git diff --name-status > "${CODEXSDK_AUTO_SYNC_DIR}/diff-name-status.txt"
 
-      - name: Build Codex sync prompt
+      - name: Build Codex drift repair prompt
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_SYNC_CANDIDATE_PREFIX }}-${{ needs.detect.outputs.upstream_short_sha }}
           LAND_REF: ${{ needs.detect.outputs.land_ref }}
@@ -432,7 +432,7 @@ jobs:
             --upstream-ref-kind "${UPSTREAM_REF_KIND}" \
             --upstream-sha "${UPSTREAM_SHA}"
 
-      - name: Run Codex upstream sync
+      - name: Run Codex drift repair agent
         uses: openai/codex-action@v1
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/${{ env.CODEXSDK_RUST_TARGET_DIR }}

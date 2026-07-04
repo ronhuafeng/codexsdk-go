@@ -1,6 +1,6 @@
 # Recovery Reference
 
-Use these recipes before adding workflow automation. Keep recovery actions on the protected PR path, and do not delete tags, delete branches, write synthetic required statuses, force-push `main`, or bypass branch protection.
+Use these recipes before adding more automation. Keep recovery actions on the protected PR path, and do not delete tags, delete branches, write synthetic required statuses, force-push `main`, or bypass branch protection.
 
 ## Sync PR `Go` Check Is `action_required`
 
@@ -20,11 +20,11 @@ Inspect the PR state, required checks, and recent CI runs on the sync branch:
 ```sh
 gh pr view <pr-number> --json state,mergeStateStatus,reviewDecision,statusCheckRollup
 gh pr checks <pr-number>
-gh run list --workflow ci.yml --branch <sync-branch> --limit 10 \
+gh run list --branch <sync-branch> --limit 10 \
   --json databaseId,event,status,conclusion,headSha,url
 ```
 
-If the required `Go` run is `action_required`, rerun it once as above. If a real check failed, inspect logs and fix the sync branch with a normal follow-up commit or rerun the auto-sync workflow; do not force a merge around the failed required check.
+If the required `Go` run is `action_required`, rerun it once as above. If a real check failed, inspect logs and fix the sync branch with a normal follow-up commit or rerun the caller-owned automation; do not force a merge around the failed required check.
 
 ## Finalize Failed After PR Merged
 
@@ -43,18 +43,13 @@ If the base upstream sync tag already exists at another commit, use the suffix p
 python3 scripts/codexsdk_sync_tag.py --next-suffix --create --push origin
 ```
 
-Then dispatch drift verification for the landed baseline target and watch it:
-
-```sh
-gh workflow run upstream-protocol-drift.yml --ref main -f upstream_ref=<target_ref>
-gh run watch <run-id> --exit-status
-```
+Then run the caller-owned drift verification path for the landed baseline target and watch it to completion.
 
 ## Drift Verification Fails After Main CI Passes
 
 Treat this as incomplete until the cause is understood. Check whether landed `baseline_metadata.json` still matches the intended upstream target, then inspect drift run logs.
 
-If the failure is transient, rerun the drift workflow. If drift is real, keep or update the protocol-drift issue and run another sync. Do not report `drift issue fully resolved`.
+If the failure is transient, rerun the drift verification path. If drift is real, keep or update the protocol-drift issue and run another sync. Do not report `drift issue fully resolved`.
 
 ## Sync Tag Already Exists
 
