@@ -160,6 +160,8 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn("read-only context", repair)
         self.assertIn("must not drive branch checkout", repair)
         self.assertIn("common.rs` provenance", repair)
+        self.assertIn("focused handwritten tests or fixtures", repair)
+        self.assertIn("schema-derived fixture is stale", repair)
 
         self.assertIn("Recommended disposable locations", local_sync)
         self.assertNotIn("Default disposable locations", local_sync)
@@ -187,6 +189,17 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn("--common-rs-source-sha", workflow)
         self.assertIn("Commit local sync changes", workflow)
         self.assertIn("commit-local-sync", workflow)
+        self.assertIn("Prepare Go validation cache for Codex repair", workflow)
+        self.assertIn("CODEXSDK_GO_CACHE_DIR", workflow)
+        self.assertIn("CODEXSDK_GO_MOD_CACHE_DIR", workflow)
+        self.assertIn("GOWORK=off go list -deps -test ./...", workflow)
+        self.assertLess(
+            workflow.index("Prepare Go validation cache for Codex repair"),
+            workflow.index("Run Codex drift repair agent"),
+        )
+        self.assertIn("GOCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_CACHE_DIR }}", workflow)
+        self.assertIn("GOMODCACHE: ${{ github.workspace }}/${{ env.CODEXSDK_GO_MOD_CACHE_DIR }}", workflow)
+        self.assertIn("GOPATH: ${{ github.workspace }}/${{ env.CODEXSDK_GO_PATH_DIR }}", workflow)
         self.assertNotIn("scripts/codexsdk_wait_sync_pr_merge.sh", workflow)
         self.assertNotIn("scripts/codexsdk_sync_tag.py", workflow)
         self.assertNotIn("gh issue close", workflow)
@@ -216,6 +229,7 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
 
         self.assertIn("Current phase: `${PHASE}`.", prompt)
         self.assertIn("Allowed side effects", prompt)
+        self.assertIn("schema-derived fixtures", prompt)
         self.assertIn("Forbidden side effects", prompt)
         self.assertIn("Final output must include", prompt)
 

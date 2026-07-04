@@ -23,6 +23,7 @@ Authoritative inputs:
 Allowed side effects:
 
 - Edit only the local checkout surfaces permitted by `repair-applied-candidate`.
+- When generated type/schema changes invalidate handwritten schema-derived fixtures, update the minimal fixture or test expectation instead of preserving removed upstream fields.
 - Run focused checks that are useful for files you touch.
 - Report blockers when candidate artifacts or provenance are inconsistent.
 

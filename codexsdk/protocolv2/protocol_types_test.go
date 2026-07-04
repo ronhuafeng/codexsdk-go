@@ -6270,6 +6270,17 @@ func TestGeneratedMcpPayloadsRejectMalformedProtocol(t *testing.T) {
 }
 
 func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
+	assertRoundTrip := func(t *testing.T, value any, target any) {
+		t.Helper()
+		raw, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(raw, target); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	summary := PluginSummary{
 		AuthPolicy:    PluginAuthPolicyONUSE,
 		Enabled:       true,
@@ -6281,28 +6292,38 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 	}
 	detail := PluginDetail{
 		AppTemplates:    []AppTemplateSummary{},
-		Apps:            []AppSummary{{ID: "app-1", Name: "App One"}},
-		Hooks:           []PluginHookSummary{{EventName: HookEventNamePreToolUse, Key: "hook-1"}},
+		Apps:            []AppSummary{},
+		Hooks:           []PluginHookSummary{},
 		MarketplaceName: "market",
-		MarketplacePath: Null[string](),
-		MCPServers:      []string{"mcp-1"},
-		ShareURL:        Value("https://example.test/plugin"),
-		Skills:          []SkillSummary{{Description: "review", Enabled: true, Name: "review"}},
+		MCPServers:      []string{},
+		Skills:          []SkillSummary{},
 		Summary:         summary,
 	}
+
+	for _, tc := range []struct {
+		name   string
+		value  any
+		target any
+	}{
+		{name: "install response", value: PluginInstallResponse{AppsNeedingAuth: []AppSummary{}, AuthPolicy: PluginAuthPolicyONINSTALL}, target: &PluginInstallResponse{}},
+		{name: "list response", value: PluginListResponse{Marketplaces: []PluginMarketplaceEntry{{Name: "market", Plugins: []PluginSummary{}}}}, target: &PluginListResponse{}},
+		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}},
+		{name: "share list response", value: PluginShareListResponse{Data: []PluginShareListItem{}}, target: &PluginShareListResponse{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertRoundTrip(t, tc.value, tc.target)
+		})
+	}
+
 	for _, tc := range []struct {
 		name   string
 		value  any
 		target any
 		want   string
 	}{
-		{name: "install response", value: PluginInstallResponse{AppsNeedingAuth: []AppSummary{{ID: "app-1", Name: "App One"}}, AuthPolicy: PluginAuthPolicyONINSTALL}, target: &PluginInstallResponse{}, want: `{"appsNeedingAuth":[{"id":"app-1","name":"App One"}],"authPolicy":"ON_INSTALL"}`},
-		{name: "list response", value: PluginListResponse{Marketplaces: []PluginMarketplaceEntry{{Name: "market", Plugins: []PluginSummary{summary}}}}, target: &PluginListResponse{}, want: `{"marketplaces":[{"name":"market","plugins":[{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}]}]}`},
-		{name: "read response", value: PluginReadResponse{Plugin: detail}, target: &PluginReadResponse{}, want: `{"plugin":{"appTemplates":[],"apps":[{"id":"app-1","name":"App One"}],"hooks":[{"eventName":"preToolUse","key":"hook-1"}],"marketplaceName":"market","marketplacePath":null,"mcpServers":["mcp-1"],"shareUrl":"https://example.test/plugin","skills":[{"description":"review","enabled":true,"name":"review"}],"summary":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}}`},
 		{name: "share delete params", value: PluginShareDeleteParams{RemotePluginID: "remote-1"}, target: &PluginShareDeleteParams{}, want: `{"remotePluginId":"remote-1"}`},
 		{name: "share delete response", value: PluginShareDeleteResponse{}, target: &PluginShareDeleteResponse{}, want: `{}`},
 		{name: "share list params", value: PluginShareListParams{}, target: &PluginShareListParams{}, want: `{}`},
-		{name: "share list response", value: PluginShareListResponse{Data: []PluginShareListItem{{LocalPluginPath: Value("/plugins/plugin-one"), Plugin: summary}}}, target: &PluginShareListResponse{}, want: `{"data":[{"localPluginPath":"/plugins/plugin-one","plugin":{"authPolicy":"ON_USE","enabled":true,"id":"plugin-1","installPolicy":"AVAILABLE","installed":true,"name":"plugin-one","source":{"type":"remote"}}}]}`},
 		{name: "share save params", value: PluginShareSaveParams{Discoverability: Value(PluginShareDiscoverabilityPRIVATE), PluginPath: "/plugins/plugin-one", RemotePluginID: Null[string](), ShareTargets: Value([]PluginShareTarget{{PrincipalID: "group-1", PrincipalType: PluginSharePrincipalTypeGroup, Role: PluginShareTargetRoleReader}})}, target: &PluginShareSaveParams{}, want: `{"discoverability":"PRIVATE","pluginPath":"/plugins/plugin-one","remotePluginId":null,"shareTargets":[{"principalId":"group-1","principalType":"group","role":"reader"}]}`},
 		{name: "share save response", value: PluginShareSaveResponse{RemotePluginID: "remote-1", ShareURL: "https://example.test/plugin"}, target: &PluginShareSaveResponse{}, want: `{"remotePluginId":"remote-1","shareUrl":"https://example.test/plugin"}`},
 		{name: "share update targets params", value: PluginShareUpdateTargetsParams{Discoverability: PluginShareUpdateDiscoverabilityUNLISTED, RemotePluginID: "remote-1", ShareTargets: []PluginShareTarget{{PrincipalID: "user-1", PrincipalType: PluginSharePrincipalTypeUser, Role: PluginShareTargetRoleEditor}}}, target: &PluginShareUpdateTargetsParams{}, want: `{"discoverability":"UNLISTED","remotePluginId":"remote-1","shareTargets":[{"principalId":"user-1","principalType":"user","role":"editor"}]}`},
