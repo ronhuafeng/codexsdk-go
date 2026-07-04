@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the bounded Codex prompt used by upstream protocol auto-sync."""
+"""Write the bounded Codex repair prompt used by upstream protocol auto-sync."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from string import Template
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TEMPLATE = REPO_ROOT / ".github/prompts/codexsdk-upstream-sync-review.md"
+DEFAULT_TEMPLATE = REPO_ROOT / ".github/prompts/codexsdk-upstream-sync-repair.md"
 
 
 def build_prompt(

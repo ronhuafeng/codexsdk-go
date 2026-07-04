@@ -30,7 +30,7 @@ class WriteSyncPromptTest(unittest.TestCase):
         self.assertIn("kind=stable_rust_tag", prompt)
         self.assertTrue(prompt.endswith("\n"))
 
-    def test_build_prompt_includes_bounded_review_contract(self) -> None:
+    def test_build_prompt_includes_bounded_repair_contract(self) -> None:
         prompt = sync_prompt.build_prompt(
             auto_sync_dir=".cache/codexsdk-auto-sync",
             candidate_dir=".cache/codexsdk-upstream-abc123",
@@ -40,11 +40,16 @@ class WriteSyncPromptTest(unittest.TestCase):
             upstream_sha="a" * 40,
         )
 
-        self.assertIn("Perform a bounded maintainer review", prompt)
+        self.assertIn("Use codexsdk-sync-upstream command: repair-applied-candidate.", prompt)
+        self.assertIn("Detect and apply have already completed", prompt)
+        self.assertIn("Treat candidate artifacts and mechanical apply output as authoritative inputs", prompt)
         self.assertIn("- upstream ref: rust-v0.141.0", prompt)
         self.assertIn(".cache/codexsdk-upstream-abc123/schema", prompt)
+        self.assertIn("Do not run resolve-target, detect-drift, track-upstream", prompt)
+        self.assertIn("Final output must include", prompt)
         self.assertIn("Do not re-copy schemas", prompt)
-        self.assertIn("Do not perform repository side effects", prompt)
+        self.assertIn("Do not commit, push, tag", prompt)
+        self.assertNotIn("references/automation.md", prompt)
 
     def test_cli_writes_prompt_file_quietly(self) -> None:
         script = Path(__file__).with_name("codexsdk_write_sync_prompt.py")

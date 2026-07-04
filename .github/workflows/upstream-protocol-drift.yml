@@ -306,7 +306,7 @@ jobs:
             --out /tmp/codexsdk-upstream
           ```
 
-          Then use `$codexsdk-sync-upstream` to review drift, update the checked-in baseline, regenerate `protocolv2`, reconcile handwritten SDK behavior, and run validation.
+          Then use `$codexsdk-sync-upstream` commands `review-drift`, `apply-candidate`, `repair-applied-candidate` when needed, and `validate-local` to complete the local sync.
           """
 
           comment = f"""Protocol drift is still present.

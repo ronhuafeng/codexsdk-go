@@ -165,7 +165,7 @@ Update files under `codexsdk/internal/protocolschema/appserver/v2` only after re
 - update `coverage_matrix.json` with explicit support status, owner, reason, revisit trigger, and exit condition for new or changed surface
 - update `drift_report.json` and `matrix_update_skeleton.json` by comparing the updated baseline with the trusted candidate schema and copying clean reports
 
-Use compare-only for the final clean report only when the candidate schema was generated from the resolved target in this workflow:
+Use compare-only for the final clean report only when the candidate schema was generated from the resolved target in this run:
 
 ```sh
 scripts/codexsdk_track_upstream.sh \
@@ -280,7 +280,7 @@ Before committing, check whether the selected upstream target moved:
 python3 scripts/codexsdk_resolve_upstream.py --latest-stable --json
 ```
 
-For default scheduled workflow, compare against the latest stable `rust-vX.Y.Z` tag, not `main`.
+For a default scheduled run, compare against the latest stable `rust-vX.Y.Z` tag, not `main`.
 
 Target-movement rules:
 
@@ -328,5 +328,5 @@ Tag rules:
 - If a method disappears upstream, preserve compatibility only when it is safe and intentional; otherwise document the breaking change.
 - If upstream adds experimental surface, mark it experimental unless it appears in the non-experimental schema comparison and existing manifest rules say otherwise.
 - If compare-only and full tracking disagree, trust full tracking output and investigate candidate provenance before editing checked-in files.
-- If a workflow closes drift issues by label, verify the existing issue has the required drift label before dispatching the workflow.
+- If caller-owned automation closes drift issues by label, verify the existing issue has the required drift label before running that automation.
 - If a scheduled or manual drift issue already exists, update or close that issue; do not create a new issue for each upstream target while the old one is unresolved.
