@@ -1,15 +1,19 @@
 # Command: detect-drift
 
-Use when:
-- Running target policy and producing drift artifacts for an already resolved upstream target.
+State handled:
+- The caller has a resolved upstream target and needs target policy plus local drift artifacts when policy allows.
 
-Inputs:
+Trusted inputs:
 - Target ref, target ref kind, target commit SHA, explicit/default status, policy mode, and downgrade policy.
 - Local upstream Codex repo path and output directory.
 
 Read:
 - Top-level skill contract and invariants in `../SKILL.md`.
 - `../references/local-sync.md`, "Resolve Target And Policy" and "Generate And Review Drift".
+
+Fixed tools:
+- `scripts/codexsdk_target_policy.py` for allow/skip/block decisions.
+- `scripts/codexsdk_track_upstream.sh` for drift candidate and compact report generation.
 
 Allowed side effects:
 - May write target policy output and local drift artifacts.
@@ -21,12 +25,10 @@ Forbidden side effects:
 - Do not apply a candidate into the checked-in baseline.
 - Do not mutate generated Go, manifest, coverage, branches, commits, PRs, tags, or issues outside a caller-owned issue step.
 
-Procedure:
-- Run `scripts/codexsdk_target_policy.py` against the current baseline and resolved target.
-- Stop on `block`; do not convert policy blocks into drift issues.
-- Stop on `skip` after reporting the selected target is already represented.
-- On `allow`, run `scripts/codexsdk_track_upstream.sh` for the resolved commit and provenance.
-- Preserve compact drift outputs under the requested output directory.
+Shortest safe path:
+- Run policy before any drift generation and accept `block`, `skip`, or `allow` as command state, not advice to override.
+- On `allow`, use the tracking script to produce candidate artifacts for the resolved commit and provenance.
+- Preserve compact evidence for later review; do not decide SDK repair or apply checked-in changes in this command.
 
 Success means:
 - Policy decision is known and, when allowed, drift status and candidate artifacts are available.

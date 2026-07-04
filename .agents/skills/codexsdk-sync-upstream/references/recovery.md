@@ -2,6 +2,8 @@
 
 Use these recipes before adding more automation. Keep recovery actions on the protected PR path, and do not delete tags, delete branches, write synthetic required statuses, force-push `main`, or bypass branch protection.
 
+These recipes are selected by failure state. Do not treat the whole file as a linear playbook, and do not continue past the narrow recovered state without a matching command boundary.
+
 ## Sync PR `Go` Check Is `action_required`
 
 This is expected for sync PRs created by `GITHUB_TOKEN`. Confirm the first run has no jobs, then have a maintainer with write access approve or rerun it once:

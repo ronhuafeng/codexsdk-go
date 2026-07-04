@@ -1,15 +1,18 @@
 # Command: resolve-target
 
-Use when:
-- Resolving the upstream Codex target before drift generation or sync work.
+State handled:
+- The caller needs the selected upstream Codex target and current baseline provenance before any drift generation or sync mutation.
 
-Inputs:
-- Requested upstream tag, ref, or full commit SHA, or no target for latest stable.
+Trusted inputs:
+- Requested upstream tag, ref, or full commit SHA, or no target when latest stable is intended.
 - Baseline metadata path, defaulting to `codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json`.
 
 Read:
 - Top-level skill contract and invariants in `../SKILL.md`.
 - `../references/local-sync.md`, "Resolve Target And Policy".
+
+Fixed tools:
+- `scripts/codexsdk_resolve_upstream.py` for latest-stable selection, ref lookup, tag peeling, and JSON output.
 
 Allowed side effects:
 - May write a local target JSON file such as `.cache/codexsdk-upstream-target.json`.
@@ -20,10 +23,10 @@ Forbidden side effects:
 - Do not generate drift.
 - Do not mutate checked-in schemas, reports, generated Go, branches, tags, issues, PRs, or commits.
 
-Procedure:
-- Inspect current baseline metadata enough to report the existing provenance.
-- Run `scripts/codexsdk_resolve_upstream.py` with the explicit target or latest-stable default.
-- Capture `upstream_ref`, `upstream_ref_kind`, `upstream_sha`, tag SHA when present, and `target_explicit`.
+Shortest safe path:
+- Inspect only enough baseline metadata to report existing provenance.
+- Use the resolver instead of ad hoc shell logic for target selection or tag peeling.
+- Capture the resolved target fields needed by later commands; stop before any drift or baseline mutation.
 
 Success means:
 - Target ref, ref kind, peeled full SHA, explicit/default status, and baseline metadata are known.

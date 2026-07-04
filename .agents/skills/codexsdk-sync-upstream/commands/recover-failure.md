@@ -1,14 +1,19 @@
 # Command: recover-failure
 
-Use when:
-- Recovering failed sync PR checks, auto-merge timeouts, finalize failures, drift verification failures, or existing sync tag conflicts.
+State handled:
+- A sync PR check, merge wait, finalize step, drift verification, or sync tag operation failed and the caller needs a narrow recovery path.
 
-Inputs:
+Trusted inputs:
 - Failure type, PR number or branch when relevant, CI/run ID when relevant, target provenance, and landed commit when finalize has started.
 
 Read:
 - Top-level skill contract and invariants in `../SKILL.md`.
 - `../references/recovery.md`.
+
+Fixed tools:
+- GitHub CLI/API inspection for PRs, checks, runs, tags, and issues.
+- Documented recovery recipes in `../references/recovery.md`.
+- `scripts/codexsdk_sync_tag.py` for tag conflict recovery when a suffix tag is allowed.
 
 Allowed side effects:
 - May inspect GitHub PRs, checks, CI runs, tags, and issues.
@@ -20,11 +25,11 @@ Forbidden side effects:
 - Do not bypass required checks, introduce PATs or app tokens, synthesize statuses, force-push `main`, or delete/move tags.
 - Do not add new automation before trying the recovery recipes.
 
-Procedure:
-- Classify the failure using `../references/recovery.md`.
+Shortest safe path:
+- Classify the failed state from available evidence and the recovery reference.
 - Preserve useful failure evidence before reruns or cleanup.
-- Apply the narrow recovery recipe for the classified failure.
-- Resume with `validate-local`, `publish-protected-pr`, or `finalize-landed-sync` only after the state is clear.
+- Apply the narrow documented recipe for that failure class.
+- Resume with another command only after the state and allowed side effects are clear.
 
 Success means:
 - The failed state is recovered or reduced to an explicit blocker with the next safe command identified.

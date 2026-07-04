@@ -1,9 +1,9 @@
 # Command: repair-applied-candidate
 
-Use when:
-- A maintainer or automation caller needs a bounded local repair pass after detect and mechanical apply have already completed.
+State handled:
+- Detect and mechanical apply have already completed, and the caller needs a bounded local repair pass for concrete issues exposed by reviewed drift or validation.
 
-Inputs:
+Trusted inputs:
 - Target ref, target ref kind, target commit SHA, and landing ref.
 - Candidate artifact directory containing `schema/`, `reports/`, and `common.rs`.
 - Mechanical apply summary and diff name-status.
@@ -12,6 +12,10 @@ Read:
 - Top-level skill contract and invariants in `../SKILL.md`.
 - Caller-provided side-effect boundaries, if stricter than this command.
 - Candidate compact reports, apply result, diff name-status, and focused code paths implicated by reviewed drift.
+
+Fixed tools:
+- Focused repo tests, generator checks, manifest/coverage checks, `gofmt`, and JSON readers as needed.
+- `scripts/codexsdk_validate_sync.sh` may be left to the caller or workflow unless focused local validation is useful during repair.
 
 Allowed side effects:
 - May edit concrete local issues in generated Go, generator behavior, manifest/coverage classification, or small handwritten SDK surfaces justified by reviewed drift.
@@ -23,10 +27,10 @@ Forbidden side effects:
 - Do not re-copy schemas from upstream.
 - Do not commit, push, tag, edit issues, create PRs, change branches, request merges, or publish remote state.
 
-Procedure:
-- Treat candidate artifacts and mechanical apply summary as authoritative inputs.
-- Inspect apply result, compact drift reports, current diff, and focused files touched by the drift.
-- Fix concrete local issues instead of stopping at passive review.
+Shortest safe path:
+- Treat candidate artifacts and mechanical apply output as authoritative; do not restart earlier commands.
+- Read the smallest set of compact evidence and focused files needed to explain or repair the current issue.
+- Fix concrete local issues rather than producing passive review when the fix is clear and inside this boundary.
 - Keep handwritten SDK changes minimal and tied to reviewed drift.
 - Leave experimental or internal upstream surface in generated `protocolv2` unless manifest rules require public SDK exposure.
 

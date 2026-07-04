@@ -1,14 +1,18 @@
 # Command: finalize-landed-sync
 
-Use when:
-- A sync PR has landed and remote completion needs tagging or drift verification.
+State handled:
+- A sync PR has landed and caller-owned remote completion may need tagging or drift verification.
 
-Inputs:
+Trusted inputs:
 - Landed ref, landed commit, sync PR, upstream target ref, upstream ref kind, upstream commit, and whether to dispatch drift verification.
 
 Read:
 - Top-level skill contract and invariants in `../SKILL.md`.
 - `../references/local-sync.md`, "Tag Landed Syncs".
+
+Fixed tools:
+- `scripts/codexsdk_sync_tag.py` for stable upstream sync tag creation and suffix selection.
+- Caller-owned workflow dispatch or CI tooling for drift verification when explicitly requested.
 
 Allowed side effects:
 - May create stable upstream sync tags only through `scripts/codexsdk_sync_tag.py`.
@@ -19,11 +23,11 @@ Forbidden side effects:
 - Do not tag unmerged PR heads, failed attempts, drift-check-only work, or uncommitted changes.
 - Do not call a drift issue fully resolved before CI, tag, drift verification, and issue closure are complete when applicable.
 
-Procedure:
-- Check out or inspect the exact landed commit.
-- For `stable_rust_tag`, create the sync tag through `scripts/codexsdk_sync_tag.py`; use `--next-suffix` for existing base-tag conflicts.
+Shortest safe path:
+- Verify the landed commit before any tag or verification side effect.
+- For `stable_rust_tag`, create tags only through the sync tag script and documented suffix path.
 - For manual refs or commits, skip upstream sync tagging.
-- Run caller-provided drift verification when requested.
+- Run drift verification only when the caller owns that dispatch.
 - Report the precise remote completion layer.
 
 Success means:
