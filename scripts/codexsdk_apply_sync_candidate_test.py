@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -20,6 +21,39 @@ def write_json(path: Path, value: object) -> None:
 
 
 class ApplySyncCandidateTest(unittest.TestCase):
+    def test_common_rs_source_sha_must_match_target_sha(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            common_rs = Path(tmp) / "common.rs"
+            common_rs.write_text("client_request_definitions! {}\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "does not match target"):
+                apply_sync.verify_common_rs_provenance(common_rs, "1" * 40, "2" * 40)
+
+    def test_common_rs_content_must_match_target_commit_when_repo_is_available(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_repo = root / "codex"
+            common_path = codex_repo / apply_sync.COMMON_RS_REF
+            common_path.parent.mkdir(parents=True)
+            common_path.write_text("client_request_definitions! {}\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(codex_repo)], check=True)
+            subprocess.run(["git", "-C", str(codex_repo), "config", "user.email", "codex@example.com"], check=True)
+            subprocess.run(["git", "-C", str(codex_repo), "config", "user.name", "Codex"], check=True)
+            subprocess.run(["git", "-C", str(codex_repo), "add", apply_sync.COMMON_RS_REF], check=True)
+            subprocess.run(["git", "-C", str(codex_repo), "commit", "-q", "-m", "common"], check=True)
+            target_sha = subprocess.check_output(
+                ["git", "-C", str(codex_repo), "rev-parse", "HEAD"],
+                text=True,
+            ).strip()
+
+            candidate_common = root / "common.rs"
+            candidate_common.write_text("client_request_definitions! {}\n", encoding="utf-8")
+            apply_sync.verify_common_rs_provenance(candidate_common, target_sha, target_sha, codex_repo)
+
+            candidate_common.write_text("server_request_definitions! {}\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "content does not match"):
+                apply_sync.verify_common_rs_provenance(candidate_common, target_sha, target_sha, codex_repo)
+
     def test_build_coverage_seeds_missing_fields_for_changed_object_schemas(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

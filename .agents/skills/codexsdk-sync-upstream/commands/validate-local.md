@@ -17,7 +17,7 @@ Boundaries:
 
 Checks:
 - Report exact commands and pass/fail results.
-- Confirm no local absolute paths or cache output paths leaked into checked-in reports.
+- Confirm no local absolute paths or cache output paths leaked into checked-in baseline metadata or checked-in reports.
 
 Output:
 - Validation result, commands run, blockers if any, and highest completed local layer.

@@ -16,6 +16,7 @@ Authoritative inputs:
 - ${CANDIDATE_DIR}/schema
 - ${CANDIDATE_DIR}/reports
 - ${CANDIDATE_DIR}/common.rs
+- ${CANDIDATE_DIR}/common.rs.source_sha
 - ${AUTO_SYNC_DIR}/apply-result.json
 - ${AUTO_SYNC_DIR}/diff-name-status.txt
 

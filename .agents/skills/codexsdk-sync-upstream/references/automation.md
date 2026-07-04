@@ -68,14 +68,14 @@ The job must:
 - build a bounded Codex review prompt
 - run `openai/codex-action@v1` against the current worktree
 - validate with `scripts/codexsdk_validate_sync.sh`
-- commit only when there are real changes
+- commit the validated local sync through the `commit-local-sync` boundary only when there are real changes
 - publish a sync PR with `scripts/codexsdk_publish_sync_pr.sh`
 - stop at PR publication unless a separate caller-owned merge/finalize command was selected
 
 The Codex review prompt must keep judgment bounded:
 
 - read the sync skill before editing
-- inspect apply summary, compact drift reports, and separate git diff/status evidence
+- inspect apply summary, compact drift reports, separate git diff/status evidence, `common.rs` provenance, and the required drift review checklist
 - do not re-copy schemas or rerun the full Rust schema generator
 - do not print large schema, report, manifest, coverage, or generated Go files
 - make only small, concrete fixes found by review

@@ -6,7 +6,7 @@ State:
 Inputs:
 - Target ref, ref kind, and target SHA.
 - Landing ref, if supplied by automation, is read-only context for summaries and prompt text. It must not drive branch checkout, PR base selection, merges, tags, or other remote operations.
-- Candidate `schema/`, `reports/`, and `common.rs`.
+- Candidate `schema/`, `reports/`, `common.rs`, and `common.rs` provenance.
 - Apply result and diff name-status.
 
 Boundaries:

@@ -5,7 +5,7 @@ State:
 - `HEAD` is the committed sync change to publish, and the worktree and index are clean before invoking the publish script.
 
 Inputs:
-- Landing ref, sync branch prefix, target ref, target SHA, candidate schema path, and explicit publish request.
+- Landing ref, sync branch prefix, target ref, target kind, target SHA, candidate schema path, and explicit publish request.
 
 Tool:
 - `scripts/codexsdk_publish_sync_pr.sh`

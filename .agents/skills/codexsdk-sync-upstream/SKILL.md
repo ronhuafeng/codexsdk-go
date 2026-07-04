@@ -17,7 +17,7 @@ Use canonical scripts for deterministic work. Use Codex judgment for classificat
 
 Report the highest completed layer precisely:
 
-- `local sync complete`: files validate locally, but nothing was pushed
+- `local sync complete`: files validate locally and any requested local sync commit is complete, but nothing was pushed
 - `sync PR published`: the sync commit was pushed to a PR branch, but merge, tag, drift verification, and issue closure are still pending
 - `landed sync finalized`: the landed commit was verified, tags were handled when applicable, and drift verification passed, but no issue closure was requested or available
 - `drift issue fully resolved`: stable-tag sync tag handling when applicable, pushed CI, drift verification, and issue closure are complete when applicable
@@ -27,7 +27,7 @@ Never call a drift issue solved at PR publication time.
 ## Automation Phases
 
 - Detect resolves the upstream target, runs policy, generates drift evidence, and creates, updates, or closes protocol-drift issue state.
-- Fix is explicitly dispatched from issue metadata or target/fingerprint inputs. It regenerates or verifies the candidate, applies it, runs `repair-applied-candidate`, validates, and publishes a protected PR.
+- Fix is explicitly dispatched from issue metadata or target/fingerprint inputs. It regenerates or verifies the candidate, applies it, runs `repair-applied-candidate`, validates, commits the local sync, and publishes a protected PR.
 - Finalize runs only after the PR landed. It verifies the landed commit, creates sync tags when applicable, dispatches drift verification, and closes or updates the issue based on that verification result.
 
 Issues are state and audit records, not the only control plane. Do not depend on an issue create/update event from `GITHUB_TOKEN` to start a fix.
@@ -41,7 +41,7 @@ Issue metadata may select the upstream target and fingerprint, but it must not s
 - Do not weaken branch protection or merge around failed required checks.
 - Keep `action_required` documented as an expected maintainer rerun gate for sync PRs created by `GITHUB_TOKEN`.
 - Keep auto-merge on the real protected-branch PR path after the required `Go` check passes.
-- Keep generated reports free of local absolute paths, `.cache` output paths, private repo paths, account data, and raw smoke-test transcripts.
+- Keep checked-in baseline metadata and checked-in reports free of local absolute paths, `.cache` output paths, private repo paths, account data, and raw smoke-test transcripts.
 - Preserve unrelated user changes.
 - Keep merge decisions on the protected PR path. Branch protection, the real required `Go` check, and repository auto-merge settings decide whether a sync PR lands.
 - Keep workflow control-plane refs and remote landing/finalize refs constrained to the repository default branch unless a future explicit allowlist is added.
@@ -56,6 +56,7 @@ Commands live under [commands/](commands/). A caller may invoke any single comma
 - [apply-candidate](commands/apply-candidate.md): mechanically apply reviewed candidate artifacts.
 - [repair-applied-candidate](commands/repair-applied-candidate.md): repair or confirm an already-applied candidate.
 - [validate-local](commands/validate-local.md): validate local sync state.
+- [commit-local-sync](commands/commit-local-sync.md): commit a validated local sync change without publishing.
 - [publish-protected-pr](commands/publish-protected-pr.md): publish through the protected PR path when explicitly owned by the caller; stop at PR publication.
 - [finalize-landed-sync](commands/finalize-landed-sync.md): verify, tag, drift-check, and close/update issue state for a landed sync when explicitly owned by the caller.
 - [recover-failure](commands/recover-failure.md): recover failed checks, merge waits, finalize failures, drift verification failures, or tag conflicts.

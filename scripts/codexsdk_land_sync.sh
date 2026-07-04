@@ -9,6 +9,7 @@ Usage:
 Options:
   --candidate <path>        Candidate schema directory validated against the checked-in baseline.
   --remote <name>           Git remote to fetch and push. Defaults to origin.
+  --target-kind <kind>      Upstream target kind, such as stable_rust_tag.
 
 The script assumes HEAD is the committed sync change. It validates, rebases onto
 the current remote landing ref, then fast-forward pushes the landing ref.
@@ -18,6 +19,7 @@ EOF
 remote="origin"
 land_ref=""
 target_ref=""
+target_kind=""
 target_sha=""
 candidate=""
 
@@ -39,6 +41,10 @@ while [[ $# -gt 0 ]]; do
       target_ref="$2"
       shift 2
       ;;
+    --target-kind)
+      target_kind="$2"
+      shift 2
+      ;;
     --target-sha)
       target_sha="$2"
       shift 2
@@ -58,6 +64,15 @@ done
 if [[ -z "${land_ref}" || -z "${target_ref}" || -z "${target_sha}" ]]; then
   usage >&2
   exit 2
+fi
+if [[ -z "${target_kind}" ]]; then
+  if [[ "${target_ref}" =~ ^rust-v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+    target_kind="stable_rust_tag"
+  elif [[ "${target_ref}" =~ ^[0-9a-f]{40}$ ]]; then
+    target_kind="manual_commit"
+  else
+    target_kind="manual_ref"
+  fi
 fi
 land_ref="${land_ref#refs/heads/}"
 

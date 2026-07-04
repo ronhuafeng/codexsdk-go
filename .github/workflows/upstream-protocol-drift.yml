@@ -263,6 +263,8 @@ jobs:
           git -C "${CODEXSDK_UPSTREAM_CLONE}" show \
             "${{ steps.refs.outputs.upstream_sha }}:${CODEX_UPSTREAM_COMMON_RS}" \
             > "${CODEXSDK_DRIFT_ARTIFACT_DIR}/common.rs"
+          printf '%s\n' "${{ steps.refs.outputs.upstream_sha }}" \
+            > "${CODEXSDK_DRIFT_ARTIFACT_DIR}/common.rs.source_sha"
 
       - name: Prepare drift issue
         if: steps.drift_action.outputs.decision == 'allow'

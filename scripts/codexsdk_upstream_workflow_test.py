@@ -100,8 +100,11 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
     def test_skill_command_contracts_match_script_boundaries(self) -> None:
         skill = read(".agents/skills/codexsdk-sync-upstream/SKILL.md")
         resolve = read(".agents/skills/codexsdk-sync-upstream/commands/resolve-target.md")
+        review = read(".agents/skills/codexsdk-sync-upstream/commands/review-drift.md")
         detect = read(".agents/skills/codexsdk-sync-upstream/commands/detect-drift.md")
         apply_candidate = read(".agents/skills/codexsdk-sync-upstream/commands/apply-candidate.md")
+        commit_local = read(".agents/skills/codexsdk-sync-upstream/commands/commit-local-sync.md")
+        validate = read(".agents/skills/codexsdk-sync-upstream/commands/validate-local.md")
         publish = read(".agents/skills/codexsdk-sync-upstream/commands/publish-protected-pr.md")
         finalize = read(".agents/skills/codexsdk-sync-upstream/commands/finalize-landed-sync.md")
         repair = read(".agents/skills/codexsdk-sync-upstream/commands/repair-applied-candidate.md")
@@ -110,17 +113,31 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
 
         self.assertIn("caller or target policy owns baseline provenance", skill)
         self.assertIn("stable-tag sync tag handling when applicable", skill)
+        self.assertIn("checked-in baseline metadata and checked-in reports", skill)
+        self.assertIn("[commit-local-sync](commands/commit-local-sync.md)", skill)
         self.assertNotIn("Baseline metadata path", resolve)
         self.assertNotIn("current baseline ref/commit", resolve)
         self.assertIn("Baseline metadata is read by the caller or by target-policy checks", resolve)
-        self.assertIn("syntactically accepted by the resolver", resolve)
-        self.assertIn("upstream reachability is confirmed later by tracking/fetch", resolve)
+        self.assertIn("accepts them syntactically", resolve)
+        self.assertIn("advanced/manual targets", resolve)
+
+        self.assertIn("`file_diff`, `method_diff`", review)
+        self.assertIn("new request response mappings", review)
+        self.assertIn("public facade impact", review)
 
         self.assertIn("stop drift generation in both cases", detect)
         self.assertIn("caller-owned issue close/update was not explicitly requested", detect)
 
+        self.assertIn("`common.rs` source SHA", apply_candidate)
+        self.assertIn("content is verified from `target_sha:codex-rs/app-server-protocol/src/protocol/common.rs`", apply_candidate)
         self.assertIn("separate diff name-status evidence from `git diff --name-status` or `git status --short`", apply_candidate)
         self.assertIn("Changed files from separate git diff/status evidence", apply_candidate)
+
+        self.assertIn("May stage and commit only reviewed local sync changes", commit_local)
+        self.assertIn("Must preserve unrelated user changes", commit_local)
+        self.assertIn("must not create the commit itself", local_sync)
+
+        self.assertIn("checked-in baseline metadata or checked-in reports", validate)
 
         self.assertIn("`HEAD` is the committed sync change to publish", publish)
         self.assertIn("worktree and index are clean", publish)
@@ -130,12 +147,15 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
 
         self.assertIn("read-only context", repair)
         self.assertIn("must not drive branch checkout", repair)
+        self.assertIn("common.rs` provenance", repair)
 
         self.assertIn("Recommended disposable locations", local_sync)
         self.assertNotIn("Default disposable locations", local_sync)
         self.assertIn("requires `--codex-repo` or `CODEXSDK_CODEX_REPO`", local_sync)
         self.assertIn("in `--compare-only` mode it needs only a resolved `--commit`", local_sync)
         self.assertIn("close/update caller-owned drift state only when explicitly requested", local_sync)
+        self.assertIn("bare `manual_commit` SHA targets as explicit advanced inputs", local_sync)
+        self.assertIn("`common.rs` must be bound to the same target commit", local_sync)
         self.assertIn("temporary `/tmp/codexsdk-upstream.*`", local_sync)
 
     def test_fix_workflow_stops_at_protected_pr_publication(self) -> None:
@@ -149,6 +169,10 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn("drift_sha:", workflow)
         self.assertIn("--phase \"fix\"", workflow)
         self.assertIn("scripts/codexsdk_publish_sync_pr.sh", workflow)
+        self.assertIn("common.rs.source_sha", workflow)
+        self.assertIn("--common-rs-source-sha", workflow)
+        self.assertIn("Commit local sync changes", workflow)
+        self.assertIn("commit-local-sync", workflow)
         self.assertNotIn("scripts/codexsdk_wait_sync_pr_merge.sh", workflow)
         self.assertNotIn("scripts/codexsdk_sync_tag.py", workflow)
         self.assertNotIn("gh issue close", workflow)

@@ -54,6 +54,7 @@ class WriteSyncPromptTest(unittest.TestCase):
         self.assertIn("rust-v0.141.0", prompt)
         self.assertIn("stable_rust_tag", prompt)
         self.assertIn(".cache/codexsdk-upstream-abc123/schema", prompt)
+        self.assertIn(".cache/codexsdk-upstream-abc123/common.rs.source_sha", prompt)
         self.assertIn("Do not run `resolve-target`, `detect-drift`, `scripts/codexsdk_track_upstream.sh`", prompt)
         self.assertIn("Final output must include", prompt)
         self.assertIn("Do not re-copy schemas", prompt)
