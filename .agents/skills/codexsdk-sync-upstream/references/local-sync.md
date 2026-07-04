@@ -84,14 +84,11 @@ Use `scripts/codexsdk_apply_sync_candidate.py` for mechanical candidate applicat
 
 Expected mechanical sync surface includes:
 
-- schema JSON
-- baseline metadata
-- checked-in clean drift reports
-- manifest and coverage
-- generated `protocolv2` files
-- generated SDK surface
+- `codexsdk/internal/protocolschema/appserver/v2/**` for schema JSON, baseline metadata, manifest, coverage, and checked-in clean drift reports
+- `codexsdk/protocolv2/*.gen.go`
+- `codexsdk/sdk_surface.gen.go`
 
-Handwritten SDK changes are justified only when they preserve compatibility, expose already-supported stable surface, fix an existing facade broken by new schema, or update tests/docs for real user-visible behavior.
+Handwritten SDK, test, or doc changes are justified only when they preserve compatibility, expose already-supported stable surface, fix an existing facade broken by new schema, update tests/docs for real user-visible behavior, or are explicitly authorized by the user. Without reviewed drift evidence or explicit authorization, keep them out of the sync commit.
 
 Prefer typed `protocolv2` params/responses over raw JSON-RPC escape hatches.
 

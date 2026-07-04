@@ -5,7 +5,8 @@ State:
 
 Inputs:
 - Target ref, ref kind, target SHA, target explicit/default status, policy mode, and downgrade policy.
-- Upstream Codex repo path and output directory.
+- Generation mode: upstream Codex repo path and output directory.
+- Compare-only mode: candidate schema directory, checked-in baseline, resolved target SHA, and output directory; no upstream repo path is required.
 
 Tools:
 - `scripts/codexsdk_target_policy.py`
