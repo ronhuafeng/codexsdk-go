@@ -138,30 +138,6 @@
         "method": {
           "type": "string",
           "enum": [
-            "thread/delete"
-          ],
-          "title": "Thread/deleteRequestMethod"
-        },
-        "params": {
-          "$ref": "#/definitions/ThreadDeleteParams"
-        }
-      },
-      "title": "Thread/deleteRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
-        "method",
-        "params"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
             "thread/unsubscribe"
           ],
           "title": "Thread/unsubscribeRequestMethod"
@@ -532,54 +508,6 @@
         }
       },
       "title": "Thread/backgroundTerminals/cleanRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
-        "method",
-        "params"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "thread/backgroundTerminals/list"
-          ],
-          "title": "Thread/backgroundTerminals/listRequestMethod"
-        },
-        "params": {
-          "$ref": "#/definitions/ThreadBackgroundTerminalsListParams"
-        }
-      },
-      "title": "Thread/backgroundTerminals/listRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
-        "method",
-        "params"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "thread/backgroundTerminals/terminate"
-          ],
-          "title": "Thread/backgroundTerminals/terminateRequestMethod"
-        },
-        "params": {
-          "$ref": "#/definitions/ThreadBackgroundTerminalsTerminateParams"
-        }
-      },
-      "title": "Thread/backgroundTerminals/terminateRequest"
     },
     {
       "type": "object",
@@ -1604,30 +1532,6 @@
         "method": {
           "type": "string",
           "enum": [
-            "thread/realtime/appendSpeech"
-          ],
-          "title": "Thread/realtime/appendSpeechRequestMethod"
-        },
-        "params": {
-          "$ref": "#/definitions/ThreadRealtimeAppendSpeechParams"
-        }
-      },
-      "title": "Thread/realtime/appendSpeechRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
-        "method",
-        "params"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
             "thread/realtime/stop"
           ],
           "title": "Thread/realtime/stopRequestMethod"
@@ -1824,14 +1728,7 @@
           "title": "RemoteControl/enableRequestMethod"
         },
         "params": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/RemoteControlEnableParams"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "null"
         }
       },
       "title": "RemoteControl/enableRequest"
@@ -1854,14 +1751,7 @@
           "title": "RemoteControl/disableRequestMethod"
         },
         "params": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/RemoteControlDisableParams"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "null"
         }
       },
       "title": "RemoteControl/disableRequest"
@@ -2324,30 +2214,6 @@
       "type": "object",
       "required": [
         "id",
-        "method",
-        "params"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "account/rateLimitResetCredit/consume"
-          ],
-          "title": "Account/rateLimitResetCredit/consumeRequestMethod"
-        },
-        "params": {
-          "$ref": "#/definitions/ConsumeAccountRateLimitResetCreditParams"
-        }
-      },
-      "title": "Account/rateLimitResetCredit/consumeRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
         "method"
       ],
       "properties": {
@@ -2366,29 +2232,6 @@
         }
       },
       "title": "Account/usage/readRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
-        "method"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "account/workspaceMessages/read"
-          ],
-          "title": "Account/workspaceMessages/readRequestMethod"
-        },
-        "params": {
-          "type": "null"
-        }
-      },
-      "title": "Account/workspaceMessages/readRequest"
     },
     {
       "type": "object",
@@ -2714,29 +2557,6 @@
       "type": "object",
       "required": [
         "id",
-        "method"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/RequestId"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "externalAgentConfig/import/readHistories"
-          ],
-          "title": "ExternalAgentConfig/import/readHistoriesRequestMethod"
-        },
-        "params": {
-          "type": "null"
-        }
-      },
-      "title": "ExternalAgentConfig/import/readHistoriesRequest"
-    },
-    {
-      "type": "object",
-      "required": [
-        "id",
         "method",
         "params"
       ],
@@ -2964,26 +2784,6 @@
         {
           "type": "object",
           "required": [
-            "text",
-            "type"
-          ],
-          "properties": {
-            "text": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "input_text"
-              ],
-              "title": "InputTextAgentMessageInputContentType"
-            }
-          },
-          "title": "InputTextAgentMessageInputContent"
-        },
-        {
-          "type": "object",
-          "required": [
             "encrypted_content",
             "type"
           ],
@@ -3124,36 +2924,6 @@
           "type": "string"
         }
       }
-    },
-    "CapabilityRootLocation": {
-      "description": "Location used to resolve a selected capability root.",
-      "oneOf": [
-        {
-          "description": "A path owned by an execution environment.",
-          "type": "object",
-          "required": [
-            "environmentId",
-            "path",
-            "type"
-          ],
-          "properties": {
-            "environmentId": {
-              "type": "string"
-            },
-            "path": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "environment"
-              ],
-              "title": "EnvironmentCapabilityRootLocationType"
-            }
-          },
-          "title": "EnvironmentCapabilityRootLocation"
-        }
-      ]
     },
     "ClientInfo": {
       "type": "object",
@@ -3490,18 +3260,6 @@
         "value": true
       }
     },
-    "ConsumeAccountRateLimitResetCreditParams": {
-      "type": "object",
-      "required": [
-        "idempotencyKey"
-      ],
-      "properties": {
-        "idempotencyKey": {
-          "description": "Identifies one logical reset attempt. A UUID is recommended; reuse the same value when retrying that attempt.",
-          "type": "string"
-        }
-      }
-    },
     "ContentItem": {
       "oneOf": [
         {
@@ -3576,110 +3334,31 @@
         }
       ]
     },
-    "ConversationTextRole": {
-      "type": "string",
-      "enum": [
-        "user",
-        "developer",
-        "assistant"
-      ]
-    },
-    "DynamicToolNamespaceTool": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "description",
-            "inputSchema",
-            "name",
-            "type"
-          ],
-          "properties": {
-            "deferLoading": {
-              "type": "boolean"
-            },
-            "description": {
-              "type": "string"
-            },
-            "inputSchema": true,
-            "name": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "function"
-              ],
-              "title": "FunctionDynamicToolNamespaceToolType"
-            }
-          },
-          "title": "FunctionDynamicToolNamespaceTool"
-        }
-      ]
-    },
     "DynamicToolSpec": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "description",
-            "inputSchema",
-            "name",
-            "type"
-          ],
-          "properties": {
-            "deferLoading": {
-              "type": "boolean"
-            },
-            "description": {
-              "type": "string"
-            },
-            "inputSchema": true,
-            "name": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "function"
-              ],
-              "title": "FunctionDynamicToolSpecType"
-            }
-          },
-          "title": "FunctionDynamicToolSpec"
+      "type": "object",
+      "required": [
+        "description",
+        "inputSchema",
+        "name"
+      ],
+      "properties": {
+        "deferLoading": {
+          "type": "boolean"
         },
-        {
-          "type": "object",
-          "required": [
-            "description",
-            "name",
-            "tools",
-            "type"
-          ],
-          "properties": {
-            "description": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "tools": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/DynamicToolNamespaceTool"
-              }
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "namespace"
-              ],
-              "title": "NamespaceDynamicToolSpecType"
-            }
-          },
-          "title": "NamespaceDynamicToolSpec"
+        "description": {
+          "type": "string"
+        },
+        "inputSchema": true,
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
-      ]
+      }
     },
     "EnvironmentAddParams": {
       "type": "object",
@@ -3688,15 +3367,6 @@
         "execServerUrl"
       ],
       "properties": {
-        "connectTimeoutMs": {
-          "description": "Optional WebSocket connection timeout. The server default applies when omitted.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0.0
-        },
         "environmentId": {
           "type": "string"
         },
@@ -3762,7 +3432,7 @@
           }
         },
         "includeHome": {
-          "description": "If true, include detection under the user's home directory.",
+          "description": "If true, include detection under the user's home (~/.claude, ~/.codex, etc.).",
           "type": "boolean"
         }
       }
@@ -3778,13 +3448,6 @@
           "items": {
             "$ref": "#/definitions/ExternalAgentConfigMigrationItem"
           }
-        },
-        "source": {
-          "description": "Source product that produced the migration items. Missing means unspecified.",
-          "type": [
-            "string",
-            "null"
-          ]
         }
       }
     },
@@ -4277,10 +3940,6 @@
           "default": false,
           "type": "boolean"
         },
-        "mcpServerOpenaiFormElicitation": {
-          "description": "Allow downstream MCP servers to request OpenAI extended form elicitations.",
-          "type": "boolean"
-        },
         "optOutNotificationMethods": {
           "description": "Exact notification method names that should be suppressed for this connection (for example `thread/started`).",
           "type": [
@@ -4318,21 +3977,6 @@
           "$ref": "#/definitions/ClientInfo"
         }
       }
-    },
-    "InternalChatMessageMetadataPassthrough": {
-      "description": "Internal Responses API passthrough metadata copied into underlying chat messages.\n\nResponses API strongly types this payload. Do not modify it without first getting API approval and making the corresponding Responses API change.",
-      "type": "object",
-      "properties": {
-        "turn_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      }
-    },
-    "LegacyAppPathString": {
-      "type": "string"
     },
     "ListMcpServerStatusParams": {
       "type": "object",
@@ -4788,15 +4432,6 @@
     "ModelProviderCapabilitiesReadParams": {
       "type": "object"
     },
-    "MultiAgentMode": {
-      "description": "Controls whether the model receives multi-agent delegation instructions and, when it does, whether it should only spawn sub-agents after an explicit user request or may delegate proactively when doing so would help. `none` leaves the multi-agent tools available without injecting delegation instructions.",
-      "type": "string",
-      "enum": [
-        "none",
-        "explicitRequestOnly",
-        "proactive"
-      ]
-    },
     "NetworkAccess": {
       "type": "string",
       "enum": [
@@ -4898,8 +4533,7 @@
         "local",
         "vertical",
         "workspace-directory",
-        "shared-with-me",
-        "created-by-me-remote"
+        "shared-with-me"
       ]
     },
     "PluginListParams": {
@@ -5298,13 +4932,6 @@
         }
       }
     },
-    "RealtimeConversationVersion": {
-      "type": "string",
-      "enum": [
-        "v1",
-        "v2"
-      ]
-    },
     "RealtimeOutputModality": {
       "type": "string",
       "enum": [
@@ -5486,22 +5113,6 @@
         }
       }
     },
-    "RemoteControlDisableParams": {
-      "type": "object",
-      "properties": {
-        "ephemeral": {
-          "type": "boolean"
-        }
-      }
-    },
-    "RemoteControlEnableParams": {
-      "type": "object",
-      "properties": {
-        "ephemeral": {
-          "type": "boolean"
-        }
-      }
-    },
     "RemoteControlPairingStartParams": {
       "type": "object",
       "properties": {
@@ -5555,19 +5166,10 @@
               }
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "phase": {
@@ -5611,22 +5213,6 @@
                 "$ref": "#/definitions/AgentMessageInputContent"
               }
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "recipient": {
               "type": "string"
             },
@@ -5661,22 +5247,6 @@
               "type": [
                 "string",
                 "null"
-              ]
-            },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "summary": {
@@ -5715,19 +5285,10 @@
             },
             "id": {
               "description": "Legacy id field retained for compatibility with older payloads.",
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "status": {
@@ -5759,19 +5320,10 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "name": {
@@ -5812,19 +5364,10 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "status": {
@@ -5854,22 +5397,6 @@
             "call_id": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "output": {
               "$ref": "#/definitions/FunctionCallOutputBody"
             },
@@ -5896,6 +5423,7 @@
               "type": "string"
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
@@ -5903,16 +5431,6 @@
             },
             "input": {
               "type": "string"
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
-              ]
             },
             "name": {
               "type": "string"
@@ -5943,22 +5461,6 @@
           "properties": {
             "call_id": {
               "type": "string"
-            },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
-              ]
             },
             "name": {
               "type": [
@@ -5997,22 +5499,6 @@
             "execution": {
               "type": "string"
             },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "status": {
               "type": "string"
             },
@@ -6047,19 +5533,10 @@
               ]
             },
             "id": {
+              "writeOnly": true,
               "type": [
                 "string",
                 "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "status": {
@@ -6081,26 +5558,14 @@
         {
           "type": "object",
           "required": [
+            "id",
             "result",
             "status",
             "type"
           ],
           "properties": {
             "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string"
             },
             "result": {
               "type": "string"
@@ -6133,22 +5598,6 @@
           "properties": {
             "encrypted_content": {
               "type": "string"
-            },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
-              ]
             },
             "type": {
               "type": "string",
@@ -6186,22 +5635,6 @@
               "type": [
                 "string",
                 "null"
-              ]
-            },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "internal_chat_message_metadata_passthrough": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/InternalChatMessageMetadataPassthrough"
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "type": {
@@ -6565,28 +5998,6 @@
         }
       ]
     },
-    "SelectedCapabilityRoot": {
-      "description": "A user-selected root that can expose one or more runtime capabilities.",
-      "type": "object",
-      "required": [
-        "id",
-        "location"
-      ],
-      "properties": {
-        "id": {
-          "description": "Stable identifier supplied by the capability selection platform.",
-          "type": "string"
-        },
-        "location": {
-          "description": "Where the selected root can be resolved.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/CapabilityRootLocation"
-            }
-          ]
-        }
-      }
-    },
     "SendAddCreditsNudgeEmailParams": {
       "type": "object",
       "required": [
@@ -6784,48 +6195,6 @@
         }
       }
     },
-    "ThreadBackgroundTerminalsListParams": {
-      "type": "object",
-      "required": [
-        "threadId"
-      ],
-      "properties": {
-        "cursor": {
-          "description": "Opaque pagination cursor returned by a previous call.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "limit": {
-          "description": "Optional page size.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0.0
-        },
-        "threadId": {
-          "type": "string"
-        }
-      }
-    },
-    "ThreadBackgroundTerminalsTerminateParams": {
-      "type": "object",
-      "required": [
-        "processId",
-        "threadId"
-      ],
-      "properties": {
-        "processId": {
-          "type": "string"
-        },
-        "threadId": {
-          "type": "string"
-        }
-      }
-    },
     "ThreadCompactStartParams": {
       "type": "object",
       "required": [
@@ -6846,17 +6215,6 @@
       "properties": {
         "threadId": {
           "description": "Thread whose out-of-band elicitation counter should be decremented.",
-          "type": "string"
-        }
-      }
-    },
-    "ThreadDeleteParams": {
-      "type": "object",
-      "required": [
-        "threadId"
-      ],
-      "properties": {
-        "threadId": {
           "type": "string"
         }
       }
@@ -7148,13 +6506,6 @@
             "type": "string"
           }
         },
-        "parentThreadId": {
-          "description": "Optional direct parent thread filter.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "searchTerm": {
           "description": "Optional substring filter for the extracted thread title.",
           "type": [
@@ -7322,22 +6673,6 @@
         }
       }
     },
-    "ThreadRealtimeAppendSpeechParams": {
-      "description": "EXPERIMENTAL - append speakable text to thread realtime.",
-      "type": "object",
-      "required": [
-        "text",
-        "threadId"
-      ],
-      "properties": {
-        "text": {
-          "type": "string"
-        },
-        "threadId": {
-          "type": "string"
-        }
-      }
-    },
     "ThreadRealtimeAppendTextParams": {
       "description": "EXPERIMENTAL - append text input to thread realtime.",
       "type": "object",
@@ -7346,14 +6681,6 @@
         "threadId"
       ],
       "properties": {
-        "role": {
-          "default": "user",
-          "allOf": [
-            {
-              "$ref": "#/definitions/ConversationTextRole"
-            }
-          ]
-        },
         "text": {
           "type": "string"
         },
@@ -7412,48 +6739,6 @@
         "threadId"
       ],
       "properties": {
-        "clientManagedHandoffs": {
-          "description": "Leaves Codex response handoffs to the client's explicit append calls instead of forwarding them automatically. Defaults to false.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "codexResponseHandoffPrefix": {
-          "description": "Optional prefix added to automatic V1 Codex commentary sent with `conversation.handoff.append` when `codexResponsesAsItems` is not true. Final answers are sent without the prefix.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "codexResponseItemPrefix": {
-          "description": "Optional prefix added to automatic Codex response items when `codexResponsesAsItems` is true.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "codexResponsesAsItems": {
-          "description": "Sends automatic Codex responses as realtime conversation items instead of handoff appends.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "includeStartupContext": {
-          "description": "Set to false to start without Codex's startup context. Omitted or null includes it.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "model": {
-          "description": "Overrides the configured realtime model for this session only.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "outputModality": {
           "description": "Selects text or audio output for the realtime session. Transport and voice stay independent so clients can choose how they connect separately from what the model emits.",
           "allOf": [
@@ -7481,17 +6766,6 @@
           "anyOf": [
             {
               "$ref": "#/definitions/ThreadRealtimeStartTransport"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "version": {
-          "description": "Overrides the configured realtime protocol version for this session only.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/RealtimeConversationVersion"
             },
             {
               "type": "null"
@@ -7911,17 +7185,6 @@
             "null"
           ]
         },
-        "multiAgentMode": {
-          "description": "@deprecated Ignored. Use `effort: \"ultra\"` for proactive multi-agent behavior.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/MultiAgentMode"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "permissions": {
           "description": "Select a named permissions profile id for subsequent turns. Cannot be combined with `sandboxPolicy`.",
           "type": [
@@ -7994,12 +7257,16 @@
       "type": "string",
       "enum": [
         "created_at",
-        "updated_at",
-        "recency_at"
+        "updated_at"
       ]
     },
     "ThreadSource": {
-      "type": "string"
+      "type": "string",
+      "enum": [
+        "user",
+        "subagent",
+        "memory_consolidation"
+      ]
     },
     "ThreadSourceKind": {
       "type": "string",
@@ -8066,7 +7333,6 @@
           ]
         },
         "dynamicTools": {
-          "default": null,
           "type": [
             "array",
             "null"
@@ -8114,17 +7380,6 @@
             "null"
           ]
         },
-        "multiAgentMode": {
-          "description": "@deprecated Ignored. Use Ultra reasoning effort for proactive multi-agent behavior.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/MultiAgentMode"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "permissions": {
           "description": "Named profile id for this thread. Cannot be combined with `sandbox`.",
           "type": [
@@ -8161,16 +7416,6 @@
               "type": "null"
             }
           ]
-        },
-        "selectedCapabilityRoots": {
-          "description": "Capability roots selected for this thread by the hosting platform.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "$ref": "#/definitions/SelectedCapabilityRoot"
-          }
         },
         "serviceName": {
           "type": [
@@ -8335,7 +7580,7 @@
       ],
       "properties": {
         "cwd": {
-          "$ref": "#/definitions/LegacyAppPathString"
+          "$ref": "#/definitions/AbsolutePathBuf"
         },
         "environmentId": {
           "type": "string"
@@ -8479,17 +7724,6 @@
             "null"
           ]
         },
-        "multiAgentMode": {
-          "description": "@deprecated Ignored. Use `effort: \"ultra\"` for proactive multi-agent behavior.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/MultiAgentMode"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "outputSchema": {
           "description": "Optional JSON Schema used to constrain the final assistant message for this turn."
         },
@@ -8512,7 +7746,7 @@
           ]
         },
         "responsesapiClientMetadata": {
-          "description": "Optional metadata to enrich Codex's ResponsesAPI turn metadata.\n\nEntries are flattened into the JSON string sent as `client_metadata[\"x-codex-turn-metadata\"]` on ResponsesAPI HTTP and websocket requests.\n\nThey are not sent as top-level ResponsesAPI `client_metadata` keys, and reserved keys such as `session_id`, `thread_id`, `turn_id`, and `window_id` cannot be overridden.",
+          "description": "Optional turn-scoped Responses API client metadata.",
           "type": [
             "object",
             "null"
@@ -8600,7 +7834,7 @@
           }
         },
         "responsesapiClientMetadata": {
-          "description": "Optional metadata to enrich Codex's ResponsesAPI turn metadata.\n\nEntries are flattened into the JSON string sent as `client_metadata[\"x-codex-turn-metadata\"]` on ResponsesAPI HTTP and websocket requests.\n\nThey are not sent as top-level ResponsesAPI `client_metadata` keys, and reserved keys such as `session_id`, `thread_id`, `turn_id`, and `window_id` cannot be overridden.",
+          "description": "Optional turn-scoped Responses API client metadata.",
           "type": [
             "object",
             "null"
