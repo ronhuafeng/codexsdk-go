@@ -4,13 +4,14 @@ State:
 - Compact drift artifacts exist and caller needs a decision before checked-in baseline changes.
 
 Inputs:
-- Candidate artifact directory, target provenance, optional upstream response mapping evidence.
+- Candidate artifact directory, target provenance, and upstream response mapping evidence when request methods are added or changed.
 
 Evidence:
 - `reports/SUMMARY.md`
 - `reports/drift_summary.json`
 - `reports/matrix_update_skeleton.json`
 - At minimum inspect `file_diff`, `method_diff`, new request response mappings, manifest/coverage skeleton, and public facade impact before classifying non-clean drift.
+- When request methods are added or changed, inspect same-target `common.rs` response mappings; without them, return `ambiguous`.
 
 Boundaries:
 - Read only enough compact evidence to classify the candidate.
@@ -20,6 +21,7 @@ Boundaries:
 Checks:
 - Decision cites the drift evidence that drives it.
 - Required evidence checklist is satisfied or the decision is `ambiguous`.
+- Request-method decisions cite same-target `common.rs` mapping evidence when method drift touches requests.
 - Public SDK or coverage recommendations are evidence-backed, not speculative.
 
 Output:

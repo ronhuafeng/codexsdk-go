@@ -123,18 +123,26 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
 
         self.assertIn("`file_diff`, `method_diff`", review)
         self.assertIn("new request response mappings", review)
+        self.assertIn("same-target `common.rs` response mappings", review)
+        self.assertIn("without them, return `ambiguous`", review)
         self.assertIn("public facade impact", review)
 
         self.assertIn("stop drift generation in both cases", detect)
         self.assertIn("caller-owned issue close/update was not explicitly requested", detect)
+        self.assertIn("Generation mode: upstream Codex repo path", detect)
+        self.assertIn("Compare-only mode: candidate schema directory", detect)
+        self.assertIn("no upstream repo path is required", detect)
 
         self.assertIn("`common.rs` source SHA", apply_candidate)
         self.assertIn("content is verified from `target_sha:codex-rs/app-server-protocol/src/protocol/common.rs`", apply_candidate)
         self.assertIn("separate diff name-status evidence from `git diff --name-status` or `git status --short`", apply_candidate)
         self.assertIn("Changed files from separate git diff/status evidence", apply_candidate)
+        self.assertIn("`codexsdk/internal/protocolschema/appserver/v2/**`", apply_candidate)
+        self.assertIn("handwritten SDK, tests, or docs require reviewed drift evidence", apply_candidate)
 
         self.assertIn("May stage and commit only reviewed local sync changes", commit_local)
         self.assertIn("Must preserve unrelated user changes", commit_local)
+        self.assertIn("any handwritten SDK, test, or doc file", commit_local)
         self.assertIn("must not create the commit itself", local_sync)
 
         self.assertIn("checked-in baseline metadata or checked-in reports", validate)
@@ -143,6 +151,10 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn("worktree and index are clean", publish)
 
         self.assertIn("choose suffixes from remote tag state when pushing", finalize)
+        self.assertIn("Minimum closure evidence chain", finalize)
+        self.assertIn("landed baseline metadata `source_ref_name`/`source_ref_kind`/`source_commit`", finalize)
+        self.assertIn("forced drift verification used the same target", finalize)
+        self.assertIn("Landed baseline metadata does not match the intended target", finalize)
         self.assertIn("remote tag state before selecting", recovery)
 
         self.assertIn("read-only context", repair)
@@ -156,6 +168,8 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn("close/update caller-owned drift state only when explicitly requested", local_sync)
         self.assertIn("bare `manual_commit` SHA targets as explicit advanced inputs", local_sync)
         self.assertIn("`common.rs` must be bound to the same target commit", local_sync)
+        self.assertIn("`codexsdk/protocolv2/*.gen.go`", local_sync)
+        self.assertIn("Without reviewed drift evidence or explicit authorization", local_sync)
         self.assertIn("temporary `/tmp/codexsdk-upstream.*`", local_sync)
 
     def test_fix_workflow_stops_at_protected_pr_publication(self) -> None:

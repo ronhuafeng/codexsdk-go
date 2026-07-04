@@ -19,6 +19,7 @@ Boundaries:
 - Must not delete/move tags, tag unmerged PR heads or failed attempts, merge PRs, or call drift fully resolved before CI, tag, drift verification, and issue closure are complete when applicable.
 
 Checks:
+- Minimum closure evidence chain is complete: PR is merged, landed commit is on the repository default branch, landed baseline metadata `source_ref_name`/`source_ref_kind`/`source_commit` matches the intended target, tag handling ran only from the landed commit when applicable, forced drift verification used the same target, and issue close/update follows that verification result.
 - Tag, if created, points at the landed commit.
 - Drift verification result is known when dispatched.
 - Issue state matches the verification result when issue closure/update is requested.
@@ -29,5 +30,7 @@ Output:
 
 Stop if:
 - PR has not landed or landed commit cannot be verified.
+- Landed baseline metadata does not match the intended target.
+- Drift verification was not run against the same target when issue closure was requested.
 - Target is manual ref/commit and tagging would be attempted.
 - Tag conflict cannot use the documented suffix path.
