@@ -18,12 +18,13 @@ Checks:
 - Resolver JSON parses.
 - Peeled SHA is a full commit SHA.
 - Ref kind is resolver-supported.
+- Explicit full commit SHA inputs are syntactically accepted by the resolver; upstream reachability is confirmed later by tracking/fetch.
 
 Output:
 - Target ref, ref kind, target commit SHA, tag SHA when available, and explicit/default status.
 
 Stop if:
-- Target is ambiguous or resolver output lacks required upstream provenance.
+- Target is ambiguous, resolver output lacks required target provenance, or a later tracking/fetch step cannot prove an explicit commit is reachable from upstream.
 
 Note:
 - Baseline metadata is read by the caller or by target-policy checks, not by the resolver.

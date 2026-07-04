@@ -2,6 +2,7 @@
 
 State:
 - Validated local sync needs publication and caller explicitly owns that remote side effect.
+- `HEAD` is the committed sync change to publish, and the worktree and index are clean before invoking the publish script.
 
 Inputs:
 - Landing ref, sync branch prefix, target ref, target SHA, candidate schema path, and explicit publish request.

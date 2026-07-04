@@ -27,7 +27,7 @@ Recommended disposable locations:
 - sync output: `.cache/codexsdk-upstream-<short-sha>`
 - Rust build cache: `.cache/cargo-target/codex`
 
-These are caller-chosen locations, not all script defaults. `scripts/codexsdk_track_upstream.sh` requires `--codex-repo` or `CODEXSDK_CODEX_REPO`; when `--out` is omitted it creates a temporary `/tmp/codexsdk-upstream.*` directory.
+These are caller-chosen locations, not all script defaults. In normal generation mode, `scripts/codexsdk_track_upstream.sh` requires `--codex-repo` or `CODEXSDK_CODEX_REPO`; in `--compare-only` mode it needs only a resolved `--commit`, checked-in baseline, and candidate schema directory. When `--out` is omitted it creates a temporary `/tmp/codexsdk-upstream.*` directory.
 
 Useful drift evidence:
 
@@ -56,7 +56,7 @@ Use the canonical resolver and target-policy script. Do not hand-roll tag sortin
 Policy meanings:
 
 - `allow`: drift generation may run
-- `skip`: selected target is already represented; stop or close/update caller-owned drift state
+- `skip`: selected target is already represented; stop drift generation, then close/update caller-owned drift state only when explicitly requested
 - `block`: stop before drift generation
 
 Do not convert a `block` into a protocol-drift issue.
@@ -116,7 +116,7 @@ Tag only after a successful baseline sync commit exists on the landing ref:
 - stable upstream tags use `upstream-codex-rust-vX.Y.Z`
 - manual refs and manual commits do not get upstream sync tags
 - never move or delete existing upstream sync tags
-- follow-up syncs to the same upstream tag use the documented `-sync.N` suffix path
+- follow-up syncs to the same upstream tag use the documented `-sync.N` suffix path, selected from remote tag state when pushing
 
 ## Decision Rules
 

@@ -87,10 +87,47 @@ def local_sync_tags(base_tag: str) -> dict[str, str]:
     tags = git_output(["tag", "--list", f"{base_tag}*"]).splitlines()
     out: dict[str, str] = {}
     for tag in tags:
-        if tag == base_tag or re.fullmatch(re.escape(base_tag) + r"-sync[.][0-9]+", tag):
+        if is_sync_tag(base_tag, tag):
             commit = git_tag_commit(f"refs/tags/{tag}")
             if commit:
                 out[tag] = commit
+    return out
+
+
+def is_sync_tag(base_tag: str, tag: str) -> bool:
+    return tag == base_tag or re.fullmatch(re.escape(base_tag) + r"-sync[.][0-9]+", tag) is not None
+
+
+def remote_sync_tags(remote: str, base_tag: str) -> dict[str, str]:
+    output = git_output(
+        [
+            "ls-remote",
+            "--tags",
+            remote,
+            f"refs/tags/{base_tag}",
+            f"refs/tags/{base_tag}^{{}}",
+            f"refs/tags/{base_tag}-sync.*",
+            f"refs/tags/{base_tag}-sync.*^{{}}",
+        ]
+    )
+    out: dict[str, str] = {}
+    prefix = "refs/tags/"
+    peel_suffix = "^{}"
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            continue
+        sha, ref = parts
+        peeled = ref.endswith(peel_suffix)
+        if peeled:
+            ref = ref[: -len(peel_suffix)]
+        if not ref.startswith(prefix):
+            continue
+        tag = ref[len(prefix) :]
+        if not is_sync_tag(base_tag, tag):
+            continue
+        if peeled or tag not in out:
+            out[tag] = sha
     return out
 
 
@@ -165,6 +202,8 @@ def main() -> int:
     commit = head_commit()
     base_tag = tag_name(metadata)
     existing_tags = local_sync_tags(base_tag)
+    if args.push:
+        existing_tags.update(remote_sync_tags(args.push, base_tag))
     choice = choose_tag(base_tag, existing_tags, commit, args.next_suffix)
     message = sync_tag_message(metadata, commit)
 
@@ -179,8 +218,9 @@ def main() -> int:
         "upstream_ref_name": metadata.get("source_ref_name", ""),
     }
 
+    remote_commit = ""
     if args.push:
-        remote_commit = remote_tag_commit(args.push, choice.tag_name)
+        remote_commit = remote_tag_commit(args.push, choice.tag_name) or ""
         if remote_commit and remote_commit != commit:
             payload["action"] = "block"
             payload["reason"] = "remote upstream sync tag already exists at a different commit"
@@ -204,7 +244,9 @@ def main() -> int:
     elif args.create and choice.action == "exists":
         payload["action"] = "exists"
 
-    if args.push:
+    if args.push and remote_commit == commit:
+        payload["remote_already_current"] = True
+    elif args.push:
         push_tag(args.push, choice.tag_name)
         payload["pushed_remote"] = args.push
 

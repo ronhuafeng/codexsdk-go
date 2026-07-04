@@ -13,7 +13,7 @@ Tools:
 Boundaries:
 - Verify the landed commit is the commit being finalized before tagging or dispatching verification.
 - Accept only the repository default branch as the landing/finalize ref unless an explicit future allowlist exists.
-- May create stable upstream sync tags only through the sync tag script.
+- May create stable upstream sync tags only through the sync tag script, which must choose suffixes from remote tag state when pushing.
 - May run drift verification only when explicitly requested.
 - May close or update the protocol-drift issue only after landed commit verification, tag handling when applicable, and drift verification have completed.
 - Must not delete/move tags, tag unmerged PR heads or failed attempts, merge PRs, or call drift fully resolved before CI, tag, drift verification, and issue closure are complete when applicable.

@@ -100,13 +100,33 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
     def test_skill_command_contracts_match_script_boundaries(self) -> None:
         skill = read(".agents/skills/codexsdk-sync-upstream/SKILL.md")
         resolve = read(".agents/skills/codexsdk-sync-upstream/commands/resolve-target.md")
+        detect = read(".agents/skills/codexsdk-sync-upstream/commands/detect-drift.md")
+        apply_candidate = read(".agents/skills/codexsdk-sync-upstream/commands/apply-candidate.md")
+        publish = read(".agents/skills/codexsdk-sync-upstream/commands/publish-protected-pr.md")
+        finalize = read(".agents/skills/codexsdk-sync-upstream/commands/finalize-landed-sync.md")
         repair = read(".agents/skills/codexsdk-sync-upstream/commands/repair-applied-candidate.md")
         local_sync = read(".agents/skills/codexsdk-sync-upstream/references/local-sync.md")
+        recovery = read(".agents/skills/codexsdk-sync-upstream/references/recovery.md")
 
         self.assertIn("caller or target policy owns baseline provenance", skill)
+        self.assertIn("stable-tag sync tag handling when applicable", skill)
         self.assertNotIn("Baseline metadata path", resolve)
         self.assertNotIn("current baseline ref/commit", resolve)
         self.assertIn("Baseline metadata is read by the caller or by target-policy checks", resolve)
+        self.assertIn("syntactically accepted by the resolver", resolve)
+        self.assertIn("upstream reachability is confirmed later by tracking/fetch", resolve)
+
+        self.assertIn("stop drift generation in both cases", detect)
+        self.assertIn("caller-owned issue close/update was not explicitly requested", detect)
+
+        self.assertIn("separate diff name-status evidence from `git diff --name-status` or `git status --short`", apply_candidate)
+        self.assertIn("Changed files from separate git diff/status evidence", apply_candidate)
+
+        self.assertIn("`HEAD` is the committed sync change to publish", publish)
+        self.assertIn("worktree and index are clean", publish)
+
+        self.assertIn("choose suffixes from remote tag state when pushing", finalize)
+        self.assertIn("remote tag state before selecting", recovery)
 
         self.assertIn("read-only context", repair)
         self.assertIn("must not drive branch checkout", repair)
@@ -114,6 +134,8 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn("Recommended disposable locations", local_sync)
         self.assertNotIn("Default disposable locations", local_sync)
         self.assertIn("requires `--codex-repo` or `CODEXSDK_CODEX_REPO`", local_sync)
+        self.assertIn("in `--compare-only` mode it needs only a resolved `--commit`", local_sync)
+        self.assertIn("close/update caller-owned drift state only when explicitly requested", local_sync)
         self.assertIn("temporary `/tmp/codexsdk-upstream.*`", local_sync)
 
     def test_fix_workflow_stops_at_protected_pr_publication(self) -> None:

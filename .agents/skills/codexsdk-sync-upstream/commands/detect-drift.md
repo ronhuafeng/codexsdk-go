@@ -30,5 +30,6 @@ Output:
 - Policy decision, reason, drift status, drift fingerprint, target provenance, artifact directory, run URL, and any caller-owned issue or dispatch action.
 
 Stop if:
-- Policy returns `block` or `skip`.
+- Policy returns `block` or `skip`; stop drift generation in both cases.
+- Policy returns `skip` and caller-owned issue close/update was not explicitly requested.
 - Candidate provenance is missing or drift generation fails.
