@@ -120,6 +120,64 @@ class SyncTagTest(unittest.TestCase):
             self.assertEqual(completed.stdout, "")
             self.assertEqual(completed.stderr, "")
 
+    def test_cli_next_suffix_uses_remote_tags_when_local_tags_are_stale(self):
+        with sync_tag_repo() as repo, tempfile.TemporaryDirectory() as remote_tmp:
+            remote = Path(remote_tmp) / "origin.git"
+            subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+            subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "tag", "-a", "upstream-codex-rust-v0.140.0", "HEAD", "-m", "old"],
+                cwd=repo,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "push", "-q", "origin", "refs/tags/upstream-codex-rust-v0.140.0"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "tag", "-d", "upstream-codex-rust-v0.140.0"],
+                cwd=repo,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "follow-up"], cwd=repo, check=True)
+
+            completed = run_sync_tag(repo, "--next-suffix", "--create", "--push", "origin", "--json")
+            payload = json.loads(completed.stdout)
+
+            self.assertEqual(payload["action"], "created")
+            self.assertEqual(payload["tag_name"], "upstream-codex-rust-v0.140.0-sync.2")
+            self.assertEqual(payload["pushed_remote"], "origin")
+
+            head = subprocess.run(
+                ["git", "rev-parse", "--verify", "HEAD^{commit}"],
+                cwd=repo,
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout.strip()
+            remote_tag = subprocess.run(
+                [
+                    "git",
+                    "ls-remote",
+                    "--tags",
+                    "origin",
+                    "refs/tags/upstream-codex-rust-v0.140.0-sync.2^{}",
+                    "refs/tags/upstream-codex-rust-v0.140.0-sync.2",
+                ],
+                cwd=repo,
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            ).stdout
+            self.assertIn(head, remote_tag)
+
 
 class sync_tag_repo:
     def __enter__(self):

@@ -20,7 +20,7 @@ Report the highest completed layer precisely:
 - `local sync complete`: files validate locally, but nothing was pushed
 - `sync PR published`: the sync commit was pushed to a PR branch, but merge, tag, drift verification, and issue closure are still pending
 - `landed sync finalized`: the landed commit was verified, tags were handled when applicable, and drift verification passed, but no issue closure was requested or available
-- `drift issue fully resolved`: tag, pushed CI, drift verification, and issue closure are complete when applicable
+- `drift issue fully resolved`: stable-tag sync tag handling when applicable, pushed CI, drift verification, and issue closure are complete when applicable
 
 Never call a drift issue solved at PR publication time.
 

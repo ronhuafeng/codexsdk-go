@@ -42,7 +42,7 @@ Evidence:
 
 Allowed action:
 - Recover from the exact landed commit.
-- Create a stable sync tag through `scripts/codexsdk_sync_tag.py`.
+- Create a stable sync tag through `scripts/codexsdk_sync_tag.py`; when pushing, let the script choose suffixes from remote tag state.
 - If the base tag already exists at another commit, use the documented suffix path.
 - Run caller-owned drift verification after tagging when required.
 
@@ -74,6 +74,7 @@ Evidence:
 
 Allowed action:
 - Use `scripts/codexsdk_sync_tag.py --next-suffix --create --push origin` for follow-up syncs to the same upstream tag.
+- The script must consider remote tag state before selecting the base tag or the next `-sync.N` suffix.
 
 Stop:
 - Never move or delete an existing upstream sync tag.
