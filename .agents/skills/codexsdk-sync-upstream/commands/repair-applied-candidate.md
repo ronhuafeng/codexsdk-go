@@ -4,7 +4,8 @@ State:
 - Detect and mechanical apply already completed; caller needs bounded local repair or confirmation that no repair is needed.
 
 Inputs:
-- Target ref, ref kind, target SHA, and landing ref.
+- Target ref, ref kind, and target SHA.
+- Landing ref, if supplied by automation, is read-only context for summaries and prompt text. It must not drive branch checkout, PR base selection, merges, tags, or other remote operations.
 - Candidate `schema/`, `reports/`, and `common.rs`.
 - Apply result and diff name-status.
 

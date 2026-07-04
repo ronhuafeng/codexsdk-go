@@ -50,7 +50,7 @@ Issue metadata may select the upstream target and fingerprint, but it must not s
 
 Commands live under [commands/](commands/). A caller may invoke any single command directly when its state and inputs match. The command-specific boundary wins over any example or prior conversation.
 
-- [resolve-target](commands/resolve-target.md): resolve an upstream target and baseline provenance.
+- [resolve-target](commands/resolve-target.md): resolve an upstream target; caller or target policy owns baseline provenance.
 - [detect-drift](commands/detect-drift.md): run target policy and create local drift artifacts.
 - [review-drift](commands/review-drift.md): classify compact drift evidence before checked-in changes.
 - [apply-candidate](commands/apply-candidate.md): mechanically apply reviewed candidate artifacts.

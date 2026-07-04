@@ -9,6 +9,7 @@ Usage:
 Options:
   --branch-prefix <prefix>  Sync branch prefix. Defaults to codex/sync-upstream.
   --candidate <path>        Candidate schema directory validated against the checked-in baseline.
+  --default-branch <branch> Repository default branch. Inferred from <remote>/HEAD when omitted.
   --drift-sha <sha>         Drift fingerprint that produced this sync candidate.
   --issue-number <number>   Protocol-drift issue number used as audit state.
   --remote <name>           Git remote to fetch and push. Defaults to origin.
@@ -24,6 +25,7 @@ EOF
 
 branch_prefix="codex/sync-upstream"
 candidate=""
+default_branch=""
 drift_sha=""
 issue_number=""
 land_ref=""
@@ -41,6 +43,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --candidate)
       candidate="$2"
+      shift 2
+      ;;
+    --default-branch)
+      default_branch="$2"
       shift 2
       ;;
     --drift-sha)
@@ -100,10 +106,52 @@ if [[ -z "${target_kind}" ]]; then
     target_kind="manual_ref"
   fi
 fi
-land_ref="${land_ref#refs/heads/}"
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
+
+normalize_branch_ref() {
+  local ref=$1
+  ref="${ref#refs/heads/}"
+  ref="${ref#refs/remotes/${remote}/}"
+  ref="${ref#${remote}/}"
+  printf '%s\n' "${ref}"
+}
+
+resolve_default_branch() {
+  local symbolic_ref
+  local remote_head
+
+  if [[ -n "${default_branch}" ]]; then
+    normalize_branch_ref "${default_branch}"
+    return 0
+  fi
+
+  if symbolic_ref="$(git symbolic-ref --quiet --short "refs/remotes/${remote}/HEAD" 2>/dev/null)"; then
+    normalize_branch_ref "${symbolic_ref}"
+    return 0
+  fi
+
+  remote_head="$(
+    git remote show "${remote}" 2>/dev/null |
+      sed -n 's/^[[:space:]]*HEAD branch: //p' |
+      head -n 1
+  )"
+  if [[ -n "${remote_head}" && "${remote_head}" != "(unknown)" ]]; then
+    normalize_branch_ref "${remote_head}"
+    return 0
+  fi
+
+  echo "unable to determine repository default branch; pass --default-branch explicitly" >&2
+  return 1
+}
+
+land_ref="$(normalize_branch_ref "${land_ref}")"
+default_branch="$(resolve_default_branch)"
+if [[ "${land_ref}" != "${default_branch}" ]]; then
+  echo "Refusing landing ref ${land_ref}; sync PRs may target only repository default branch ${default_branch}." >&2
+  exit 1
+fi
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "worktree must be clean before publishing a sync PR" >&2
