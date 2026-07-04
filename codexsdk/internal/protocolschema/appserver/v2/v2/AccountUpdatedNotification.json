@@ -62,13 +62,6 @@
           "enum": [
             "personalAccessToken"
           ]
-        },
-        {
-          "description": "Amazon Bedrock bearer token managed by Codex.",
-          "type": "string",
-          "enum": [
-            "bedrockApiKey"
-          ]
         }
       ]
     },
