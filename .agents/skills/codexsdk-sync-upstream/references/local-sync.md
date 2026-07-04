@@ -21,11 +21,13 @@ Do not check in local absolute paths, `.cache/...` output paths, private repo pa
 
 ## Artifacts
 
-Default disposable locations:
+Recommended disposable locations:
 
 - upstream clone: `.cache/openai-codex`
 - sync output: `.cache/codexsdk-upstream-<short-sha>`
 - Rust build cache: `.cache/cargo-target/codex`
+
+These are caller-chosen locations, not all script defaults. `scripts/codexsdk_track_upstream.sh` requires `--codex-repo` or `CODEXSDK_CODEX_REPO`; when `--out` is omitted it creates a temporary `/tmp/codexsdk-upstream.*` directory.
 
 Useful drift evidence:
 

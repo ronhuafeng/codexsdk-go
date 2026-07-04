@@ -476,6 +476,7 @@ jobs:
         env:
           CANDIDATE_DIR: ${{ env.CODEXSDK_DRIFT_ARTIFACT_DIR }}
           DRIFT_SHA: ${{ steps.drift.outputs.drift_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ steps.requested.outputs.issue_number }}
           LAND_REF: ${{ steps.landing.outputs.land_ref }}
@@ -486,6 +487,7 @@ jobs:
           set -euo pipefail
           args=(
             --land-ref "${LAND_REF}"
+            --default-branch "${DEFAULT_BRANCH}"
             --branch-prefix "${CODEXSDK_SYNC_BRANCH_PREFIX}"
             --target-ref "${UPSTREAM_REF}"
             --target-kind "${UPSTREAM_REF_KIND}"

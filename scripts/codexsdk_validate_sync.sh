@@ -44,7 +44,12 @@ baseline="codexsdk/internal/protocolschema/appserver/v2"
 
 cd "${repo_root}"
 
-git ls-files -z -- '*.go' ':!:vendor/**' | xargs -0 gofmt -w
+unformatted_go="$(git ls-files -z -- '*.go' ':!:vendor/**' | xargs -0 gofmt -l)"
+if [[ -n "${unformatted_go}" ]]; then
+  echo "tracked Go files are not gofmt-formatted:" >&2
+  printf '%s\n' "${unformatted_go}" >&2
+  exit 1
+fi
 GOWORK=off go vet ./...
 GOWORK=off go test ./...
 

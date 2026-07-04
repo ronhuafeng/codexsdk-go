@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -53,6 +54,7 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn("Resolve landing ref", fix)
         self.assertIn("Refusing landing ref", fix)
         self.assertIn("steps.landing.outputs.land_ref", fix)
+        self.assertIn("--default-branch", fix)
         self.assertNotIn("default: main", fix)
         self.assertNotIn("ref: ${{ inputs.land_ref", fix)
 
@@ -62,6 +64,57 @@ class UpstreamWorkflowContractTest(unittest.TestCase):
         self.assertIn('--branch "${DEFAULT_BRANCH}"', finalize)
         self.assertNotIn('--ref "${LANDED_REF}"', finalize)
         self.assertNotIn("ref: ${{ inputs.landed_ref", finalize)
+
+    def test_publish_script_enforces_default_branch_before_other_validation(self) -> None:
+        completed = subprocess.run(
+            [
+                "bash",
+                "scripts/codexsdk_publish_sync_pr.sh",
+                "--land-ref",
+                "release",
+                "--default-branch",
+                "main",
+                "--target-ref",
+                "rust-v0.1.0",
+                "--target-sha",
+                "a" * 40,
+                "--skip-pr",
+            ],
+            cwd=REPO,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("Refusing landing ref release", completed.stderr)
+        self.assertNotIn("worktree must be clean", completed.stderr)
+
+    def test_validate_sync_checks_gofmt_without_rewriting_tracked_go(self) -> None:
+        script = read("scripts/codexsdk_validate_sync.sh")
+
+        self.assertIn("gofmt -l", script)
+        self.assertIn("tracked Go files are not gofmt-formatted", script)
+        self.assertNotIn("git ls-files -z -- '*.go' ':!:vendor/**' | xargs -0 gofmt -w", script)
+
+    def test_skill_command_contracts_match_script_boundaries(self) -> None:
+        skill = read(".agents/skills/codexsdk-sync-upstream/SKILL.md")
+        resolve = read(".agents/skills/codexsdk-sync-upstream/commands/resolve-target.md")
+        repair = read(".agents/skills/codexsdk-sync-upstream/commands/repair-applied-candidate.md")
+        local_sync = read(".agents/skills/codexsdk-sync-upstream/references/local-sync.md")
+
+        self.assertIn("caller or target policy owns baseline provenance", skill)
+        self.assertNotIn("Baseline metadata path", resolve)
+        self.assertNotIn("current baseline ref/commit", resolve)
+        self.assertIn("Baseline metadata is read by the caller or by target-policy checks", resolve)
+
+        self.assertIn("read-only context", repair)
+        self.assertIn("must not drive branch checkout", repair)
+
+        self.assertIn("Recommended disposable locations", local_sync)
+        self.assertNotIn("Default disposable locations", local_sync)
+        self.assertIn("requires `--codex-repo` or `CODEXSDK_CODEX_REPO`", local_sync)
+        self.assertIn("temporary `/tmp/codexsdk-upstream.*`", local_sync)
 
     def test_fix_workflow_stops_at_protected_pr_publication(self) -> None:
         workflow = read(".github/workflows/upstream-protocol-auto-sync.yml")
