@@ -10,6 +10,7 @@ Evidence:
 - `reports/SUMMARY.md`
 - `reports/drift_summary.json`
 - `reports/matrix_update_skeleton.json`
+- At minimum inspect `file_diff`, `method_diff`, new request response mappings, manifest/coverage skeleton, and public facade impact before classifying non-clean drift.
 
 Boundaries:
 - Read only enough compact evidence to classify the candidate.
@@ -18,6 +19,7 @@ Boundaries:
 
 Checks:
 - Decision cites the drift evidence that drives it.
+- Required evidence checklist is satisfied or the decision is `ambiguous`.
 - Public SDK or coverage recommendations are evidence-backed, not speculative.
 
 Output:

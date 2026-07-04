@@ -228,6 +228,33 @@ def parse_request_mappings(common_rs: Path) -> dict[str, RequestMapping]:
     return mappings
 
 
+def load_common_rs_source_sha(common_rs: Path, explicit_sha: str) -> str:
+    if explicit_sha:
+        return explicit_sha
+    sidecar = common_rs.with_name(f"{common_rs.name}.source_sha")
+    if sidecar.exists():
+        return sidecar.read_text(encoding="utf-8").strip()
+    return ""
+
+
+def verify_common_rs_provenance(common_rs: Path, source_sha: str, target_sha: str, codex_repo: Path | None = None) -> None:
+    if not source_sha:
+        raise ValueError("common.rs source SHA is required")
+    if source_sha != target_sha:
+        raise ValueError(f"common.rs source SHA {source_sha} does not match target {target_sha}")
+    if codex_repo is None:
+        return
+
+    completed = subprocess.run(
+        ["git", "-C", str(codex_repo), "show", f"{target_sha}:{COMMON_RS_REF}"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if completed.stdout != common_rs.read_bytes():
+        raise ValueError(f"common.rs content does not match {target_sha}:{COMMON_RS_REF}")
+
+
 def aggregate_entries(root: Path, aggregate: str) -> list[AggregateEntry]:
     schema = load_json(root / aggregate)
     entries: list[AggregateEntry] = []
@@ -542,8 +569,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE, help="checked-in app-server v2 schema baseline root")
     parser.add_argument("--candidate", required=True, type=Path, help="trusted candidate schema directory")
+    parser.add_argument("--codex-repo", type=Path, help="local openai/codex clone used to verify common.rs content")
     parser.add_argument("--reports", type=Path, help="candidate drift report directory")
     parser.add_argument("--common-rs", required=True, type=Path, help="upstream common.rs response mapping source")
+    parser.add_argument("--common-rs-source-sha", default="", help="commit SHA that produced --common-rs")
     parser.add_argument("--target-ref", required=True, help="selected upstream ref name")
     parser.add_argument("--target-kind", required=True, help="selected upstream ref kind")
     parser.add_argument("--target-sha", required=True, help="selected upstream commit SHA")
@@ -560,6 +589,11 @@ def main() -> int:
         raise SystemExit(f"candidate directory does not exist: {candidate}")
     if not args.common_rs.is_file():
         raise SystemExit(f"common.rs does not exist: {args.common_rs}")
+    try:
+        common_rs_source_sha = load_common_rs_source_sha(args.common_rs, args.common_rs_source_sha)
+        verify_common_rs_provenance(args.common_rs, common_rs_source_sha, args.target_sha, args.codex_repo)
+    except (subprocess.CalledProcessError, ValueError) as exc:
+        raise SystemExit(str(exc))
 
     old_metadata = load_json(baseline / "baseline_metadata.json")
     old_manifest = load_json(baseline / "manifest.json")
@@ -603,6 +637,7 @@ def main() -> int:
     summary = {
         "status": "ok",
         "added_schemas": sorted(added_schemas),
+        "common_rs_source_sha": common_rs_source_sha,
         "schema_file_count": len(schema_utils.schema_files(baseline)),
         "method_count": len(manifest["entries"]),
         "coverage_type_count": len(coverage["types"]),

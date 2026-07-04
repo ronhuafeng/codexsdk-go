@@ -34,7 +34,7 @@ Useful drift evidence:
 - `reports/SUMMARY.md`
 - `reports/drift_summary.json`
 - `reports/matrix_update_skeleton.json`
-- upstream `common.rs` response mappings
+- upstream `common.rs` response mappings from `source_commit:codex-rs/app-server-protocol/src/protocol/common.rs`
 
 Preserve compact pre-change evidence before overwriting checked-in clean reports.
 
@@ -43,7 +43,7 @@ Preserve compact pre-change evidence before overwriting checked-in clean reports
 Issues are status and audit records, not the only control plane.
 
 - Detect: resolve target, run policy, generate drift, record upstream ref/SHA, drift fingerprint, and workflow run URL, then create/update/close protocol-drift issue state when caller-owned.
-- Fix: explicitly dispatched from an issue number or upstream target/fingerprint. Regenerate or verify the candidate, apply it, run `repair-applied-candidate`, validate, and publish a protected PR.
+- Fix: explicitly dispatched from an issue number or upstream target/fingerprint. Regenerate or verify the candidate, apply it, run `repair-applied-candidate`, validate, commit the local sync, and publish a protected PR.
 - Finalize: after the PR lands, verify the landed commit, create the stable sync tag when applicable, run forced drift verification, then close or update the issue based on the verification result.
 
 Do not depend on a `GITHUB_TOKEN` issue creation/update to trigger the fix. Dispatch a fix workflow explicitly or ask a maintainer to dispatch it manually.
@@ -52,6 +52,8 @@ Keep upstream target selection flexible, but keep workflow code refs, PR base re
 ## Target Policy
 
 Use the canonical resolver and target-policy script. Do not hand-roll tag sorting, prerelease filtering, annotated-tag peeling, or downgrade logic.
+
+Prefer stable tags or named refs for normal syncs. Treat bare `manual_commit` SHA targets as explicit advanced inputs: the resolver accepts them syntactically, and tracking/fetch must fail closed if upstream cannot fetch the object.
 
 Policy meanings:
 
@@ -78,6 +80,8 @@ If new methods appear, compare stable vs experimental schema presence before dec
 
 Use `scripts/codexsdk_apply_sync_candidate.py` for mechanical candidate application. Do not copy schema/report files by hand.
 
+`common.rs` must be bound to the same target commit as the candidate. Use `target_sha:codex-rs/app-server-protocol/src/protocol/common.rs` and provide its source SHA to the apply script; when an upstream clone is available, the script verifies the file content against that commit.
+
 Expected mechanical sync surface includes:
 
 - schema JSON
@@ -101,7 +105,9 @@ Validation should prove:
 - generated files reproduce exactly
 - manifest and coverage no longer reference removed upstream surface
 - checked-in reports are clean and sanitized
-- no local absolute paths or cache output paths leaked into checked-in reports
+- no local absolute paths or cache output paths leaked into checked-in baseline metadata or checked-in reports
+
+After validation passes, use `commit-local-sync` to create the local sync commit before publication. `publish-protected-pr` consumes that committed `HEAD`; it must not create the commit itself.
 
 When validation fails, inspect the first actionable failure before adding code or abstractions.
 

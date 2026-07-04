@@ -4,7 +4,7 @@ State:
 - Reviewed candidate is ready for mechanical application into the checked-in baseline.
 
 Inputs:
-- Candidate schema directory, reports directory, upstream `common.rs`, target ref, ref kind, and target SHA.
+- Candidate schema directory, reports directory, upstream `common.rs`, `common.rs` source SHA, target ref, ref kind, and target SHA.
 
 Tool:
 - `scripts/codexsdk_apply_sync_candidate.py`
@@ -18,6 +18,7 @@ Boundaries:
 
 Checks:
 - Apply result JSON parses.
+- `common.rs` source SHA matches the target SHA, and content is verified from `target_sha:codex-rs/app-server-protocol/src/protocol/common.rs` when an upstream clone is available.
 - Changed files from separate git diff/status evidence stay inside the allowed sync surface.
 - Candidate provenance still matches target.
 
@@ -26,4 +27,5 @@ Output:
 
 Stop if:
 - Candidate artifacts or provenance are missing/mismatched.
+- `common.rs` provenance is missing, mismatched, or cannot be verified when verification inputs are available.
 - Apply script fails or wants to touch files outside the allowed sync surface.

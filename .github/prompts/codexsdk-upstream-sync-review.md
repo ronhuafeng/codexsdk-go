@@ -14,6 +14,7 @@ Candidate schema and drift artifacts from this workflow's detect job are already
 - ${CANDIDATE_DIR}/schema
 - ${CANDIDATE_DIR}/reports
 - ${CANDIDATE_DIR}/common.rs
+- ${CANDIDATE_DIR}/common.rs.source_sha
 
 Mechanical apply summary:
 

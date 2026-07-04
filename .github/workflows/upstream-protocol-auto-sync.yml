@@ -323,6 +323,8 @@ jobs:
           git -C "${CODEXSDK_UPSTREAM_CLONE}" show \
             "${{ steps.refs.outputs.upstream_sha }}:${CODEX_UPSTREAM_COMMON_RS}" \
             > "${CODEXSDK_DRIFT_ARTIFACT_DIR}/common.rs"
+          printf '%s\n' "${{ steps.refs.outputs.upstream_sha }}" \
+            > "${CODEXSDK_DRIFT_ARTIFACT_DIR}/common.rs.source_sha"
 
       - name: Prepare regenerated drift metadata
         if: steps.target_policy.outputs.decision == 'allow'
@@ -391,8 +393,10 @@ jobs:
           mkdir -p "${CODEXSDK_AUTO_SYNC_DIR}"
           python3 scripts/codexsdk_apply_sync_candidate.py \
             --candidate "${CANDIDATE_DIR}/schema" \
+            --codex-repo "${CODEXSDK_UPSTREAM_CLONE}" \
             --reports "${CANDIDATE_DIR}/reports" \
             --common-rs "${CANDIDATE_DIR}/common.rs" \
+            --common-rs-source-sha "${UPSTREAM_SHA}" \
             --target-ref "${UPSTREAM_REF}" \
             --target-kind "${UPSTREAM_REF_KIND}" \
             --target-sha "${UPSTREAM_SHA}" \
@@ -446,7 +450,7 @@ jobs:
             --candidate "${CANDIDATE_DIR}/schema" \
             --target-sha "${UPSTREAM_SHA}"
 
-      - name: Commit sync changes
+      - name: Commit local sync changes
         if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
         env:
           UPSTREAM_REF: ${{ steps.refs.outputs.upstream_ref }}
@@ -454,6 +458,7 @@ jobs:
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
         run: |
           set -euo pipefail
+          echo "Using codexsdk-sync-upstream command: commit-local-sync."
           git diff --name-status
           if git diff --quiet; then
             echo "Codex sync produced no file changes while drift was review-required." >&2
