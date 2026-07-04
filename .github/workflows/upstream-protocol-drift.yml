@@ -1,5 +1,5 @@
 name: Codex Upstream Protocol Drift
-run-name: Protocol drift ${{ inputs.upstream_ref || 'latest stable' }}
+run-name: "Protocol drift ${{ inputs.upstream_ref || 'latest stable' }}"
 
 on:
   schedule:
@@ -15,12 +15,23 @@ on:
         required: false
         type: boolean
         default: false
+      force_compare:
+        description: "Generate drift artifacts even when baseline metadata already points at the selected upstream target."
+        required: false
+        type: boolean
+        default: false
+      dispatch_fix:
+        description: "When review-required drift is found, explicitly dispatch the fix workflow with this run's target and fingerprint."
+        required: false
+        type: boolean
+        default: false
 
 defaults:
   run:
     shell: bash
 
 env:
+  CODEX_UPSTREAM_COMMON_RS: codex-rs/app-server-protocol/src/protocol/common.rs
   CODEX_UPSTREAM_REPO: https://github.com/openai/codex.git
   CODEXSDK_DRIFT_ARTIFACT_DIR: /tmp/codexsdk-upstream
   CODEXSDK_DRIFT_LABEL: protocol-drift
@@ -32,7 +43,6 @@ env:
 
 concurrency:
   group: codex-upstream-protocol-drift
-  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -41,12 +51,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
+      actions: write
       contents: read
       issues: write
 
     steps:
+      - name: Guard control-plane ref
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_NAME}" != "${DEFAULT_BRANCH}" ]]; then
+            echo "Refusing to run drift control plane from ${GITHUB_REF_NAME}; use ${DEFAULT_BRANCH}." >&2
+            exit 1
+          fi
+
       - name: Check out
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Resolve upstream baseline
         id: refs
@@ -79,6 +103,7 @@ jobs:
           {
             echo "## Codex upstream protocol drift"
             echo
+            echo "- Current phase: \`detect\`"
             echo "- Baseline: \`$(python3 -c 'import json, os; print(json.load(open(os.environ["CODEXSDK_SCHEMA_BASELINE"] + "/baseline_metadata.json"))["source_commit"])')\`"
             echo "- Upstream target: \`$(jq -r '.upstream_ref' "${CODEXSDK_UPSTREAM_TARGET_JSON}")\` (\`$(jq -r '.upstream_ref_kind' "${CODEXSDK_UPSTREAM_TARGET_JSON}")\`)"
             echo "- Upstream commit: \`$(jq -r '.upstream_sha' "${CODEXSDK_UPSTREAM_TARGET_JSON}")\`"
@@ -143,22 +168,51 @@ jobs:
             echo "- Requested target: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_ref_kind }}\`)"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Select drift action
+        id: drift_action
+        env:
+          FORCE_COMPARE: ${{ inputs.force_compare || false }}
+        run: |
+          set -euo pipefail
+
+          decision="${{ steps.target_policy.outputs.decision }}"
+          reason="${{ steps.target_policy.outputs.reason }}"
+          if [[ "${decision}" == "skip" && "${FORCE_COMPARE}" == "true" ]]; then
+            decision="allow"
+            reason="force_compare requested; generating verification drift artifacts"
+          fi
+
+          {
+            echo "decision=${decision}"
+            echo "reason=${reason}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo
+            echo "## Drift action"
+            echo
+            echo "- Effective decision: \`${decision}\`"
+            echo "- Reason: ${reason}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Skip when target policy is current
-        if: steps.target_policy.outputs.decision == 'skip'
+        if: steps.drift_action.outputs.decision == 'skip'
         run: |
           echo "Baseline already points at the selected openai/codex upstream target: ${{ steps.refs.outputs.upstream_ref }}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Stop when target policy blocks drift detection
-        if: steps.target_policy.outputs.decision == 'block'
+        if: steps.drift_action.outputs.decision == 'block'
         run: |
           {
             echo "Protocol drift generation was skipped by target policy."
             echo
-            echo "Reason: ${{ steps.target_policy.outputs.reason }}"
+            echo "Reason: ${{ steps.drift_action.outputs.reason }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close drift issue when baseline is current
-        if: steps.target_policy.outputs.decision == 'skip'
+        if: steps.drift_action.outputs.decision == 'skip'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -179,23 +233,21 @@ jobs:
           else
             echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clone upstream Codex
-        if: steps.target_policy.outputs.decision == 'allow'
+        if: steps.drift_action.outputs.decision == 'allow'
         run: |
           git clone --filter=blob:none --no-checkout "${CODEX_UPSTREAM_REPO}" "${CODEXSDK_UPSTREAM_CLONE}"
 
       - name: Set up Codex Rust
-        if: steps.target_policy.outputs.decision == 'allow'
+        if: steps.drift_action.outputs.decision == 'allow'
         uses: ./.github/actions/setup-codex-rust
         with:
           cache-key-suffix: ${{ steps.refs.outputs.upstream_short_sha }}
           target-dir: ${{ env.CODEXSDK_RUST_TARGET_DIR }}
 
       - name: Generate drift report
-        if: steps.target_policy.outputs.decision == 'allow'
+        if: steps.drift_action.outputs.decision == 'allow'
         run: |
           CARGO_TARGET_DIR="$PWD/${CODEXSDK_RUST_TARGET_DIR}" \
             scripts/codexsdk_track_upstream.sh \
@@ -205,157 +257,57 @@ jobs:
             --source-ref-kind "${{ steps.refs.outputs.upstream_ref_kind }}" \
             --out "${CODEXSDK_DRIFT_ARTIFACT_DIR}"
 
-      - name: Prepare drift issue
-        if: steps.target_policy.outputs.decision == 'allow'
-        id: drift
+      - name: Capture upstream response mappings
+        if: steps.drift_action.outputs.decision == 'allow'
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
+          git -C "${CODEXSDK_UPSTREAM_CLONE}" show \
+            "${{ steps.refs.outputs.upstream_sha }}:${CODEX_UPSTREAM_COMMON_RS}" \
+            > "${CODEXSDK_DRIFT_ARTIFACT_DIR}/common.rs"
 
-          reports = Path(os.environ["CODEXSDK_DRIFT_ARTIFACT_DIR"], "reports")
-          drift_path = reports / "drift_summary.json"
-          drift = json.loads(drift_path.read_text())
-          drift_sha = hashlib.sha256(drift_path.read_bytes()).hexdigest()
-
-          baseline = os.environ["BASELINE_SHA"]
-          upstream_ref = os.environ["UPSTREAM_REF"]
-          upstream_ref_kind = os.environ["UPSTREAM_REF_KIND"]
-          upstream = os.environ["UPSTREAM_SHA"]
-          run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
-          status = drift["status"]
-          file_diff = drift["file_diff"]
-          method_diff = drift["method_diff"]
-
-          def short_list(items, limit=20):
-              if not items:
-                  return "_none_"
-              lines = [f"- `{item}`" for item in items[:limit]]
-              if len(items) > limit:
-                  lines.append(f"- ...and {len(items) - limit} more")
-              return "\n".join(lines)
-
-          method_lines = []
-          for schema, diff in method_diff.items():
-              if diff["added"] or diff["removed"]:
-                  method_lines.append(f"### {schema}")
-                  method_lines.append("")
-                  method_lines.append("Added:")
-                  method_lines.append(short_list(diff["added"]))
-                  method_lines.append("")
-                  method_lines.append("Removed:")
-                  method_lines.append(short_list(diff["removed"]))
-                  method_lines.append("")
-          if not method_lines:
-              method_lines.append("_No aggregate method additions or removals._")
-
-          upstream_display = f"`{upstream_ref}` (`{upstream}`)"
-          title = f"Protocol drift detected against openai/codex {upstream_ref}"
-          body = f"""<!-- codexsdk-upstream-sync
-          baseline_commit: {baseline}
-          upstream_ref: {upstream_ref}
-          upstream_ref_kind: {upstream_ref_kind}
-          upstream_commit: {upstream}
-          drift_sha256: {drift_sha}
-          -->
-
-          ## Protocol Drift Detected
-
-          The checked-in Codex app-server schema baseline no longer matches upstream `openai/codex`.
-
-          - Baseline: `openai/codex@{baseline}`
-          - Upstream target: {upstream_display}
-          - Upstream target kind: `{upstream_ref_kind}`
-          - Drift status: `{status}`
-          - Drift fingerprint: `{drift_sha}`
-          - Workflow run: {run_url}
-
-          ## File Diff
-
-          - Added: {len(file_diff["added"])}
-          - Changed: {len(file_diff["changed"])}
-          - Removed: {len(file_diff["removed"])}
-
-          ### Added Schemas
-
-          {short_list(file_diff["added"])}
-
-          ### Changed Schemas
-
-          {short_list(file_diff["changed"])}
-
-          ### Removed Schemas
-
-          {short_list(file_diff["removed"])}
-
-          ## Method Diff
-
-          {chr(10).join(method_lines)}
-
-          ## Suggested Local Sync
-
-          ```sh
-          scripts/codexsdk_track_upstream.sh \\
-            --codex-repo /path/to/openai/codex \\
-            --commit {upstream} \\
-            --source-ref {upstream_ref} \\
-            --source-ref-kind {upstream_ref_kind} \\
-            --out /tmp/codexsdk-upstream
-          ```
-
-          Then use `$codexsdk-sync-upstream` commands `review-drift`, `apply-candidate`, `repair-applied-candidate` when needed, and `validate-local` to complete the local sync.
-          """
-
-          comment = f"""Protocol drift is still present.
-
-          - Baseline: `openai/codex@{baseline}`
-          - Upstream target: {upstream_display}
-          - Upstream target kind: `{upstream_ref_kind}`
-          - Drift status: `{status}`
-          - Drift fingerprint: `{drift_sha}`
-          - Workflow run: {run_url}
-          """
-
-          artifact_dir = Path(os.environ["CODEXSDK_DRIFT_ARTIFACT_DIR"])
-          Path(artifact_dir, "issue-title.txt").write_text(title + "\n")
-          Path(artifact_dir, "issue-body.md").write_text(body)
-          Path(artifact_dir, "issue-comment.md").write_text(comment)
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"status={status}\n")
-              output.write(f"drift_sha={drift_sha}\n")
-          PY
+      - name: Prepare drift issue
+        if: steps.drift_action.outputs.decision == 'allow'
+        id: drift
         env:
           BASELINE_SHA: ${{ steps.refs.outputs.baseline_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           UPSTREAM_REF: ${{ steps.refs.outputs.upstream_ref }}
           UPSTREAM_REF_KIND: ${{ steps.refs.outputs.upstream_ref_kind }}
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/codexsdk_write_drift_issue_artifacts.py \
+            --artifact-dir "${CODEXSDK_DRIFT_ARTIFACT_DIR}" \
+            --baseline-sha "${BASELINE_SHA}" \
+            --run-url "${RUN_URL}" \
+            --upstream-ref "${UPSTREAM_REF}" \
+            --upstream-ref-kind "${UPSTREAM_REF_KIND}" \
+            --upstream-sha "${UPSTREAM_SHA}"
 
-      - name: Upload drift reports
-        if: steps.target_policy.outputs.decision == 'allow'
+      - name: Upload drift evidence
+        if: steps.drift_action.outputs.decision == 'allow'
         uses: actions/upload-artifact@v7
         with:
-          name: codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}
-          path: ${{ env.CODEXSDK_DRIFT_ARTIFACT_DIR }}/reports
+          name: codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}-${{ steps.drift.outputs.drift_sha }}
+          path: ${{ env.CODEXSDK_DRIFT_ARTIFACT_DIR }}
           if-no-files-found: error
 
       - name: Update workflow summary
-        if: steps.target_policy.outputs.decision == 'allow'
+        if: steps.drift_action.outputs.decision == 'allow'
         run: |
           set -euo pipefail
           {
             echo
             echo "- Drift status: \`${{ steps.drift.outputs.status }}\`"
             echo "- Drift fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`"
+            echo "- Drift evidence artifact: \`codex-upstream-drift-${{ steps.refs.outputs.upstream_sha }}-${{ steps.drift.outputs.drift_sha }}\`"
             echo
             cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/reports/SUMMARY.md"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close drift issue when drift is clean
-        if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'clean'
+        if: steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status == 'clean' && !inputs.force_compare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -376,11 +328,12 @@ jobs:
           else
             echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create or update drift issue
-        if: steps.target_policy.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
+        if: steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
+        id: issue_state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -427,7 +380,37 @@ jobs:
                 --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-body.md" \
                 --label "$label"
             )"
+            issue_number="${new_issue_url##*/}"
             echo "Created drift issue: ${new_issue_url}" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+          echo "issue_number=${issue_number}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch fix workflow
+        if: github.event_name == 'workflow_dispatch' && inputs.dispatch_fix && steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
         env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.issue_state.outputs.issue_number }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ISSUE_NUMBER}" ]]; then
+            echo "Cannot dispatch fix workflow without a protocol-drift issue number." >&2
+            exit 1
+          fi
+
+          gh workflow run upstream-protocol-auto-sync.yml \
+            --ref "${DEFAULT_BRANCH}" \
+            -f "issue_number=${ISSUE_NUMBER}" \
+            -f "upstream_ref=${{ steps.refs.outputs.upstream_ref }}" \
+            -f "upstream_sha=${{ steps.refs.outputs.upstream_sha }}" \
+            -f "drift_sha=${{ steps.drift.outputs.drift_sha }}"
+
+          echo "Dispatched fix workflow for issue #${ISSUE_NUMBER} and fingerprint ${{ steps.drift.outputs.drift_sha }}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail verification when drift remains
+        if: inputs.force_compare && steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status != 'clean'
+        run: |
+          echo "force_compare verification found drift status '${{ steps.drift.outputs.status }}'; issue state was updated before failing." >&2
+          exit 1

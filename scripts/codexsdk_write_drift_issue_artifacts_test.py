@@ -40,6 +40,9 @@ class WriteDriftIssueArtifactsTest(unittest.TestCase):
         self.assertIn("### ClientRequest.json", rendered["body"])
         self.assertIn("- `thread/start`", rendered["body"])
         self.assertIn("`action_required`", rendered["body"])
+        self.assertIn("This issue is state and audit evidence", rendered["body"])
+        self.assertIn("upstream-protocol-auto-sync.yml", rendered["body"])
+        self.assertIn("upstream-protocol-finalize.yml", rendered["body"])
         self.assertIn("Protocol drift is still present.", rendered["comment"])
 
     def test_cli_writes_artifacts_and_github_output(self) -> None:

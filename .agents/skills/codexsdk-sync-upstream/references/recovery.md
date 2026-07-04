@@ -16,10 +16,10 @@ Allowed action:
 Stop:
 - Do not manually merge around this gate. After the real `Go` check passes, protected auto-merge should continue.
 
-## Sync PR Does Not Merge Before Timeout
+## Sync PR Does Not Merge After Publication
 
 Trigger:
-- Auto-merge wait times out.
+- A published sync PR remains open or repository auto-merge does not land it.
 
 Evidence:
 - PR state, merge state, review decision, status rollup, required checks, and recent CI runs on the sync branch.
@@ -27,6 +27,7 @@ Evidence:
 Allowed action:
 - If the blocker is `action_required`, use that recipe.
 - If a real check failed, inspect logs and fix with a normal follow-up commit or rerun caller-owned automation.
+- If checks passed but auto-merge is not enabled, leave the PR on the protected path for a maintainer or repository auto-merge policy to handle.
 
 Stop:
 - Do not force a merge around failed required checks.

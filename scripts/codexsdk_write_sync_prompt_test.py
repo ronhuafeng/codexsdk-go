@@ -17,15 +17,17 @@ import codexsdk_write_sync_prompt as sync_prompt
 class WriteSyncPromptTest(unittest.TestCase):
     def test_render_prompt_substitutes_template_values(self) -> None:
         prompt = sync_prompt.render_prompt(
-            "ref=${UPSTREAM_REF}\nkind=${UPSTREAM_REF_KIND}\nsha=${UPSTREAM_SHA}\n",
+            "phase=${PHASE}\nref=${UPSTREAM_REF}\nkind=${UPSTREAM_REF_KIND}\nsha=${UPSTREAM_SHA}\n",
             auto_sync_dir=".cache/codexsdk-auto-sync",
             candidate_dir=".cache/candidate",
             land_ref="main",
+            phase="fix",
             upstream_ref="rust-v0.141.0",
             upstream_ref_kind="stable_rust_tag",
             upstream_sha="a" * 40,
         )
 
+        self.assertIn("phase=fix", prompt)
         self.assertIn("ref=rust-v0.141.0", prompt)
         self.assertIn("kind=stable_rust_tag", prompt)
         self.assertTrue(prompt.endswith("\n"))
@@ -35,14 +37,18 @@ class WriteSyncPromptTest(unittest.TestCase):
             auto_sync_dir=".cache/codexsdk-auto-sync",
             candidate_dir=".cache/codexsdk-upstream-abc123",
             land_ref="main",
+            phase="fix",
             upstream_ref="rust-v0.141.0",
             upstream_ref_kind="stable_rust_tag",
             upstream_sha="a" * 40,
         )
 
         self.assertIn("Use codexsdk-sync-upstream command: repair-applied-candidate.", prompt)
+        self.assertIn("Current phase: `fix`.", prompt)
         self.assertIn("Detect and apply have already completed", prompt)
         self.assertIn("Authoritative inputs", prompt)
+        self.assertIn("Allowed side effects", prompt)
+        self.assertIn("Forbidden side effects", prompt)
         self.assertIn("Do not follow a global sync workflow", prompt)
         self.assertIn("shortest safe path", prompt)
         self.assertIn("rust-v0.141.0", prompt)
@@ -52,6 +58,8 @@ class WriteSyncPromptTest(unittest.TestCase):
         self.assertIn("Final output must include", prompt)
         self.assertIn("Do not re-copy schemas", prompt)
         self.assertIn("Do not commit, push, tag", prompt)
+        self.assertIn("required `Go` check", prompt)
+        self.assertIn("finalize workflow", prompt)
         self.assertNotIn("references/automation.md", prompt)
 
     def test_cli_writes_prompt_file_quietly(self) -> None:
@@ -70,6 +78,8 @@ class WriteSyncPromptTest(unittest.TestCase):
                     ".cache/candidate",
                     "--land-ref",
                     "main",
+                    "--phase",
+                    "fix",
                     "--upstream-ref",
                     "rust-v0.141.0",
                     "--upstream-ref-kind",
