@@ -93,3 +93,7 @@ Collect or infer:
 - output workdir, defaulting to `.cache/codexsdk-upstream-<short-sha>`
 
 If the target cannot be inferred from the user request, latest stable tag, or local context, ask before changing files.
+
+## After Run
+
+After completing the selected command, if execution revealed a concrete improvement to this skill, its helper scripts, or environment-specific assumptions, mention it briefly and ask whether to update the skill. Do not modify the skill during the original command unless the user explicitly asks.
