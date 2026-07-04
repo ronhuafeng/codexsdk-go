@@ -1,15 +1,19 @@
 # Command: validate-local
 
-Use when:
-- Validating local checked-in sync state before commit, publish, or final report.
+State handled:
+- The checked-in sync surface has local changes and needs validation before commit, publish, or final report.
 
-Inputs:
+Trusted inputs:
 - Candidate schema directory when available.
 - Target commit SHA and current checked-in baseline.
 
 Read:
 - Top-level skill contract and invariants in `../SKILL.md`.
 - `../references/local-sync.md`, "Validate".
+
+Fixed tools:
+- `scripts/codexsdk_validate_sync.sh` for the canonical local sync validation path.
+- Focused tests, `gofmt`, generator reproduction checks, sync-state checks, and path sanitization checks when they fit the changed files.
 
 Allowed side effects:
 - May run `scripts/codexsdk_validate_sync.sh`.
@@ -19,10 +23,10 @@ Forbidden side effects:
 - Do not publish remote state.
 - Do not commit, push, tag, edit issues, create PRs, request merges, or change branches.
 
-Procedure:
-- Run `scripts/codexsdk_validate_sync.sh` with the candidate and target SHA when available.
-- Run any focused checks needed for files changed during repair.
-- Inspect validation failures before adding code or changing classification.
+Shortest safe path:
+- Prefer the canonical validation script when candidate and target inputs are available.
+- Add focused checks for files changed during repair or for the first actionable failure.
+- Inspect validation failures before adding code or changing manifest, coverage, or SDK classification.
 
 Success means:
 - Local validation passes, or blockers are explicit and actionable.

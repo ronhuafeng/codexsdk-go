@@ -2,6 +2,8 @@
 
 Use this reference for local baseline syncs, target resolution, drift review, checked-in baseline updates, regeneration, validation, and upstream sync tagging.
 
+This file is contextual reference material for bounded commands. Its snippets document canonical tools and recovery-safe recipes; they are not a required end-to-end workflow unless the selected command and caller state require each step.
+
 ## Contents
 
 - [Inputs And Cache Layout](#inputs-and-cache-layout)

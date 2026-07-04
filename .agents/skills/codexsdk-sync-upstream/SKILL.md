@@ -9,7 +9,9 @@ description: Sync codexsdk-go's checked-in Codex app-server protocol baseline to
 
 Update the SDK by treating the checked-in app-server schema baseline as the source for generated Go code. Do not make the SDK follow the local `codex` binary implicitly during normal builds.
 
-Use the repository's tracking script first, then review protocol drift before copying anything into the tree. Helper scripts are report-only or mechanical unless their usage says otherwise; they must not decide the sync strategy.
+This skill is a contract and router, not a monolithic workflow. It supplies domain context, source-of-truth rules, completion layers, command boundaries, and dangerous-operation guardrails. Codex may choose the shortest safe path inside the selected command boundary, using focused evidence and checks that fit the current state.
+
+Fixed, reproducible, error-prone operations belong in canonical scripts. Helper scripts are report-only or mechanical unless their usage says otherwise; they must not decide the sync strategy, bypass review, or publish remote state on their own.
 
 Tool output contract:
 
@@ -17,6 +19,14 @@ Tool output contract:
 - use `--verbose` for human-readable paths, progress, and counts on stderr
 - use `--json` when another command or caller needs machine-readable stdout
 - treat exit code as the success/failure signal
+
+## Source Of Truth
+
+- Checked-in baseline: `codexsdk/internal/protocolschema/appserver/v2`
+- Baseline metadata: `codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json`
+- Generated public protocol types: `codexsdk/protocolv2/*.gen.go`
+- Sync candidate artifacts: the `schema/`, `reports/`, and `common.rs` outputs produced for the resolved target
+- Canonical scripts under `scripts/` for target resolution, target policy, drift tracking, candidate apply, local validation, PR publication, merge waiting, and sync tagging
 
 ## Completion Layers
 
@@ -43,12 +53,27 @@ Do not call a drift issue solved at push time.
 
 ## Reference Routing
 
-Read only the references needed for the task:
+Read only the references needed for the selected command and current failure state:
 
 - For a local baseline sync, target resolution, drift review, checked-in baseline updates, regeneration, validation, or tagging, read [references/local-sync.md](references/local-sync.md).
 - For failed sync PR checks, auto-merge timeouts, finalize failures, drift verification failures, or existing sync tags, read [references/recovery.md](references/recovery.md).
 
 If a failure occurs, use the recovery reference before adding automation.
+
+## Deterministic Tools
+
+Use the existing scripts for stable, testable operations with clear inputs, outputs, and exit-code results:
+
+- `scripts/codexsdk_resolve_upstream.py`: resolve tags, refs, commits, and peeled SHAs.
+- `scripts/codexsdk_target_policy.py`: decide whether a target is allowed, skipped, or blocked.
+- `scripts/codexsdk_track_upstream.sh`: generate drift artifacts or compare a candidate against the baseline.
+- `scripts/codexsdk_apply_sync_candidate.py`: mechanically apply reviewed candidate artifacts.
+- `scripts/codexsdk_validate_sync.sh`: validate local baseline, reports, manifests, coverage, generated Go, and path hygiene.
+- `scripts/codexsdk_publish_sync_pr.sh`: publish validated local sync work through the protected PR path.
+- `scripts/codexsdk_wait_sync_pr_merge.sh`: wait for the protected PR path to merge after real required checks.
+- `scripts/codexsdk_sync_tag.py`: create stable upstream sync tags without moving existing tags.
+
+Treat these scripts as capabilities for bounded commands. Do not replace them with ad hoc shell logic for target sorting, tag peeling, candidate copying, report sanitization, PR publication, merge waiting, or tag creation.
 
 ## Command Routing
 
@@ -64,9 +89,31 @@ Commands live under [commands/](commands/). A caller may invoke one command dire
 - [finalize-landed-sync](commands/finalize-landed-sync.md): tag and optionally verify a sync after the PR has landed.
 - [recover-failure](commands/recover-failure.md): recover failed checks, merge waits, finalize failures, drift verification failures, or tag conflicts.
 
-## Common Workflow Composition
+## Agent Judgment
 
-Local baseline sync:
+Codex owns judgment inside the selected command boundary:
+
+- identify the highest already-completed layer
+- decide which compact evidence is needed
+- decide whether drift needs local repair
+- classify validation failures as generator, schema, manifest, coverage, SDK surface, provenance, or environment issues
+- choose focused checks for changed behavior
+- pick the narrow recovery command for a failed state
+
+Codex does not own dangerous state transitions unless the selected command and caller explicitly grant them:
+
+- push to protected branches
+- bypass required checks or synthesize statuses
+- create PATs, GitHub App tokens, or bot-token bypasses
+- move or delete tags
+- merge directly outside the protected PR path
+- close drift issues while claiming full resolution before tag, CI, drift verification, and issue closure are complete
+
+## Common Compositions
+
+These are examples, not required global flows. A caller may start with any single command whose inputs and state match, and that command's boundary takes priority.
+
+Typical local baseline sync:
 
 1. `resolve-target`
 2. `detect-drift`
@@ -74,12 +121,12 @@ Local baseline sync:
 4. `apply-candidate`
 5. `repair-applied-candidate` when reviewed drift or validation shows local repair is needed
 6. `validate-local`
-7. `publish-protected-pr` only when the user explicitly asks to publish
+7. `publish-protected-pr` only when the user or workflow explicitly owns publishing
 
-Recovery:
+Typical recovery:
 
-1. Start with `recover-failure`.
-2. Resume with the narrow command that matches the recovered state, usually `validate-local`, `publish-protected-pr`, or `finalize-landed-sync`.
+1. `recover-failure`
+2. resume with the narrow command matching the recovered state, often `validate-local`, `publish-protected-pr`, or `finalize-landed-sync`
 
 ## Required Inputs
 
