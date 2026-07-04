@@ -2,6 +2,8 @@ You are maintaining codexsdk-go.
 
 Task: Use codexsdk-sync-upstream command: repair-applied-candidate.
 
+Current phase: `${PHASE}`.
+
 Read and follow:
 
 - .agents/skills/codexsdk-sync-upstream/SKILL.md
@@ -17,10 +19,20 @@ Authoritative inputs:
 - ${AUTO_SYNC_DIR}/apply-result.json
 - ${AUTO_SYNC_DIR}/diff-name-status.txt
 
+Allowed side effects:
+
+- Edit only the local checkout surfaces permitted by `repair-applied-candidate`.
+- Run focused checks that are useful for files you touch.
+- Report blockers when candidate artifacts or provenance are inconsistent.
+
+Forbidden side effects:
+
+- Do not run `resolve-target`, `detect-drift`, `scripts/codexsdk_track_upstream.sh`, full Rust schema generation, or `apply-candidate`.
+- Do not re-copy schemas from upstream.
+- Do not commit, push, tag, edit issues, create PRs, change branches, request merges, close issues, or publish remote state.
+
 Do not follow a global sync workflow; stay inside the repair command boundary and use the shortest safe path for the evidence in this checkout.
 
-Do not run `resolve-target`, `detect-drift`, `scripts/codexsdk_track_upstream.sh`, full Rust schema generation, or `apply-candidate`. Do not re-copy schemas from upstream. Do not commit, push, tag, edit issues, create PRs, change branches, request merges, or publish remote state.
-
-The workflow runs full validation, commit, PR publication, CI, merge, tags, issues, and remote verification after you finish. Run only focused checks that are useful for files you touch.
+After you finish, the fix workflow owns full validation, commit creation, and protected PR publication. Branch protection, the required `Go` check, repository auto-merge rules, and the finalize workflow own merge, tags, drift verification, and issue closure.
 
 Final output must include: completed_actions, files_changed, validation, blockers, highest local completion layer.

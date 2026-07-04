@@ -36,6 +36,17 @@ Useful drift evidence:
 
 Preserve compact pre-change evidence before overwriting checked-in clean reports.
 
+## Automation Phases
+
+Issues are status and audit records, not the only control plane.
+
+- Detect: resolve target, run policy, generate drift, record upstream ref/SHA, drift fingerprint, and workflow run URL, then create/update/close protocol-drift issue state when caller-owned.
+- Fix: explicitly dispatched from an issue number or upstream target/fingerprint. Regenerate or verify the candidate, apply it, run `repair-applied-candidate`, validate, and publish a protected PR.
+- Finalize: after the PR lands, verify the landed commit, create the stable sync tag when applicable, run forced drift verification, then close or update the issue based on the verification result.
+
+Do not depend on a `GITHUB_TOKEN` issue creation/update to trigger the fix. Dispatch a fix workflow explicitly or ask a maintainer to dispatch it manually.
+Keep upstream target selection flexible, but keep workflow code refs, PR base refs, and finalize refs on the repository default branch unless a future explicit allowlist is added.
+
 ## Target Policy
 
 Use the canonical resolver and target-policy script. Do not hand-roll tag sorting, prerelease filtering, annotated-tag peeling, or downgrade logic.
@@ -110,6 +121,8 @@ Tag only after a successful baseline sync commit exists on the landing ref:
 - If drift is clean and the user only asked to check a target, report no SDK update is needed.
 - If drift is clean but the user asked to move provenance, update provenance and clean reports without changing schema-derived Go output.
 - If target policy returns `block`, stop before drift generation.
+- If a fix PR was published, report `sync PR published` and stop before merge, tag, drift verification, or issue closure.
+- If a PR has landed, finalize from the landed commit rather than the PR branch head or an unmerged attempt.
 - If generated Go fails because a new schema shape is unsupported, update focused generator rules and tests before regenerating.
 - If a method disappears upstream, preserve compatibility only when safe and intentional; otherwise document the breaking change.
 - If compare-only and full tracking disagree, trust full tracking and investigate candidate provenance before editing checked-in files.
