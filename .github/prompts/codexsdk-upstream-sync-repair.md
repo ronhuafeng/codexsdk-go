@@ -31,10 +31,10 @@ Forbidden side effects:
 
 - Do not run `resolve-target`, `detect-drift`, `scripts/codexsdk_track_upstream.sh`, full Rust schema generation, or `apply-candidate`.
 - Do not re-copy schemas from upstream.
-- Do not commit, push, tag, edit issues, create PRs, change branches, request merges, close issues, or publish remote state.
+- Do not commit, push, tag, create PRs, change branches, request merges, or publish remote state.
 
 Do not follow a global sync workflow; stay inside the repair command boundary and use the shortest safe path for the evidence in this checkout.
 
-After you finish, the sync workflow owns full validation, commit creation, and protected PR publication. Branch protection, the required `Go` check, repository auto-merge rules, and the finalize workflow own merge, tags, drift verification, and issue closure.
+After you finish, the sync workflow owns full validation, commit creation, and protected PR publication. Branch protection, the required `Go` check, repository auto-merge rules, and the finalize workflow own merge, tags, and drift verification.
 
 Final output must include: completed_actions, files_changed, validation, blockers, highest local completion layer.

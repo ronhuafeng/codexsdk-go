@@ -55,14 +55,14 @@ Trigger:
 - Main CI passed but dispatched drift verification failed or still reports drift.
 
 Evidence:
-- Landed `baseline_metadata.json`, target provenance, drift run logs, and issue state.
+- Landed `baseline_metadata.json`, target provenance, and drift run logs.
 
 Allowed action:
 - Rerun if transient.
-- If drift is real, keep/update the protocol-drift issue and start another sync.
+- If drift is real, start another sync from fresh drift evidence.
 
 Stop:
-- Do not report `drift issue fully resolved` until drift verification is clean and issue closure is complete when applicable.
+- Do not report `landed sync finalized` until drift verification is clean when requested.
 
 ## Sync Tag Already Exists
 

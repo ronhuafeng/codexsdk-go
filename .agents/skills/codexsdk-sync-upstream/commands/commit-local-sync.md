@@ -12,8 +12,8 @@ Tool:
 Boundaries:
 - May stage and commit only reviewed local sync changes after validation has passed for the same target SHA.
 - Must preserve unrelated user changes and must not stage unrelated files.
-- Must not push, tag, create/edit issues, create PRs, request merges, change branches, or publish remote state.
-- Must not claim `sync PR published`, `landed sync finalized`, or `drift issue fully resolved`.
+- Must not push, tag, create PRs, request merges, change branches, or publish remote state.
+- Must not claim `sync PR published` or `landed sync finalized`.
 
 Checks:
 - Validation evidence names `scripts/codexsdk_validate_sync.sh` or equivalent focused checks and matches the target SHA.

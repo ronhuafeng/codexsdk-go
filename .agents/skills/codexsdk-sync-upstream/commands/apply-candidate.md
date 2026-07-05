@@ -14,7 +14,7 @@ Boundaries:
 - May write a local apply summary from the apply script and separate diff name-status evidence from `git diff --name-status` or `git status --short`.
 - Must not hand-copy schemas or reports.
 - Must not make judgment calls beyond provenance/input checks.
-- Must not commit, push, tag, create/edit issues, create PRs, request merges, or change branches.
+- Must not commit, push, tag, create PRs, request merges, or change branches.
 
 Checks:
 - Apply result JSON parses.

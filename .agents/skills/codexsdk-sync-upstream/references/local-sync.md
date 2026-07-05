@@ -40,13 +40,11 @@ Preserve compact pre-change evidence before overwriting checked-in clean reports
 
 ## Automation Phases
 
-Issues are status and audit records, not the only control plane.
-
-- Detect: resolve target, run policy, generate drift, record upstream ref/SHA, drift fingerprint, and workflow run URL, then create/update/close protocol-drift issue state when caller-owned.
+- Detect: resolve target, run policy, generate drift, record upstream ref/SHA, drift fingerprint, and workflow run URL, then render PR-ready drift analysis.
 - Fix: when workflow-owned drift is `review-required` and the run is not `force_compare` verification, apply the generated candidate, run `repair-applied-candidate`, validate, commit the local sync, and publish a protected PR automatically.
-- Finalize: after the PR lands, verify the landed commit, create the stable sync tag when applicable, run forced drift verification, then close or update the issue based on the verification result.
+- Finalize: after the PR lands, verify the landed commit, create the stable sync tag when applicable, and run forced drift verification when requested.
 
-Do not depend on a `GITHUB_TOKEN` issue creation/update event to trigger the fix. The sync workflow should continue directly from drift evidence to protected PR publication when drift requires it.
+Do not depend on a `GITHUB_TOKEN` remote event to trigger the fix. The sync workflow should continue directly from drift evidence to protected PR publication when drift requires it.
 Keep upstream target selection flexible, but keep workflow code refs, PR base refs, and finalize refs on the repository default branch unless a future explicit allowlist is added.
 
 ## Target Policy
@@ -58,10 +56,10 @@ Prefer stable tags or named refs for normal syncs. Treat bare `manual_commit` SH
 Policy meanings:
 
 - `allow`: drift generation may run
-- `skip`: selected target is already represented; stop drift generation, then close/update caller-owned drift state only when explicitly requested
+- `skip`: selected target is already represented; stop drift generation
 - `block`: stop before drift generation
 
-Do not convert a `block` into a protocol-drift issue.
+Do not convert a `block` into remote publication.
 
 ## Drift Review
 
@@ -126,9 +124,8 @@ Tag only after a successful baseline sync commit exists on the landing ref:
 - If drift is clean and the user only asked to check a target, report no SDK update is needed.
 - If drift is clean but the user asked to move provenance, update provenance and clean reports without changing schema-derived Go output.
 - If target policy returns `block`, stop before drift generation.
-- If a fix PR was published, report `sync PR published` and stop before merge, tag, drift verification, or issue closure.
+- If a fix PR was published, report `sync PR published` and stop before merge, tag, or drift verification.
 - If a PR has landed, finalize from the landed commit rather than the PR branch head or an unmerged attempt.
 - If generated Go fails because a new schema shape is unsupported, update focused generator rules and tests before regenerating.
 - If a method disappears upstream, preserve compatibility only when safe and intentional; otherwise document the breaking change.
 - If compare-only and full tracking disagree, trust full tracking and investigate candidate provenance before editing checked-in files.
-- If caller-owned automation closes or updates drift issues, verify it operates on the existing protocol-drift issue instead of creating duplicates.

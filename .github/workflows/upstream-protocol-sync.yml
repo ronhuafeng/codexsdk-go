@@ -33,7 +33,6 @@ env:
   CODEX_UPSTREAM_COMMON_RS: codex-rs/app-server-protocol/src/protocol/common.rs
   CODEX_UPSTREAM_REPO: https://github.com/openai/codex.git
   CODEXSDK_DRIFT_ARTIFACT_DIR: /tmp/codexsdk-upstream
-  CODEXSDK_DRIFT_LABEL: protocol-drift
   CODEXSDK_RUST_TARGET_DIR: .cache/cargo-target/codex
   CODEXSDK_SCHEMA_BASELINE: codexsdk/internal/protocolschema/appserver/v2
   CODEXSDK_SYNC_BRANCH_PREFIX: codex/sync-upstream
@@ -42,7 +41,7 @@ env:
   CODEXSDK_UPSTREAM_TARGET_JSON: /tmp/codexsdk-upstream-target.json
 
 concurrency:
-  group: codex-upstream-protocol-drift
+  group: codex-upstream-protocol-sync
   cancel-in-progress: false
 
 jobs:
@@ -52,7 +51,6 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: write
-      issues: write
       pull-requests: write
 
     steps:
@@ -216,31 +214,6 @@ jobs:
             echo "Reason: ${{ steps.drift_action.outputs.reason }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Close drift issue when baseline is current
-        if: steps.drift_action.outputs.decision == 'skip'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          label="${CODEXSDK_DRIFT_LABEL}"
-          issue_number="$(
-            gh issue list \
-              --state open \
-              --label "$label" \
-              --json number \
-              --jq '.[0].number // empty'
-          )"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue close "$issue_number" \
-              --reason completed \
-              --comment "Closing because the checked-in baseline already points at the selected upstream Codex target: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_sha }}\`)."
-            echo "Closed resolved drift issue #${issue_number}." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
       - name: Clone upstream Codex
         if: steps.drift_action.outputs.decision == 'allow'
         run: |
@@ -273,7 +246,7 @@ jobs:
           printf '%s\n' "${{ steps.refs.outputs.upstream_sha }}" \
             > "${CODEXSDK_DRIFT_ARTIFACT_DIR}/common.rs.source_sha"
 
-      - name: Prepare drift issue
+      - name: Prepare drift PR analysis
         if: steps.drift_action.outputs.decision == 'allow'
         id: drift
         env:
@@ -284,7 +257,7 @@ jobs:
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
         run: |
           set -euo pipefail
-          python3 scripts/codexsdk_write_drift_issue_artifacts.py \
+          python3 scripts/codexsdk_write_drift_pr_analysis.py \
             --artifact-dir "${CODEXSDK_DRIFT_ARTIFACT_DIR}" \
             --baseline-sha "${BASELINE_SHA}" \
             --run-url "${RUN_URL}" \
@@ -312,88 +285,6 @@ jobs:
             echo
             cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/reports/SUMMARY.md"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Close drift issue when drift is clean
-        if: steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status == 'clean' && !inputs.force_compare
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          label="${CODEXSDK_DRIFT_LABEL}"
-          issue_number="$(
-            gh issue list \
-              --state open \
-              --label "$label" \
-              --json number \
-              --jq '.[0].number // empty'
-          )"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue close "$issue_number" \
-              --reason completed \
-              --comment "Closing because the selected upstream target has no schema drift. Upstream: \`${{ steps.refs.outputs.upstream_ref }}\` (\`${{ steps.refs.outputs.upstream_sha }}\`); fingerprint: \`${{ steps.drift.outputs.drift_sha }}\`."
-            echo "Closed resolved drift issue #${issue_number}." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No open protocol drift issue to close." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Create or update drift issue
-        if: steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required'
-        id: issue_state
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          label="${CODEXSDK_DRIFT_LABEL}"
-          gh label create "$label" \
-            --description "Upstream Codex app-server protocol drift needs review" \
-            --color "BFDADC" \
-            --force
-
-          issue_number="$(
-            gh issue list \
-              --state open \
-              --label "$label" \
-              --json number \
-              --jq '.[0].number // empty'
-          )"
-
-          if [[ -n "$issue_number" ]]; then
-            existing_drift_sha="$(
-              gh issue view "$issue_number" \
-                --json body \
-                --jq '.body' \
-                | sed -n 's/^[[:space:]]*drift_sha256: //p' \
-                | head -n 1 \
-                | tr -d '\r'
-            )"
-            title="$(cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-title.txt")"
-
-            gh issue edit "$issue_number" \
-              --title "$title" \
-              --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-body.md"
-
-            if [[ "$existing_drift_sha" == "${{ steps.drift.outputs.drift_sha }}" ]]; then
-              echo "Updated existing drift issue #${issue_number}; fingerprint unchanged, so no comment was added." >> "$GITHUB_STEP_SUMMARY"
-            else
-              gh issue comment "$issue_number" --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-comment.md"
-              echo "Updated existing drift issue #${issue_number} and added a comment for the new fingerprint." >> "$GITHUB_STEP_SUMMARY"
-            fi
-          else
-            title="$(cat "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-title.txt")"
-            new_issue_url="$(
-              gh issue create \
-                --title "$title" \
-                --body-file "${CODEXSDK_DRIFT_ARTIFACT_DIR}/issue-body.md" \
-                --label "$label"
-            )"
-            issue_number="${new_issue_url##*/}"
-            echo "Created drift issue: ${new_issue_url}" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          echo "issue_number=${issue_number}" >> "$GITHUB_OUTPUT"
 
       - name: Configure git identity
         if: steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status == 'review-required' && !inputs.force_compare
@@ -520,7 +411,6 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           DRIFT_SHA: ${{ steps.drift.outputs.drift_sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ steps.issue_state.outputs.issue_number }}
           UPSTREAM_REF: ${{ steps.refs.outputs.upstream_ref }}
           UPSTREAM_REF_KIND: ${{ steps.refs.outputs.upstream_ref_kind }}
           UPSTREAM_SHA: ${{ steps.refs.outputs.upstream_sha }}
@@ -534,12 +424,9 @@ jobs:
             --target-kind "${UPSTREAM_REF_KIND}"
             --target-sha "${UPSTREAM_SHA}"
             --drift-sha "${DRIFT_SHA}"
-            --drift-analysis "${CANDIDATE_DIR}/issue-body.md"
+            --drift-analysis "${CANDIDATE_DIR}/drift-analysis.md"
             --candidate "${CANDIDATE_DIR}/schema"
           )
-          if [[ -n "${ISSUE_NUMBER}" ]]; then
-            args+=(--issue-number "${ISSUE_NUMBER}")
-          fi
           scripts/codexsdk_publish_sync_pr.sh "${args[@]}"
 
       - name: Report sync PR outcome
@@ -558,11 +445,11 @@ jobs:
             echo "- Sync commit: \`${SYNC_COMMIT}\`"
             echo "- Sync PR: ${PR_URL}"
             echo
-            echo "Branch protection, the required \`Go\` check, and repository auto-merge rules own the merge decision. The finalize workflow owns landed verification, sync tags, and issue closure."
+            echo "Branch protection, the required \`Go\` check, and repository auto-merge rules own the merge decision. The finalize workflow owns landed verification, sync tags, and drift verification."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail verification when drift remains
         if: inputs.force_compare && steps.drift_action.outputs.decision == 'allow' && steps.drift.outputs.status != 'clean'
         run: |
-          echo "force_compare verification found drift status '${{ steps.drift.outputs.status }}'; issue state was updated before failing." >&2
+          echo "force_compare verification found drift status '${{ steps.drift.outputs.status }}'." >&2
           exit 1

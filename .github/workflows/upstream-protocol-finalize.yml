@@ -13,10 +13,6 @@ on:
         description: "Merged sync PR number. Preferred because the PR body carries sync metadata."
         required: false
         type: string
-      issue_number:
-        description: "Protocol-drift issue number to close or update after verification."
-        required: false
-        type: string
       landed_ref:
         description: "Optional landing branch that contains the sync commit. Only the repository default branch is accepted."
         required: false
@@ -38,11 +34,11 @@ on:
         required: false
         type: string
       drift_sha:
-        description: "Optional drift fingerprint from the detect/fix phase for audit comments."
+        description: "Optional drift fingerprint from the detect/fix phase for audit metadata."
         required: false
         type: string
       dispatch_drift_check:
-        description: "Dispatch drift workflow with force_compare=true and wait for it before closing the issue."
+        description: "Dispatch drift workflow with force_compare=true and wait for it before finalizing."
         required: false
         type: boolean
         default: true
@@ -67,7 +63,6 @@ jobs:
     permissions:
       actions: write
       contents: write
-      issues: write
       pull-requests: read
 
     steps:
@@ -115,7 +110,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           INPUT_DISPATCH_DRIFT_CHECK: ${{ inputs.dispatch_drift_check }}
           INPUT_DRIFT_SHA: ${{ inputs.drift_sha || '' }}
-          INPUT_ISSUE_NUMBER: ${{ inputs.issue_number || '' }}
           INPUT_LANDED_COMMIT: ${{ inputs.landed_commit || '' }}
           INPUT_LANDED_REF: ${{ inputs.landed_ref || '' }}
           INPUT_PR_NUMBER: ${{ inputs.pr_number || '' }}
@@ -131,7 +125,6 @@ jobs:
           explicit_target=false
           for value in \
             "${INPUT_DRIFT_SHA}" \
-            "${INPUT_ISSUE_NUMBER}" \
             "${INPUT_LANDED_COMMIT}" \
             "${INPUT_LANDED_REF}" \
             "${INPUT_PR_NUMBER}" \
@@ -149,7 +142,6 @@ jobs:
             {
               echo "dispatch=true"
               echo "drift_sha=${INPUT_DRIFT_SHA}"
-              echo "issue_number=${INPUT_ISSUE_NUMBER}"
               echo "landed_commit=${INPUT_LANDED_COMMIT}"
               echo "landed_ref=${INPUT_LANDED_REF}"
               echo "pr_number=${INPUT_PR_NUMBER}"
@@ -224,7 +216,6 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           INPUT_DRIFT_SHA: ${{ steps.candidate.outputs.drift_sha || '' }}
-          INPUT_ISSUE_NUMBER: ${{ steps.candidate.outputs.issue_number || '' }}
           INPUT_LANDED_COMMIT: ${{ steps.candidate.outputs.landed_commit || '' }}
           INPUT_LANDED_REF: ${{ steps.candidate.outputs.landed_ref || '' }}
           INPUT_PR_NUMBER: ${{ steps.candidate.outputs.pr_number || '' }}
@@ -246,7 +237,6 @@ jobs:
             --default-branch "${DEFAULT_BRANCH}" \
             --sync-pr-json /tmp/codexsdk-sync-pr.json \
             --input-drift-sha "${INPUT_DRIFT_SHA}" \
-            --input-issue-number "${INPUT_ISSUE_NUMBER}" \
             --input-landed-commit "${INPUT_LANDED_COMMIT}" \
             --input-landed-ref "${INPUT_LANDED_REF}" \
             --input-pr-number "${INPUT_PR_NUMBER}" \
@@ -341,7 +331,7 @@ jobs:
           set -euo pipefail
 
           dispatch_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          gh workflow run upstream-protocol-drift.yml \
+          gh workflow run upstream-protocol-sync.yml \
             --ref "${DEFAULT_BRANCH}" \
             -f "upstream_ref=${UPSTREAM_REF}" \
             -f "force_compare=true"
@@ -350,7 +340,7 @@ jobs:
           for _ in $(seq 1 24); do
             run_id="$(
               gh run list \
-                --workflow upstream-protocol-drift.yml \
+                --workflow upstream-protocol-sync.yml \
                 --branch "${DEFAULT_BRANCH}" \
                 --limit 20 \
                 --json databaseId,createdAt,event,headSha \
@@ -382,29 +372,6 @@ jobs:
             echo "verification_status=failed" >> "$GITHUB_OUTPUT"
           fi
           exit "${watch_status}"
-
-      - name: Update drift issue after failed verification
-        if: steps.candidate.outputs.dispatch == 'true' && steps.candidate.outputs.dispatch_drift_check == 'true' && steps.verification.outcome != 'success' && steps.metadata.outputs.issue_number != ''
-        env:
-          ISSUE_NUMBER: ${{ steps.metadata.outputs.issue_number }}
-          LANDED_COMMIT: ${{ steps.landed.outputs.landed_commit }}
-          LANDED_REF: ${{ steps.landing.outputs.landed_ref }}
-          VERIFICATION_URL: ${{ steps.verification.outputs.run_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          comment="$(mktemp)"
-          {
-            echo "Finalize did not close this drift issue because drift verification failed or could not be observed."
-            echo
-            echo "- Landing ref: \`${LANDED_REF}\`"
-            echo "- Landed commit: \`${LANDED_COMMIT}\`"
-            if [[ -n "${VERIFICATION_URL}" ]]; then
-              echo "- Drift verification: ${VERIFICATION_URL}"
-            fi
-          } > "${comment}"
-          gh issue comment "${ISSUE_NUMBER}" --body-file "${comment}"
 
       - name: Fail when drift verification failed
         if: steps.candidate.outputs.dispatch == 'true' && steps.candidate.outputs.dispatch_drift_check == 'true' && steps.verification.outcome != 'success'
@@ -440,53 +407,9 @@ jobs:
             echo "- Action: \`${action}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Close drift issue after verified finalize
-        if: steps.candidate.outputs.dispatch == 'true' && steps.candidate.outputs.dispatch_drift_check == 'true' && steps.verification.outcome == 'success' && steps.metadata.outputs.issue_number != ''
-        env:
-          DRIFT_SHA: ${{ steps.metadata.outputs.drift_sha }}
-          ISSUE_NUMBER: ${{ steps.metadata.outputs.issue_number }}
-          LANDED_COMMIT: ${{ steps.landed.outputs.landed_commit }}
-          LANDED_REF: ${{ steps.landing.outputs.landed_ref }}
-          PR_URL: ${{ steps.metadata.outputs.pr_url }}
-          TAG_NAME: ${{ steps.tag.outputs.tag_name }}
-          UPSTREAM_REF: ${{ steps.baseline.outputs.upstream_ref }}
-          UPSTREAM_SHA: ${{ steps.baseline.outputs.upstream_sha }}
-          VERIFICATION_URL: ${{ steps.verification.outputs.run_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          comment="$(mktemp)"
-          {
-            echo "Finalized upstream protocol sync."
-            echo
-            if [[ -n "${PR_URL}" ]]; then
-              echo "- Sync PR: ${PR_URL}"
-            fi
-            echo "- Landing ref: \`${LANDED_REF}\`"
-            echo "- Landed commit: \`${LANDED_COMMIT}\`"
-            echo "- Upstream target: \`${UPSTREAM_REF}\`"
-            echo "- Upstream commit: \`${UPSTREAM_SHA}\`"
-            if [[ -n "${DRIFT_SHA}" ]]; then
-              echo "- Drift fingerprint: \`${DRIFT_SHA}\`"
-            fi
-            if [[ -n "${TAG_NAME}" ]]; then
-              echo "- Sync tag: \`${TAG_NAME}\`"
-            fi
-            echo "- Drift verification: ${VERIFICATION_URL}"
-          } > "${comment}"
-
-          gh issue comment "${ISSUE_NUMBER}" --body-file "${comment}"
-          state="$(gh issue view "${ISSUE_NUMBER}" --json state --jq '.state')"
-          if [[ "${state}" == "OPEN" ]]; then
-            gh issue close "${ISSUE_NUMBER}" --reason completed
-          fi
-          echo "Closed or updated drift issue #${ISSUE_NUMBER} after verified finalize." >> "$GITHUB_STEP_SUMMARY"
-
       - name: Report final sync outcome
         if: steps.candidate.outputs.dispatch == 'true'
         env:
-          ISSUE_NUMBER: ${{ steps.metadata.outputs.issue_number }}
           LANDED_COMMIT: ${{ steps.landed.outputs.landed_commit }}
           LANDED_REF: ${{ steps.landing.outputs.landed_ref }}
           PR_URL: ${{ steps.metadata.outputs.pr_url }}
@@ -499,9 +422,7 @@ jobs:
             echo
             echo "## Sync finalize outcome"
             echo
-            if [[ "${VERIFICATION_STATUS}" == "passed" && -n "${ISSUE_NUMBER}" ]]; then
-              echo "- Completion layer: \`drift issue fully resolved\`"
-            elif [[ "${VERIFICATION_STATUS}" == "passed" ]]; then
+            if [[ "${VERIFICATION_STATUS}" == "passed" ]]; then
               echo "- Completion layer: \`landed sync finalized\`"
             else
               echo "- Completion layer: \`landed sync verified; drift verification ${VERIFICATION_STATUS}\`"

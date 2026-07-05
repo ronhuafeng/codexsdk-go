@@ -13,7 +13,7 @@ Tools:
 
 Boundaries:
 - May run local validation and formatting/check commands.
-- Must not commit, push, tag, edit issues, create PRs, request merges, change branches, or publish remote state.
+- Must not commit, push, tag, create PRs, request merges, change branches, or publish remote state.
 
 Checks:
 - Report exact commands and pass/fail results.

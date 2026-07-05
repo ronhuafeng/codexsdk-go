@@ -7,12 +7,8 @@ import argparse
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
 from typing import Any
-
-
-FINALIZE_EVIDENCE = "Finalized upstream protocol sync."
 
 
 def metadata_from_body(body: str) -> dict[str, str]:
@@ -33,28 +29,6 @@ def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def gh_issue(issue_number: str) -> dict[str, Any]:
-    completed = subprocess.run(
-        ["gh", "issue", "view", issue_number, "--json", "state,comments,url"],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    return json.loads(completed.stdout)
-
-
-def issue_from_dir(issue_dir: Path, issue_number: str) -> dict[str, Any]:
-    return read_json(issue_dir / f"issue-{issue_number}.json")
-
-
-def has_finalize_evidence(issue: dict[str, Any]) -> bool:
-    return any(
-        FINALIZE_EVIDENCE in (comment.get("body") or "")
-        for comment in issue.get("comments", [])
-    )
-
-
 def resolve_metadata(*, pr: dict[str, Any], inputs: dict[str, str], default_branch: str) -> dict[str, str]:
     if pr and pr.get("state") != "MERGED":
         raise ValueError(f"sync PR #{pr.get('number')} is not merged; state={pr.get('state')}")
@@ -63,9 +37,8 @@ def resolve_metadata(*, pr: dict[str, Any], inputs: dict[str, str], default_bran
     merge_commit = (pr.get("mergeCommit") or {}).get("oid", "")
     return {
         "drift_sha": inputs.get("drift_sha", "") or body_metadata.get("drift_sha256", ""),
-        "issue_number": inputs.get("issue_number", "") or body_metadata.get("issue_number", ""),
         "landed_commit": inputs.get("landed_commit", "") or merge_commit,
-        "landed_ref": inputs.get("landed_ref", "") or pr.get("baseRefName", "") or default_branch,
+        "landed_ref": inputs.get("landed_ref", "") or pr.get("baseRefName", "") or body_metadata.get("base_branch", "") or default_branch,
         "pr_number": inputs.get("pr_number", "") or str(pr.get("number") or ""),
         "pr_url": pr.get("url", ""),
         "upstream_ref": inputs.get("upstream_ref", "") or body_metadata.get("upstream_ref", ""),
@@ -80,7 +53,6 @@ def select_candidate(
     default_branch: str,
     default_head: str,
     prs: list[dict[str, Any]],
-    issue_lookup,
 ) -> tuple[dict[str, str], list[str]]:
     skipped: list[str] = []
     if active_runs:
@@ -96,10 +68,6 @@ def select_candidate(
         if metadata.get("phase") != "fix":
             skipped.append(f"PR #{number}: sync metadata phase is not fix")
             continue
-        issue_number = metadata.get("issue_number", "")
-        if not issue_number:
-            skipped.append(f"PR #{number}: missing issue_number metadata")
-            continue
         merge_commit = (pr.get("mergeCommit") or {}).get("oid", "")
         if merge_commit != default_head:
             skipped.append(f"PR #{number}: merge commit is not current {default_branch} head")
@@ -107,17 +75,8 @@ def select_candidate(
         candidates.append((pr, metadata))
 
     for pr, metadata in candidates:
-        issue_number = metadata["issue_number"]
-        issue = issue_lookup(issue_number)
-        if issue.get("state") != "OPEN":
-            skipped.append(f"PR #{pr['number']}: issue #{issue_number} is {issue.get('state')}")
-            continue
-        if has_finalize_evidence(issue):
-            skipped.append(f"PR #{pr['number']}: issue #{issue_number} already has finalize evidence")
-            continue
         return {
             "dispatch": "true",
-            "issue_number": issue_number,
             "pr_number": str(pr["number"]),
         }, skipped
 
@@ -144,10 +103,10 @@ def write_summary(path: str | None, default_branch: str, default_head: str, resu
                 summary.write(f"- {item}\n")
         if result["dispatch"] == "true":
             summary.write(
-                f"\nSelected finalize candidate PR #{result['pr_number']} and issue #{result['issue_number']}.\n"
+                f"\nSelected finalize candidate PR #{result['pr_number']}.\n"
             )
         else:
-            summary.write("\nNo pending sync PR matched the current default branch head and open drift issue.\n")
+            summary.write("\nNo merged sync PR matched the current default branch head.\n")
 
 
 def main() -> int:
@@ -157,7 +116,6 @@ def main() -> int:
     parser.add_argument("--default-head")
     parser.add_argument("--github-output", default=os.environ.get("GITHUB_OUTPUT", ""))
     parser.add_argument("--input-drift-sha", default="")
-    parser.add_argument("--input-issue-number", default="")
     parser.add_argument("--input-landed-commit", default="")
     parser.add_argument("--input-landed-ref", default="")
     parser.add_argument("--input-pr-number", default="")
@@ -167,7 +125,6 @@ def main() -> int:
     parser.add_argument("--merged-prs-json", type=Path)
     parser.add_argument("--sync-pr-json", type=Path, help="resolve finalize metadata from a PR JSON object instead of selecting a candidate")
     parser.add_argument("--summary", default=os.environ.get("GITHUB_STEP_SUMMARY", ""))
-    parser.add_argument("--issue-json-dir", type=Path, help="test hook: read issue-<number>.json files instead of gh")
     args = parser.parse_args()
 
     if args.sync_pr_json is not None:
@@ -176,7 +133,6 @@ def main() -> int:
                 pr=read_json(args.sync_pr_json),
                 inputs={
                     "drift_sha": args.input_drift_sha,
-                    "issue_number": args.input_issue_number,
                     "landed_commit": args.input_landed_commit,
                     "landed_ref": args.input_landed_ref,
                     "pr_number": args.input_pr_number,
@@ -197,14 +153,12 @@ def main() -> int:
 
     active_runs = read_json(args.active_runs_json)
     prs = read_json(args.merged_prs_json)
-    issue_lookup = gh_issue if args.issue_json_dir is None else lambda issue_number: issue_from_dir(args.issue_json_dir, issue_number)
 
     result, skipped = select_candidate(
         active_runs=active_runs,
         default_branch=args.default_branch,
         default_head=args.default_head,
         prs=prs,
-        issue_lookup=issue_lookup,
     )
     write_outputs(args.github_output, result)
     write_summary(args.summary, args.default_branch, args.default_head, result, skipped)

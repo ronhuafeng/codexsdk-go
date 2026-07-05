@@ -8,7 +8,7 @@ Inputs:
 
 Evidence:
 - `../references/recovery.md`
-- GitHub PR/check/run/tag/issue state when caller owns remote inspection.
+- GitHub PR/check/run/tag state when caller owns remote inspection.
 
 Boundaries:
 - Preserve useful failure evidence before reruns or cleanup.

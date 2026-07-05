@@ -12,7 +12,7 @@ Tool:
 Boundaries:
 - May write a local target JSON file.
 - May perform resolver-owned network reads.
-- Must not clone upstream, generate drift, mutate checked-in files, commit, push, tag, create issues, or create PRs.
+- Must not clone upstream, generate drift, mutate checked-in files, commit, push, tag, or create PRs.
 
 Checks:
 - Resolver JSON parses.

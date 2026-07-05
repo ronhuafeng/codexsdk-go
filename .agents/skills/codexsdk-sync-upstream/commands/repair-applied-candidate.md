@@ -12,11 +12,11 @@ Inputs:
 Boundaries:
 - Treat candidate artifacts and apply output as authoritative.
 - Choose the smallest compact evidence and focused files needed for the repair decision.
-- May edit concrete local issues in generated Go, generator behavior, manifest/coverage classification, or small handwritten SDK surfaces when justified by reviewed drift.
+- May edit concrete local problems in generated Go, generator behavior, manifest/coverage classification, or small handwritten SDK surfaces when justified by reviewed drift.
 - May update focused handwritten tests or fixtures when generated type/schema changes prove that a schema-derived fixture is stale; keep the test about SDK/generator behavior, not about preserving removed upstream fields.
 - May run focused checks for changed behavior.
 - Must not rerun target resolution, policy, tracking, full Rust schema generation, or candidate apply.
-- Must not re-copy schemas, commit, push, tag, edit issues, create PRs, change branches, request merges, or publish remote state.
+- Must not re-copy schemas, commit, push, tag, create PRs, change branches, request merges, or publish remote state.
 
 Checks:
 - Run focused generator, manifest, coverage, gofmt, or package tests when practical and relevant to touched files.

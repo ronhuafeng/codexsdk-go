@@ -1,6 +1,6 @@
 ---
 name: codexsdk-sync-upstream
-description: Sync codexsdk-go's checked-in Codex app-server protocol baseline to a selected upstream openai/codex tag, ref, or commit. Use for protocol drift issues, baseline metadata/report refresh, protocolv2 regeneration, validation, upstream sync tagging, and drift issue closure.
+description: Sync codexsdk-go's checked-in Codex app-server protocol baseline to a selected upstream openai/codex tag, ref, or commit. Use for protocol drift detection, protected sync PR publication, baseline metadata/report refresh, protocolv2 regeneration, validation, upstream sync tagging, and finalize verification.
 ---
 
 # Codex SDK Upstream Sync
@@ -18,20 +18,18 @@ Use canonical scripts for deterministic work. Use Codex judgment for classificat
 Report the highest completed layer precisely:
 
 - `local sync complete`: files validate locally and any requested local sync commit is complete, but nothing was pushed
-- `sync PR published`: the sync commit was pushed to a PR branch, but merge, tag, drift verification, and issue closure are still pending
-- `landed sync finalized`: the landed commit was verified, tags were handled when applicable, and drift verification passed, but no issue closure was requested or available
-- `drift issue fully resolved`: stable-tag sync tag handling when applicable, pushed CI, drift verification, and issue closure are complete when applicable
+- `sync PR published`: the sync commit was pushed to a PR branch, but protected merge, tag handling, and drift verification are still pending
+- `landed sync finalized`: the landed commit was verified, tags were handled when applicable, and drift verification passed when requested
 
-Never call a drift issue solved at PR publication time.
+Never call a sync finalized at PR publication time.
 
 ## Automation Phases
 
-- Detect resolves the upstream target, runs policy, generates drift evidence, and creates, updates, or closes protocol-drift issue state.
-- Fix runs in the scheduled/manual sync workflow when drift is `review-required` and the run is not `force_compare` verification. It applies the generated candidate, runs `repair-applied-candidate`, validates, commits the local sync, and publishes a protected PR automatically.
-- Finalize runs only after the PR landed. The PR-closed trigger is the fast path after a sync PR merges; schedule and manual dispatch are required recovery paths. It verifies the landed commit, creates sync tags when applicable, dispatches drift verification, and closes or updates the issue based on that verification result.
+- Detect resolves the upstream target, runs policy, generates drift evidence, and writes PR-ready drift analysis artifacts.
+- Fix runs in the scheduled/manual sync workflow when drift is `review-required` and the run is not `force_compare` verification. It applies the generated candidate, runs `repair-applied-candidate`, validates, commits the local sync, and publishes a protected PR automatically. The PR body carries drift analysis, fix description, and compact sync metadata.
+- Finalize runs only after the PR landed. The PR-closed trigger is the fast path after a sync PR merges; schedule and manual dispatch are required recovery paths. It verifies the landed commit, creates sync tags when applicable, and dispatches drift verification when requested.
 
-Issues are state and audit records, not the human control plane. Do not depend on an issue create/update event from `GITHUB_TOKEN` to start a fix; the sync workflow continues directly to protected PR publication when drift requires it.
-Issue metadata records the upstream target and fingerprint for audit, but it must not select workflow code refs, landing refs, or finalize refs.
+Sync PR metadata records the upstream target, drift fingerprint, sync commit, and base branch needed by finalize. It must not select workflow code refs, landing refs, or finalize refs outside the repository default branch.
 
 ## Safety Boundaries
 
@@ -57,7 +55,7 @@ Commands live under [commands/](commands/). A caller may invoke any single comma
 - [validate-local](commands/validate-local.md): validate local sync state.
 - [commit-local-sync](commands/commit-local-sync.md): commit a validated local sync change without publishing.
 - [publish-protected-pr](commands/publish-protected-pr.md): publish through the protected PR path when explicitly owned by the caller; stop at PR publication.
-- [finalize-landed-sync](commands/finalize-landed-sync.md): verify, tag, drift-check, and close/update issue state for a landed sync when explicitly owned by the caller.
+- [finalize-landed-sync](commands/finalize-landed-sync.md): verify, tag, and drift-check a landed sync when explicitly owned by the caller.
 - [recover-failure](commands/recover-failure.md): recover failed checks, open sync PRs, finalize failures, drift verification failures, or tag conflicts.
 
 References are optional context, not required linear playbooks:
