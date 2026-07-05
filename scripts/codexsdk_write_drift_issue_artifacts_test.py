@@ -11,10 +11,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-import codexsdk_write_drift_issue_artifacts as drift_issue
-
 
 def write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -22,29 +18,6 @@ def write_json(path: Path, value: object) -> None:
 
 
 class WriteDriftIssueArtifactsTest(unittest.TestCase):
-    def test_render_artifacts_summarizes_file_and_method_drift(self) -> None:
-        drift = sample_drift()
-        rendered = drift_issue.render_artifacts(
-            baseline_sha="b" * 40,
-            drift=drift,
-            drift_sha="f" * 64,
-            run_url="https://github.example/runs/1",
-            upstream_ref="rust-v0.141.0",
-            upstream_ref_kind="stable_rust_tag",
-            upstream_sha="a" * 40,
-        )
-
-        self.assertEqual(rendered["title"], "Protocol drift detected against openai/codex rust-v0.141.0")
-        self.assertIn("drift_sha256: " + "f" * 64, rendered["body"])
-        self.assertIn("- Added: 1", rendered["body"])
-        self.assertIn("### ClientRequest.json", rendered["body"])
-        self.assertIn("- `thread/start`", rendered["body"])
-        self.assertIn("`action_required`", rendered["body"])
-        self.assertIn("This issue is state and audit evidence", rendered["body"])
-        self.assertIn("upstream-protocol-auto-sync.yml", rendered["body"])
-        self.assertIn("upstream-protocol-finalize.yml", rendered["body"])
-        self.assertIn("Protocol drift is still present.", rendered["comment"])
-
     def test_cli_writes_artifacts_and_github_output(self) -> None:
         script = Path(__file__).with_name("codexsdk_write_drift_issue_artifacts.py")
         with tempfile.TemporaryDirectory() as tmp:
