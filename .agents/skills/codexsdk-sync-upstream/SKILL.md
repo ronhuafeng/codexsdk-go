@@ -52,14 +52,13 @@ Commands live under [commands/](commands/). A caller may invoke any single comma
 
 - [resolve-target](commands/resolve-target.md): resolve an upstream target; caller or target policy owns baseline provenance.
 - [detect-drift](commands/detect-drift.md): run target policy and create local drift artifacts.
-- [review-drift](commands/review-drift.md): classify compact drift evidence before checked-in changes.
-- [apply-candidate](commands/apply-candidate.md): mechanically apply reviewed candidate artifacts.
+- [apply-candidate](commands/apply-candidate.md): mechanically apply reviewed drift artifacts.
 - [repair-applied-candidate](commands/repair-applied-candidate.md): repair or confirm an already-applied candidate.
 - [validate-local](commands/validate-local.md): validate local sync state.
 - [commit-local-sync](commands/commit-local-sync.md): commit a validated local sync change without publishing.
 - [publish-protected-pr](commands/publish-protected-pr.md): publish through the protected PR path when explicitly owned by the caller; stop at PR publication.
 - [finalize-landed-sync](commands/finalize-landed-sync.md): verify, tag, drift-check, and close/update issue state for a landed sync when explicitly owned by the caller.
-- [recover-failure](commands/recover-failure.md): recover failed checks, merge waits, finalize failures, drift verification failures, or tag conflicts.
+- [recover-failure](commands/recover-failure.md): recover failed checks, open sync PRs, finalize failures, drift verification failures, or tag conflicts.
 
 References are optional context, not required linear playbooks:
 

@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/codexsdk_publish_sync_pr.sh --land-ref <branch> --target-ref <ref> --target-sha <sha> [options]
+  scripts/codexsdk_publish_sync_pr.sh --land-ref <branch> --target-ref <ref> --target-kind <kind> --target-sha <sha> [options]
 
 Options:
   --branch-prefix <prefix>  Sync branch prefix. Defaults to codex/sync-upstream.
@@ -14,7 +14,6 @@ Options:
   --drift-sha <sha>         Drift fingerprint that produced this sync candidate.
   --issue-number <number>   Protocol-drift issue number used as audit state.
   --remote <name>           Git remote to fetch and push. Defaults to origin.
-  --skip-pr                 Push the sync branch but do not create or update a GitHub PR.
   --target-kind <kind>      Upstream target kind, such as stable_rust_tag.
 
 The script assumes HEAD is the committed sync change. It validates, rebases onto
@@ -32,7 +31,6 @@ drift_sha=""
 issue_number=""
 land_ref=""
 remote="origin"
-skip_pr=false
 target_ref=""
 target_kind=""
 target_sha=""
@@ -71,10 +69,6 @@ while [[ $# -gt 0 ]]; do
       remote="$2"
       shift 2
       ;;
-    --skip-pr)
-      skip_pr=true
-      shift
-      ;;
     --target-ref)
       target_ref="$2"
       shift 2
@@ -99,18 +93,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${land_ref}" || -z "${target_ref}" || -z "${target_sha}" ]]; then
+if [[ -z "${land_ref}" || -z "${target_ref}" || -z "${target_kind}" || -z "${target_sha}" ]]; then
   usage >&2
   exit 2
-fi
-if [[ -z "${target_kind}" ]]; then
-  if [[ "${target_ref}" =~ ^rust-v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
-    target_kind="stable_rust_tag"
-  elif [[ "${target_ref}" =~ ^[0-9a-f]{40}$ ]]; then
-    target_kind="manual_commit"
-  else
-    target_kind="manual_ref"
-  fi
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -357,9 +342,5 @@ push_sync_branch "${sync_branch}"
 
 write_output "sync_branch" "${sync_branch}"
 write_output "sync_commit" "${sync_commit}"
-
-if [[ "${skip_pr}" == true ]]; then
-  exit 0
-fi
 
 create_or_update_pr "${sync_branch}" "${sync_commit}"

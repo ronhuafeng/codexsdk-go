@@ -16,7 +16,7 @@ Routine drift handling is split across a sync workflow and a finalize workflow. 
 
 The high-level job structure must stay recognizable:
 
-1. `sync`: resolve target, run policy, generate drift, upload candidate evidence, create/update/close drift issue state, apply mechanical sync when needed, ask Codex for bounded maintainer review, validate, commit, and publish a protected sync PR.
+1. `sync`: resolve target, run policy, generate drift, upload candidate evidence, create/update/close drift issue state, apply mechanical sync when needed, run a bounded Codex repair pass, validate, commit, and publish a protected sync PR.
 2. protected branch auto-merge: GitHub merges only after required real checks pass.
 3. `finalize`: after a sync PR merge event or recovery scan, verify the landed commit, tag landed stable syncs when applicable, dispatch drift verification when requested, and close/update issue state when caller-owned.
 
@@ -59,14 +59,14 @@ The fix phase must:
 - set up Go and Codex Rust
 - configure a bot git identity
 - apply the candidate mechanically with `scripts/codexsdk_apply_sync_candidate.py`
-- build a bounded Codex review prompt
+- build a bounded Codex repair prompt
 - run `openai/codex-action@v1` against the current worktree
 - validate with `scripts/codexsdk_validate_sync.sh`
 - commit the validated local sync through the `commit-local-sync` boundary only when there are real changes
 - publish a sync PR with `scripts/codexsdk_publish_sync_pr.sh`, including drift issue analysis and the fix description in the PR body
 - stop at PR publication unless a separate caller-owned merge/finalize command was selected
 
-The Codex review prompt must keep judgment bounded:
+The Codex repair prompt must keep judgment bounded:
 
 - read the sync skill before editing
 - inspect apply summary, compact drift reports, separate git diff/status evidence, `common.rs` provenance, and the required drift review checklist
@@ -130,7 +130,7 @@ Good helpers in this workflow include:
 
 - rendering the Codex prompt file from explicit inputs
 - rendering drift issue title/body/comment artifacts from `drift_summary.json`
-- polling a PR merge and printing diagnostics
+- publishing the protected sync PR and printing post-publication diagnostics
 - validating generated outputs and sync state
 
 Do not collapse deterministic helpers into a monolithic shell blob; keep target resolution, drift rendering, candidate application, validation, PR publication, and tag handling in canonical scripts.

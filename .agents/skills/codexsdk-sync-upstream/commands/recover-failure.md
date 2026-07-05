@@ -1,7 +1,7 @@
 # Command: recover-failure
 
 State:
-- Sync PR check, merge wait, finalize step, drift verification, or sync tag operation failed.
+- Sync PR check, open sync PR state, finalize step, drift verification, or sync tag operation failed.
 
 Inputs:
 - Failure type, PR/branch, CI/run ID, target provenance, and landed commit when relevant.

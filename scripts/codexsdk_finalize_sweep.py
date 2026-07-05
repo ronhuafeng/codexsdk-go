@@ -55,6 +55,25 @@ def has_finalize_evidence(issue: dict[str, Any]) -> bool:
     )
 
 
+def resolve_metadata(*, pr: dict[str, Any], inputs: dict[str, str], default_branch: str) -> dict[str, str]:
+    if pr and pr.get("state") != "MERGED":
+        raise ValueError(f"sync PR #{pr.get('number')} is not merged; state={pr.get('state')}")
+
+    body_metadata = metadata_from_body(pr.get("body", ""))
+    merge_commit = (pr.get("mergeCommit") or {}).get("oid", "")
+    return {
+        "drift_sha": inputs.get("drift_sha", "") or body_metadata.get("drift_sha256", ""),
+        "issue_number": inputs.get("issue_number", "") or body_metadata.get("issue_number", ""),
+        "landed_commit": inputs.get("landed_commit", "") or merge_commit,
+        "landed_ref": inputs.get("landed_ref", "") or pr.get("baseRefName", "") or default_branch,
+        "pr_number": inputs.get("pr_number", "") or str(pr.get("number") or ""),
+        "pr_url": pr.get("url", ""),
+        "upstream_ref": inputs.get("upstream_ref", "") or body_metadata.get("upstream_ref", ""),
+        "upstream_ref_kind": inputs.get("upstream_ref_kind", "") or body_metadata.get("upstream_ref_kind", ""),
+        "upstream_sha": inputs.get("upstream_sha", "") or body_metadata.get("upstream_commit", ""),
+    }
+
+
 def select_candidate(
     *,
     active_runs: list[dict[str, Any]],
@@ -133,14 +152,48 @@ def write_summary(path: str | None, default_branch: str, default_head: str, resu
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--active-runs-json", required=True, type=Path)
+    parser.add_argument("--active-runs-json", type=Path)
     parser.add_argument("--default-branch", required=True)
-    parser.add_argument("--default-head", required=True)
+    parser.add_argument("--default-head")
     parser.add_argument("--github-output", default=os.environ.get("GITHUB_OUTPUT", ""))
-    parser.add_argument("--merged-prs-json", required=True, type=Path)
+    parser.add_argument("--input-drift-sha", default="")
+    parser.add_argument("--input-issue-number", default="")
+    parser.add_argument("--input-landed-commit", default="")
+    parser.add_argument("--input-landed-ref", default="")
+    parser.add_argument("--input-pr-number", default="")
+    parser.add_argument("--input-upstream-ref", default="")
+    parser.add_argument("--input-upstream-ref-kind", default="")
+    parser.add_argument("--input-upstream-sha", default="")
+    parser.add_argument("--merged-prs-json", type=Path)
+    parser.add_argument("--sync-pr-json", type=Path, help="resolve finalize metadata from a PR JSON object instead of selecting a candidate")
     parser.add_argument("--summary", default=os.environ.get("GITHUB_STEP_SUMMARY", ""))
     parser.add_argument("--issue-json-dir", type=Path, help="test hook: read issue-<number>.json files instead of gh")
     args = parser.parse_args()
+
+    if args.sync_pr_json is not None:
+        try:
+            result = resolve_metadata(
+                pr=read_json(args.sync_pr_json),
+                inputs={
+                    "drift_sha": args.input_drift_sha,
+                    "issue_number": args.input_issue_number,
+                    "landed_commit": args.input_landed_commit,
+                    "landed_ref": args.input_landed_ref,
+                    "pr_number": args.input_pr_number,
+                    "upstream_ref": args.input_upstream_ref,
+                    "upstream_ref_kind": args.input_upstream_ref_kind,
+                    "upstream_sha": args.input_upstream_sha,
+                },
+                default_branch=args.default_branch,
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        write_outputs(args.github_output, result)
+        print(json.dumps({"result": result}, indent=2, sort_keys=True))
+        return 0
+
+    if args.active_runs_json is None or args.default_head is None or args.merged_prs_json is None:
+        parser.error("--active-runs-json, --default-head, and --merged-prs-json are required unless --sync-pr-json is used")
 
     active_runs = read_json(args.active_runs_json)
     prs = read_json(args.merged_prs_json)

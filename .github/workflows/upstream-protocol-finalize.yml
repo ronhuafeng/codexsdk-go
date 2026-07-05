@@ -242,50 +242,17 @@ jobs:
             printf '{}\n' > /tmp/codexsdk-sync-pr.json
           fi
 
-          python3 - <<'PY'
-          import json
-          import os
-          import re
-          import sys
-          from pathlib import Path
-
-          pr = json.loads(Path("/tmp/codexsdk-sync-pr.json").read_text(encoding="utf-8"))
-          if pr and pr.get("state") != "MERGED":
-              print(f"sync PR #{pr.get('number')} is not merged; state={pr.get('state')}", file=sys.stderr)
-              raise SystemExit(1)
-
-          def metadata_from_body(body: str) -> dict[str, str]:
-              match = re.search(r"<!--\s*codexsdk-upstream-sync\s*(.*?)-->", body or "", re.S)
-              if match is None:
-                  return {}
-              metadata = {}
-              for raw_line in match.group(1).splitlines():
-                  line = raw_line.strip()
-                  if not line or ":" not in line:
-                      continue
-                  key, value = line.split(":", 1)
-                  metadata[key.strip()] = value.strip()
-              return metadata
-
-          body_metadata = metadata_from_body(pr.get("body", ""))
-          merge_commit = (pr.get("mergeCommit") or {}).get("oid", "")
-
-          values = {
-              "drift_sha": os.environ["INPUT_DRIFT_SHA"] or body_metadata.get("drift_sha256", ""),
-              "issue_number": os.environ["INPUT_ISSUE_NUMBER"] or body_metadata.get("issue_number", ""),
-              "landed_commit": os.environ["INPUT_LANDED_COMMIT"] or merge_commit,
-              "landed_ref": os.environ["INPUT_LANDED_REF"] or pr.get("baseRefName", "") or os.environ["DEFAULT_BRANCH"],
-              "pr_number": os.environ["INPUT_PR_NUMBER"] or str(pr.get("number") or ""),
-              "pr_url": pr.get("url", ""),
-              "upstream_ref": os.environ["INPUT_UPSTREAM_REF"] or body_metadata.get("upstream_ref", ""),
-              "upstream_ref_kind": os.environ["INPUT_UPSTREAM_REF_KIND"] or body_metadata.get("upstream_ref_kind", ""),
-              "upstream_sha": os.environ["INPUT_UPSTREAM_SHA"] or body_metadata.get("upstream_commit", ""),
-          }
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              for key, value in values.items():
-                  output.write(f"{key}={value}\n")
-          PY
+          python3 scripts/codexsdk_finalize_sweep.py \
+            --default-branch "${DEFAULT_BRANCH}" \
+            --sync-pr-json /tmp/codexsdk-sync-pr.json \
+            --input-drift-sha "${INPUT_DRIFT_SHA}" \
+            --input-issue-number "${INPUT_ISSUE_NUMBER}" \
+            --input-landed-commit "${INPUT_LANDED_COMMIT}" \
+            --input-landed-ref "${INPUT_LANDED_REF}" \
+            --input-pr-number "${INPUT_PR_NUMBER}" \
+            --input-upstream-ref "${INPUT_UPSTREAM_REF}" \
+            --input-upstream-ref-kind "${INPUT_UPSTREAM_REF_KIND}" \
+            --input-upstream-sha "${INPUT_UPSTREAM_SHA}"
 
       - name: Verify landing ref policy
         id: landing
