@@ -27,11 +27,11 @@ Never call a drift issue solved at PR publication time.
 ## Automation Phases
 
 - Detect resolves the upstream target, runs policy, generates drift evidence, and creates, updates, or closes protocol-drift issue state.
-- Fix is explicitly dispatched from issue metadata or target/fingerprint inputs. It regenerates or verifies the candidate, applies it, runs `repair-applied-candidate`, validates, commits the local sync, and publishes a protected PR.
-- Finalize runs only after the PR landed. It verifies the landed commit, creates sync tags when applicable, dispatches drift verification, and closes or updates the issue based on that verification result.
+- Fix runs in the scheduled/manual sync workflow when drift is `review-required` and the run is not `force_compare` verification. It applies the generated candidate, runs `repair-applied-candidate`, validates, commits the local sync, and publishes a protected PR automatically.
+- Finalize runs only after the PR landed. The PR-closed trigger is the fast path after a sync PR merges; schedule and manual dispatch are required recovery paths. It verifies the landed commit, creates sync tags when applicable, dispatches drift verification, and closes or updates the issue based on that verification result.
 
-Issues are state and audit records, not the only control plane. Do not depend on an issue create/update event from `GITHUB_TOKEN` to start a fix.
-Issue metadata may select the upstream target and fingerprint, but it must not select workflow code refs, landing refs, or finalize refs.
+Issues are state and audit records, not the human control plane. Do not depend on an issue create/update event from `GITHUB_TOKEN` to start a fix; the sync workflow continues directly to protected PR publication when drift requires it.
+Issue metadata records the upstream target and fingerprint for audit, but it must not select workflow code refs, landing refs, or finalize refs.
 
 ## Safety Boundaries
 

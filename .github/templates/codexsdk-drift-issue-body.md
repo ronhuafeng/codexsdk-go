@@ -41,23 +41,15 @@ ${METHOD_DIFF}
 
 ## Sync Control Plane
 
-This issue is state and audit evidence, not the only control plane.
+This issue is state and audit evidence. Routine scheduled sync does not wait for a maintainer to act on this issue.
 
-To create a sync PR, explicitly dispatch the fix workflow with this issue number or with the upstream target plus drift fingerprint:
+When the upstream protocol sync workflow finds `review-required` drift outside `force_compare` verification, it uses this analysis to publish a protected sync PR automatically. The PR body includes the drift analysis above plus the fix description.
 
-```sh
-gh workflow run upstream-protocol-auto-sync.yml \
-  -f issue_number=<this issue number> \
-  -f upstream_ref=${UPSTREAM_REF} \
-  -f upstream_sha=${UPSTREAM_SHA} \
-  -f drift_sha=${DRIFT_SHA}
-```
+The sync workflow regenerates the candidate, applies it locally, runs the bounded Codex `repair-applied-candidate` command, validates, commits the sync, and publishes a protected PR. It does not push `main`, tag, close this issue as resolved, or decide whether the PR should merge.
 
-The fix workflow regenerates or verifies the candidate, applies it locally, runs the bounded Codex `repair-applied-candidate` command, validates, and publishes a protected PR. It does not push `main`, tag, close this issue as resolved, or decide whether the PR should merge.
+Issue metadata records the upstream target and drift fingerprint for audit. Workflow code, PR base, and finalize refs are constrained to the repository default branch.
 
-Issue metadata controls the upstream target and drift fingerprint only. Workflow code, PR base, and finalize refs are constrained to the repository default branch.
-
-After the sync PR lands through branch protection, dispatch the finalize workflow:
+After the sync PR lands through branch protection, the post-merge finalize trigger should pick it up automatically. Scheduled finalize runs are the fallback. To recover manually, dispatch finalize with:
 
 ```sh
 gh workflow run upstream-protocol-finalize.yml \

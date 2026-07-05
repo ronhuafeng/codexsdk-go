@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select a merged upstream sync PR that is ready for finalize dispatch."""
+"""Select a merged upstream sync PR that is ready for finalization."""
 
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ def write_summary(path: str | None, default_branch: str, default_head: str, resu
                 summary.write(f"- {item}\n")
         if result["dispatch"] == "true":
             summary.write(
-                f"\nDispatching finalize for PR #{result['pr_number']} and issue #{result['issue_number']}.\n"
+                f"\nSelected finalize candidate PR #{result['pr_number']} and issue #{result['issue_number']}.\n"
             )
         else:
             summary.write("\nNo pending sync PR matched the current default branch head and open drift issue.\n")

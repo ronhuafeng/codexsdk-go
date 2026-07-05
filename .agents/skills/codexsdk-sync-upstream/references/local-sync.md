@@ -43,10 +43,10 @@ Preserve compact pre-change evidence before overwriting checked-in clean reports
 Issues are status and audit records, not the only control plane.
 
 - Detect: resolve target, run policy, generate drift, record upstream ref/SHA, drift fingerprint, and workflow run URL, then create/update/close protocol-drift issue state when caller-owned.
-- Fix: explicitly dispatched from an issue number or upstream target/fingerprint. Regenerate or verify the candidate, apply it, run `repair-applied-candidate`, validate, commit the local sync, and publish a protected PR.
+- Fix: when workflow-owned drift is `review-required` and the run is not `force_compare` verification, apply the generated candidate, run `repair-applied-candidate`, validate, commit the local sync, and publish a protected PR automatically.
 - Finalize: after the PR lands, verify the landed commit, create the stable sync tag when applicable, run forced drift verification, then close or update the issue based on the verification result.
 
-Do not depend on a `GITHUB_TOKEN` issue creation/update to trigger the fix. Dispatch a fix workflow explicitly or ask a maintainer to dispatch it manually.
+Do not depend on a `GITHUB_TOKEN` issue creation/update event to trigger the fix. The sync workflow should continue directly from drift evidence to protected PR publication when drift requires it.
 Keep upstream target selection flexible, but keep workflow code refs, PR base refs, and finalize refs on the repository default branch unless a future explicit allowlist is added.
 
 ## Target Policy

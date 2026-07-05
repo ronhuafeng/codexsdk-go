@@ -35,6 +35,6 @@ Forbidden side effects:
 
 Do not follow a global sync workflow; stay inside the repair command boundary and use the shortest safe path for the evidence in this checkout.
 
-After you finish, the fix workflow owns full validation, commit creation, and protected PR publication. Branch protection, the required `Go` check, repository auto-merge rules, and the finalize workflow own merge, tags, drift verification, and issue closure.
+After you finish, the sync workflow owns full validation, commit creation, and protected PR publication. Branch protection, the required `Go` check, repository auto-merge rules, and the finalize workflow own merge, tags, drift verification, and issue closure.
 
 Final output must include: completed_actions, files_changed, validation, blockers, highest local completion layer.

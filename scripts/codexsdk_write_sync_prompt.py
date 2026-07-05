@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the bounded Codex repair prompt used by the upstream protocol fix workflow."""
+"""Write the bounded Codex repair prompt used by the upstream protocol sync workflow."""
 
 from __future__ import annotations
 

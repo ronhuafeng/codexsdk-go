@@ -1,26 +1,24 @@
-# Split Workflow Automation Reference
+# Sync Workflow Automation Reference
 
-Use this reference for the split GitHub Actions drift/fix/finalize workflows, protected PR path, drift issue behavior, auto-merge behavior, drift verification, and remote completion layers.
+Use this reference for the GitHub Actions sync/finalize workflows, protected PR path, drift issue behavior, auto-merge behavior, drift verification, and remote completion layers.
 
 ## Contents
 
 - [Workflow Contract](#workflow-contract)
-- [Detect Job](#detect-job)
-- [Sync PR Job](#sync-pr-job)
+- [Sync Workflow](#sync-workflow)
 - [Finalize Job](#finalize-job)
 - [Remote Completion Layers](#remote-completion-layers)
 - [Helper Boundaries](#helper-boundaries)
 
 ## Workflow Contract
 
-Routine drift handling is split across detect, fix, and finalize workflows. Scheduled or manual detect creates or updates issue state; fix is explicitly dispatched from trusted inputs; finalize runs only after the protected PR has landed.
+Routine drift handling is split across a sync workflow and a finalize workflow. Scheduled or manual sync detects drift, records issue audit state, and publishes a protected sync PR automatically when drift is `review-required` and the run is not `force_compare` verification. Finalize runs only after the protected PR has landed; the PR-closed trigger is the fast path, with schedule and manual dispatch as required recovery paths.
 
 The high-level job structure must stay recognizable:
 
-1. `detect`: resolve target, run policy, generate drift, upload candidate, and create/update/close drift issue state when caller-owned.
-2. `fix`: download or regenerate candidate, apply mechanical sync, ask Codex for bounded maintainer review, validate, commit, and publish a protected sync PR.
-3. protected branch auto-merge: GitHub merges only after required real checks pass.
-4. `finalize`: verify the landed commit, tag landed stable syncs when applicable, dispatch drift verification when requested, and close/update issue state when caller-owned.
+1. `sync`: resolve target, run policy, generate drift, upload candidate evidence, create/update/close drift issue state, apply mechanical sync when needed, ask Codex for bounded maintainer review, validate, commit, and publish a protected sync PR.
+2. protected branch auto-merge: GitHub merges only after required real checks pass.
+3. `finalize`: after a sync PR merge event or recovery scan, verify the landed commit, tag landed stable syncs when applicable, dispatch drift verification when requested, and close/update issue state when caller-owned.
 
 Invariants:
 
@@ -34,9 +32,9 @@ Invariants:
 
 Sync PRs created by `GITHUB_TOKEN` may require one maintainer approval or rerun before GitHub schedules the required `Go` pull request check. This `action_required` state is an expected GitHub Actions safety gate, not a sync failure.
 
-## Detect Workflow
+## Sync Workflow
 
-Detect must:
+The detect phase must:
 
 - resolve landing ref as the repository default branch
 - check out the landing ref with full history
@@ -46,30 +44,26 @@ Detect must:
 - stop drift generation on policy `skip`, then close or update the protocol-drift issue only when the caller owns that side effect
 - clone upstream only after policy `allow`
 - generate drift with `scripts/codexsdk_track_upstream.sh`
-- capture upstream `common.rs` response mappings for the sync job
+- capture upstream `common.rs` response mappings for the fix phase
 - render drift issue title/body/comment as deterministic artifacts
-- upload the full candidate artifact directory for the sync job
+- upload the full candidate artifact directory as pre-change evidence
 
 When drift status is `clean`, close an existing protocol-drift issue. When drift status is `review-required`, create or update one open protocol-drift issue by label and comment only when the drift fingerprint changed.
 
 Do not create drift issues for target policy blocks.
 
-## Fix Workflow
+The fix phase must run only when drift status is `review-required` and the run is not `force_compare` verification. Scheduled drift may publish a protected sync PR automatically; it must still stop at PR publication.
 
-Fix must run only when explicitly dispatched from trusted issue metadata or explicit target/fingerprint inputs.
+The fix phase must:
 
-The job must:
-
-- check out the landing ref
 - set up Go and Codex Rust
-- download the candidate artifact from detect
 - configure a bot git identity
 - apply the candidate mechanically with `scripts/codexsdk_apply_sync_candidate.py`
 - build a bounded Codex review prompt
 - run `openai/codex-action@v1` against the current worktree
 - validate with `scripts/codexsdk_validate_sync.sh`
 - commit the validated local sync through the `commit-local-sync` boundary only when there are real changes
-- publish a sync PR with `scripts/codexsdk_publish_sync_pr.sh`
+- publish a sync PR with `scripts/codexsdk_publish_sync_pr.sh`, including drift issue analysis and the fix description in the PR body
 - stop at PR publication unless a separate caller-owned merge/finalize command was selected
 
 The Codex review prompt must keep judgment bounded:
@@ -91,7 +85,7 @@ Post-publication diagnostics must keep merge decisions on the protected PR path:
 
 ## Finalize Workflow
 
-Finalize must run only after the sync PR has landed.
+Finalize must run only after the sync PR has landed. A `pull_request.closed` event for a merged default-branch PR is the fast path when GitHub emits it; scheduled no-input runs scan recent merged PRs as a fallback; manual dispatch remains the explicit recovery path.
 
 The job must:
 
@@ -100,7 +94,7 @@ The job must:
 - create an upstream sync tag only for `stable_rust_tag`
 - if the base tag already exists at another commit, use the suffix path through `scripts/codexsdk_sync_tag.py --next-suffix`
 - when pushing, let `scripts/codexsdk_sync_tag.py` choose the base tag or next `-sync.N` suffix from remote tag state
-- dispatch `upstream-protocol-drift.yml` when scheduled or when `dispatch_drift_check` is true
+- dispatch `upstream-protocol-drift.yml` with `force_compare=true` when drift verification is requested
 - watch the dispatched drift workflow to completion
 - report landing ref, landed commit, sync PR, upstream target, upstream commit, and sync tag when present
 
@@ -113,7 +107,7 @@ Report remote completion precisely:
 - `commit pushed`: sync PR branch exists, but protected merge, tag, CI, drift workflow, or issue closure is pending
 - `drift issue fully resolved`: sync PR merged, stable-tag sync tag handling completed when applicable, pushed CI passed, drift verification passed, and the drift issue closed when applicable
 
-After a sync PR merges into `main`, the Codex Upstream Protocol Drift workflow runs on schedule or `workflow_dispatch`, not ordinary pushes. If resolving a drift issue, dispatch drift verification for the selected upstream ref and watch the run:
+After a sync PR merges into `main`, the PR-closed finalize trigger dispatches forced drift verification rather than relying on ordinary pushes. If the event path is unavailable or suppressed, the scheduled finalize fallback should select the current default-branch sync PR. If resolving a drift issue manually, dispatch drift verification for the selected upstream ref and watch the run:
 
 ```sh
 gh workflow run upstream-protocol-drift.yml --ref main -f upstream_ref=<target_ref>
@@ -139,4 +133,4 @@ Good helpers in this workflow include:
 - polling a PR merge and printing diagnostics
 - validating generated outputs and sync state
 
-Do not replace the workflow with a monolithic auto-sync pipeline.
+Do not collapse deterministic helpers into a monolithic shell blob; keep target resolution, drift rendering, candidate application, validation, PR publication, and tag handling in canonical scripts.
