@@ -47,12 +47,14 @@ const (
 	MethodAccountLoginCompleted                   = "account/login/completed"
 	MethodAccountLoginStart                       = "account/login/start"
 	MethodAccountLogout                           = "account/logout"
+	MethodAccountRateLimitResetCreditConsume      = "account/rateLimitResetCredit/consume"
 	MethodAccountRateLimitsRead                   = "account/rateLimits/read"
 	MethodAccountRateLimitsUpdated                = "account/rateLimits/updated"
 	MethodAccountRead                             = "account/read"
 	MethodAccountSendAddCreditsNudgeEmail         = "account/sendAddCreditsNudgeEmail"
 	MethodAccountUpdated                          = "account/updated"
 	MethodAccountUsageRead                        = "account/usage/read"
+	MethodAccountWorkspaceMessagesRead            = "account/workspaceMessages/read"
 	MethodAppList                                 = "app/list"
 	MethodAppListUpdated                          = "app/list/updated"
 	MethodApplyPatchApproval                      = "applyPatchApproval"
@@ -69,6 +71,7 @@ const (
 	MethodConfigValueWrite                        = "config/value/write"
 	MethodConfigRequirementsRead                  = "configRequirements/read"
 	MethodConfigWarning                           = "configWarning"
+	MethodCurrentTimeRead                         = "currentTime/read"
 	MethodDeprecationNotice                       = "deprecationNotice"
 	MethodEnvironmentAdd                          = "environment/add"
 	MethodError                                   = "error"
@@ -78,6 +81,8 @@ const (
 	MethodExternalAgentConfigDetect               = "externalAgentConfig/detect"
 	MethodExternalAgentConfigImport               = "externalAgentConfig/import"
 	MethodExternalAgentConfigImportCompleted      = "externalAgentConfig/import/completed"
+	MethodExternalAgentConfigImportProgress       = "externalAgentConfig/import/progress"
+	MethodExternalAgentConfigImportReadHistories  = "externalAgentConfig/import/readHistories"
 	MethodFeedbackUpload                          = "feedback/upload"
 	MethodFSChanged                               = "fs/changed"
 	MethodFSCopy                                  = "fs/copy"
@@ -134,6 +139,7 @@ const (
 	MethodMockExperimentalMethod                  = "mock/experimentalMethod"
 	MethodModelList                               = "model/list"
 	MethodModelRerouted                           = "model/rerouted"
+	MethodModelSafetyBufferingUpdated             = "model/safetyBuffering/updated"
 	MethodModelVerification                       = "model/verification"
 	MethodModelProviderCapabilitiesRead           = "modelProvider/capabilities/read"
 	MethodPermissionProfileList                   = "permissionProfile/list"
@@ -172,10 +178,14 @@ const (
 	MethodThreadArchive                           = "thread/archive"
 	MethodThreadArchived                          = "thread/archived"
 	MethodThreadBackgroundTerminalsClean          = "thread/backgroundTerminals/clean"
+	MethodThreadBackgroundTerminalsList           = "thread/backgroundTerminals/list"
+	MethodThreadBackgroundTerminalsTerminate      = "thread/backgroundTerminals/terminate"
 	MethodThreadClosed                            = "thread/closed"
 	MethodThreadCompactStart                      = "thread/compact/start"
 	MethodThreadCompacted                         = "thread/compacted"
 	MethodThreadDecrementElicitation              = "thread/decrement_elicitation"
+	MethodThreadDelete                            = "thread/delete"
+	MethodThreadDeleted                           = "thread/deleted"
 	MethodThreadFork                              = "thread/fork"
 	MethodThreadGoalClear                         = "thread/goal/clear"
 	MethodThreadGoalCleared                       = "thread/goal/cleared"
@@ -192,6 +202,7 @@ const (
 	MethodThreadNameUpdated                       = "thread/name/updated"
 	MethodThreadRead                              = "thread/read"
 	MethodThreadRealtimeAppendAudio               = "thread/realtime/appendAudio"
+	MethodThreadRealtimeAppendSpeech              = "thread/realtime/appendSpeech"
 	MethodThreadRealtimeAppendText                = "thread/realtime/appendText"
 	MethodThreadRealtimeClosed                    = "thread/realtime/closed"
 	MethodThreadRealtimeError                     = "thread/realtime/error"
@@ -290,6 +301,17 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Accounts().Logout",
 		Stability:             MethodStabilityStable,
 	},
+	MethodAccountRateLimitResetCreditConsume: {
+		Method:                MethodAccountRateLimitResetCreditConsume,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "account",
+		ParamsOrPayloadSchema: "ConsumeAccountRateLimitResetCreditParams",
+		ResponseSchema:        "v2/ConsumeAccountRateLimitResetCreditResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Accounts().RateLimitResetCreditConsume",
+		Stability:             MethodStabilityStable,
+	},
 	MethodAccountRateLimitsRead: {
 		Method:                MethodAccountRateLimitsRead,
 		Direction:             MethodDirectionClientToServer,
@@ -354,6 +376,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/GetAccountTokenUsageResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Accounts().UsageRead",
+		Stability:             MethodStabilityStable,
+	},
+	MethodAccountWorkspaceMessagesRead: {
+		Method:                MethodAccountWorkspaceMessagesRead,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "account",
+		ParamsOrPayloadSchema: "",
+		ResponseSchema:        "v2/GetWorkspaceMessagesResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Accounts().WorkspaceMessagesRead",
 		Stability:             MethodStabilityStable,
 	},
 	MethodAppList: {
@@ -532,6 +565,17 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "ServerNotifications().ConfigWarning",
 		Stability:             MethodStabilityStable,
 	},
+	MethodCurrentTimeRead: {
+		Method:                MethodCurrentTimeRead,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindRequest,
+		Family:                "currentTime",
+		ParamsOrPayloadSchema: "CurrentTimeReadParams",
+		ResponseSchema:        "CurrentTimeReadResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "ServerRequests().CurrentTimeRead",
+		Stability:             MethodStabilityExperimental,
+	},
 	MethodDeprecationNotice: {
 		Method:                MethodDeprecationNotice,
 		Direction:             MethodDirectionServerToClient,
@@ -629,6 +673,28 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "",
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportCompleted",
+		Stability:             MethodStabilityStable,
+	},
+	MethodExternalAgentConfigImportProgress: {
+		Method:                MethodExternalAgentConfigImportProgress,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindNotification,
+		Family:                "externalAgentConfig",
+		ParamsOrPayloadSchema: "ExternalAgentConfigImportProgressNotification",
+		ResponseSchema:        "",
+		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
+		FacadeTarget:          "ServerNotifications().ExternalAgentConfigImportProgress",
+		Stability:             MethodStabilityStable,
+	},
+	MethodExternalAgentConfigImportReadHistories: {
+		Method:                MethodExternalAgentConfigImportReadHistories,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "externalAgentConfig",
+		ParamsOrPayloadSchema: "",
+		ResponseSchema:        "v2/ExternalAgentConfigImportHistoriesReadResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "ExternalAgentConfigs().ImportReadHistories",
 		Stability:             MethodStabilityStable,
 	},
 	MethodFeedbackUpload: {
@@ -1247,6 +1313,17 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "ServerNotifications().ModelRerouted",
 		Stability:             MethodStabilityStable,
 	},
+	MethodModelSafetyBufferingUpdated: {
+		Method:                MethodModelSafetyBufferingUpdated,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindNotification,
+		Family:                "model",
+		ParamsOrPayloadSchema: "ModelSafetyBufferingUpdatedNotification",
+		ResponseSchema:        "",
+		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
+		FacadeTarget:          "ServerNotifications().ModelSafetyBufferingUpdated",
+		Stability:             MethodStabilityStable,
+	},
 	MethodModelVerification: {
 		Method:                MethodModelVerification,
 		Direction:             MethodDirectionServerToClient,
@@ -1665,6 +1742,28 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Threads().BackgroundTerminalsClean",
 		Stability:             MethodStabilityExperimental,
 	},
+	MethodThreadBackgroundTerminalsList: {
+		Method:                MethodThreadBackgroundTerminalsList,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadBackgroundTerminalsListParams",
+		ResponseSchema:        "v2/ThreadBackgroundTerminalsListResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().BackgroundTerminalsList",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodThreadBackgroundTerminalsTerminate: {
+		Method:                MethodThreadBackgroundTerminalsTerminate,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadBackgroundTerminalsTerminateParams",
+		ResponseSchema:        "v2/ThreadBackgroundTerminalsTerminateResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().BackgroundTerminalsTerminate",
+		Stability:             MethodStabilityExperimental,
+	},
 	MethodThreadClosed: {
 		Method:                MethodThreadClosed,
 		Direction:             MethodDirectionServerToClient,
@@ -1708,6 +1807,28 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Threads().DecrementElicitation",
 		Stability:             MethodStabilityExperimental,
+	},
+	MethodThreadDelete: {
+		Method:                MethodThreadDelete,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadDeleteParams",
+		ResponseSchema:        "v2/ThreadDeleteResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().Delete",
+		Stability:             MethodStabilityStable,
+	},
+	MethodThreadDeleted: {
+		Method:                MethodThreadDeleted,
+		Direction:             MethodDirectionServerToClient,
+		Kind:                  MethodKindNotification,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadDeletedNotification",
+		ResponseSchema:        "",
+		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
+		FacadeTarget:          "ServerNotifications().ThreadDeleted",
+		Stability:             MethodStabilityStable,
 	},
 	MethodThreadFork: {
 		Method:                MethodThreadFork,
@@ -1883,6 +2004,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/ThreadRealtimeAppendAudioResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Threads().RealtimeAppendAudio",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodThreadRealtimeAppendSpeech: {
+		Method:                MethodThreadRealtimeAppendSpeech,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadRealtimeAppendSpeechParams",
+		ResponseSchema:        "v2/ThreadRealtimeAppendSpeechResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().RealtimeAppendSpeech",
 		Stability:             MethodStabilityExperimental,
 	},
 	MethodThreadRealtimeAppendText: {
