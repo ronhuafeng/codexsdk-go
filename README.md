@@ -120,15 +120,15 @@ func main() {
 	defer root.Close()
 
 	threads := root.ThreadClient(codexsdk.ThreadClientOptions{
-		DefaultModel:  model,
-		DefaultCWD:    workspace,
-		DefaultEffort: codexsdk.ReasoningEffortLow,
+		DefaultModel:          model,
+		DefaultCWD:            workspace,
+		DefaultEffort:         codexsdk.ReasoningEffortLow,
+		DefaultApprovalPolicy: codexsdk.ApprovalPolicyNever,
+		DefaultEphemeral:      codexsdk.Bool(true),
 	})
 
 	result, err := threads.StartThread(ctx, codexsdk.StartThreadRequest{
-		Input:          codexsdk.Text("Reply with a short confirmation."),
-		Ephemeral:      codexsdk.Bool(true),
-		ApprovalPolicy: codexsdk.ApprovalPolicyNever,
+		Input: codexsdk.Text("Reply with a short confirmation."),
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -138,6 +138,10 @@ func main() {
 ```
 
 More compile-checked examples live in `codexsdk/examples_test.go`.
+
+`ThreadClientOptions` can default model, working directory, reasoning effort,
+approval policy, approvals reviewer, and ephemeral thread creation. Request
+fields override those defaults when set.
 
 ## Real App-Server Smoke Test
 

@@ -3777,17 +3777,21 @@ func TestProtocolFacadeMethodsReturnErrClientClosed(t *testing.T) {
 	}
 }
 
-func TestThreadClientOptionsDefaultModelCWDAndEffort(t *testing.T) {
+func TestThreadClientOptionsDefaultsStartThreadRequest(t *testing.T) {
 	record := tempRecord(t)
 	t.Setenv("CODEXSDK_FAKE_RECORD", record)
 	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
 	if err != nil {
 		t.Fatal(err)
 	}
+	defaultEphemeral := true
 	client := root.ThreadClient(ThreadClientOptions{
-		DefaultModel:  "default-model",
-		DefaultCWD:    "/workspace/thread",
-		DefaultEffort: ReasoningEffortHigh,
+		DefaultModel:             "default-model",
+		DefaultCWD:               "/workspace/thread",
+		DefaultEffort:            ReasoningEffortHigh,
+		DefaultApprovalPolicy:    ApprovalPolicyNever,
+		DefaultApprovalsReviewer: ApprovalsReviewerAutoReview,
+		DefaultEphemeral:         &defaultEphemeral,
 	})
 	defer root.Close()
 
@@ -3797,12 +3801,170 @@ func TestThreadClientOptionsDefaultModelCWDAndEffort(t *testing.T) {
 
 	records := readRecords(t, record)
 	start := firstRecord(records, "recv", "thread/start")["params"].(map[string]any)
-	if start["model"] != "default-model" || start["cwd"] != "/workspace/thread" {
+	if start["model"] != "default-model" || start["cwd"] != "/workspace/thread" || start["approvalPolicy"] != "never" || start["approvalsReviewer"] != "auto_review" || start["ephemeral"] != true {
 		t.Fatalf("thread/start params = %#v", start)
 	}
 	turnStart := firstRecord(records, "recv", "turn/start")["params"].(map[string]any)
 	if turnStart["cwd"] != "/workspace/thread" || turnStart["effort"] != "high" {
 		t.Fatalf("turn/start params = %#v", turnStart)
+	}
+}
+
+func TestThreadClientStartRequestOverridesDefaults(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := root.ThreadClient(ThreadClientOptions{
+		DefaultModel:             "default-model",
+		DefaultCWD:               "/workspace/default",
+		DefaultEffort:            ReasoningEffortLow,
+		DefaultApprovalPolicy:    ApprovalPolicyNever,
+		DefaultApprovalsReviewer: ApprovalsReviewerAutoReview,
+		DefaultEphemeral:         Bool(true),
+	})
+	defer root.Close()
+
+	if _, err := client.StartThread(context.Background(), StartThreadRequest{
+		Input:             Text("overrides"),
+		Model:             "request-model",
+		CWD:               "/workspace/request",
+		Effort:            ReasoningEffortHigh,
+		ApprovalPolicy:    ApprovalPolicyOnRequest,
+		ApprovalsReviewer: ApprovalsReviewerUser,
+		Ephemeral:         Bool(false),
+	}); err != nil {
+		t.Fatalf("StartThread returned error: %v", err)
+	}
+
+	records := readRecords(t, record)
+	start := firstRecord(records, "recv", protocolv2.MethodThreadStart)["params"].(map[string]any)
+	if start["model"] != "request-model" || start["cwd"] != "/workspace/request" || start["approvalPolicy"] != "on-request" || start["approvalsReviewer"] != "user" || start["ephemeral"] != false {
+		t.Fatalf("thread/start params = %#v", start)
+	}
+	turnStart := firstRecord(records, "recv", protocolv2.MethodTurnStart)["params"].(map[string]any)
+	if turnStart["cwd"] != "/workspace/request" || turnStart["effort"] != "high" {
+		t.Fatalf("turn/start params = %#v", turnStart)
+	}
+}
+
+func TestThreadClientOptionsDefaultsResumeAndForkRequests(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := root.ThreadClient(ThreadClientOptions{
+		DefaultModel:             "default-model",
+		DefaultCWD:               "/workspace/thread",
+		DefaultApprovalPolicy:    ApprovalPolicyNever,
+		DefaultApprovalsReviewer: ApprovalsReviewerGuardianSubagent,
+		DefaultEphemeral:         Bool(true),
+	})
+	defer root.Close()
+
+	result, err := client.StartThread(context.Background(), StartThreadRequest{Input: Text("start")})
+	if err != nil {
+		t.Fatalf("StartThread returned error: %v", err)
+	}
+	if _, err := client.ResumeThread(context.Background(), ResumeThreadRequest{ThreadID: result.ThreadID, Input: Text("resume")}); err != nil {
+		t.Fatalf("ResumeThread returned error: %v", err)
+	}
+	if _, err := client.ForkThread(context.Background(), ForkThreadRequest{ParentThreadID: result.ThreadID}); err != nil {
+		t.Fatalf("ForkThread returned error: %v", err)
+	}
+
+	records := readRecords(t, record)
+	resume := firstRecord(records, "recv", protocolv2.MethodThreadResume)["params"].(map[string]any)
+	if resume["model"] != "default-model" || resume["cwd"] != "/workspace/thread" || resume["approvalPolicy"] != "never" || resume["approvalsReviewer"] != "guardian_subagent" {
+		t.Fatalf("thread/resume params = %#v", resume)
+	}
+	turnStarts := recordsByMethod(records, "recv", protocolv2.MethodTurnStart)
+	if turnStarts[1]["params"].(map[string]any)["cwd"] != "/workspace/thread" {
+		t.Fatalf("resume turn/start params = %#v", turnStarts[1]["params"])
+	}
+	fork := firstRecord(records, "recv", protocolv2.MethodThreadFork)["params"].(map[string]any)
+	if fork["model"] != "default-model" || fork["cwd"] != "/workspace/thread" || fork["approvalPolicy"] != "never" || fork["approvalsReviewer"] != "guardian_subagent" || fork["ephemeral"] != true {
+		t.Fatalf("thread/fork params = %#v", fork)
+	}
+}
+
+func TestThreadClientRejectsInvalidPolicyDefaultsBeforeThreadStart(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options ThreadClientOptions
+		wantErr string
+	}{
+		{
+			name: "approval policy",
+			options: ThreadClientOptions{
+				DefaultModel:          "client-model",
+				DefaultApprovalPolicy: ApprovalPolicy("root"),
+			},
+			wantErr: `unsupported ApprovalPolicy "root"`,
+		},
+		{
+			name: "approvals reviewer",
+			options: ThreadClientOptions{
+				DefaultModel:             "client-model",
+				DefaultApprovalsReviewer: ApprovalsReviewer("committee"),
+			},
+			wantErr: `unsupported ApprovalsReviewer "committee"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			record := tempRecord(t)
+			t.Setenv("CODEXSDK_FAKE_RECORD", record)
+			root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer root.Close()
+
+			client := root.ThreadClient(tc.options)
+			_, err = client.StartThread(context.Background(), StartThreadRequest{Input: Text("invalid default")})
+			if err == nil {
+				t.Fatalf("StartThread accepted invalid default %s", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("invalid default %s error = %v", tc.name, err)
+			}
+			if firstRecord(readRecords(t, record), "recv", protocolv2.MethodThreadStart) != nil {
+				t.Fatalf("thread/start was sent after invalid default %s preflight failure", tc.name)
+			}
+		})
+	}
+}
+
+func TestThreadClientZeroValueOptionsDoNotSetPolicyDefaults(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	client := root.ThreadClient(ThreadClientOptions{})
+	if _, err := client.StartThread(context.Background(), StartThreadRequest{
+		Input: Text("zero"),
+		Model: "request-model",
+	}); err != nil {
+		t.Fatalf("StartThread returned error: %v", err)
+	}
+
+	start := firstRecord(readRecords(t, record), "recv", protocolv2.MethodThreadStart)["params"].(map[string]any)
+	if _, ok := start["approvalPolicy"]; ok {
+		t.Fatalf("zero-value options set approval policy: %#v", start)
+	}
+	if _, ok := start["approvalsReviewer"]; ok {
+		t.Fatalf("zero-value options set approvals reviewer: %#v", start)
+	}
+	if _, ok := start["ephemeral"]; ok {
+		t.Fatalf("zero-value options set ephemeral: %#v", start)
 	}
 }
 
@@ -4117,8 +4279,8 @@ func TestRequestMappingSteeringForkAndAggregateInputStats(t *testing.T) {
 		t.Fatalf("mention input item = %#v", mention)
 	}
 	resumes := recordsByMethod(records, "recv", "thread/resume")
-	if _, ok := resumes[0]["params"].(map[string]any)["model"]; ok {
-		t.Fatalf("resume without model steered client default: %#v", resumes[0]["params"])
+	if resumes[0]["params"].(map[string]any)["model"] != "client-model" {
+		t.Fatalf("resume without model did not use client default: %#v", resumes[0]["params"])
 	}
 	if resumes[1]["params"].(map[string]any)["model"] != "resume-model" {
 		t.Fatalf("resume model params = %#v", resumes[1]["params"])

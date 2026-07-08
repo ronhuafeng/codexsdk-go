@@ -221,6 +221,9 @@ func (tc *threadClient) StartThreadStream(ctx context.Context, req StartThreadRe
 		return nil, err
 	}
 	cwd := defaultString(req.CWD, tc.options.DefaultCWD)
+	req.ApprovalPolicy = defaultApprovalPolicy(req.ApprovalPolicy, tc.options.DefaultApprovalPolicy)
+	req.ApprovalsReviewer = defaultApprovalsReviewer(req.ApprovalsReviewer, tc.options.DefaultApprovalsReviewer)
+	req.Ephemeral = defaultBoolPointer(req.Ephemeral, tc.options.DefaultEphemeral)
 	params, err := threadStartProtocolParams(req, model, cwd)
 	if err != nil {
 		return nil, err
@@ -257,6 +260,10 @@ func (tc *threadClient) ResumeThreadStream(ctx context.Context, req ResumeThread
 	if _, err := protocolUserInput(req.Input); err != nil {
 		return nil, err
 	}
+	req.Model = defaultString(req.Model, tc.options.DefaultModel)
+	req.CWD = defaultString(req.CWD, tc.options.DefaultCWD)
+	req.ApprovalPolicy = defaultApprovalPolicy(req.ApprovalPolicy, tc.options.DefaultApprovalPolicy)
+	req.ApprovalsReviewer = defaultApprovalsReviewer(req.ApprovalsReviewer, tc.options.DefaultApprovalsReviewer)
 	params, err := threadResumeProtocolParams(req)
 	if err != nil {
 		return nil, err
@@ -287,6 +294,11 @@ func (tc *threadClient) ForkThread(ctx context.Context, req ForkThreadRequest) (
 	if strings.TrimSpace(req.ParentThreadID) == "" {
 		return ThreadForkResult{}, errors.New("codexsdk: ForkThreadRequest.ParentThreadID is required")
 	}
+	req.Model = defaultString(req.Model, tc.options.DefaultModel)
+	req.CWD = defaultString(req.CWD, tc.options.DefaultCWD)
+	req.ApprovalPolicy = defaultApprovalPolicy(req.ApprovalPolicy, tc.options.DefaultApprovalPolicy)
+	req.ApprovalsReviewer = defaultApprovalsReviewer(req.ApprovalsReviewer, tc.options.DefaultApprovalsReviewer)
+	req.Ephemeral = defaultBoolPointer(req.Ephemeral, tc.options.DefaultEphemeral)
 	params, err := threadForkProtocolParams(req)
 	if err != nil {
 		return ThreadForkResult{}, err
@@ -315,6 +327,32 @@ func validateOutputSchema(schema protocolv2.OutputSchema) error {
 	}
 	if _, err := schema.MarshalJSON(); err != nil {
 		return fmt.Errorf("codexsdk: invalid OutputSchema: %w", err)
+	}
+	return nil
+}
+
+func defaultApprovalPolicy(request ApprovalPolicy, fallback ApprovalPolicy) ApprovalPolicy {
+	if request != "" {
+		return request
+	}
+	return fallback
+}
+
+func defaultApprovalsReviewer(request ApprovalsReviewer, fallback ApprovalsReviewer) ApprovalsReviewer {
+	if request != "" {
+		return request
+	}
+	return fallback
+}
+
+func defaultBoolPointer(request *bool, fallback *bool) *bool {
+	if request != nil {
+		value := *request
+		return &value
+	}
+	if fallback != nil {
+		value := *fallback
+		return &value
 	}
 	return nil
 }

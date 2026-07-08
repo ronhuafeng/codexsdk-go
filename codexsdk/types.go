@@ -45,9 +45,12 @@ type ClientCapabilities struct {
 }
 
 type ThreadClientOptions struct {
-	DefaultModel  string
-	DefaultCWD    string
-	DefaultEffort ReasoningEffort
+	DefaultModel             string
+	DefaultCWD               string
+	DefaultEffort            ReasoningEffort
+	DefaultApprovalPolicy    ApprovalPolicy
+	DefaultApprovalsReviewer ApprovalsReviewer
+	DefaultEphemeral         *bool
 }
 
 type InputItem struct {
