@@ -472,11 +472,6 @@ func TestConfigRequirementsProtocolFamilyFacadeSendsTypedMethodAndDecodesRespons
 		(*requirements.FeatureRequirements.Value)["alpha"] != true {
 		t.Fatalf("configRequirements/read feature requirements = %#v", requirements.FeatureRequirements)
 	}
-	if requirements.Network == nil || requirements.Network.Value == nil ||
-		requirements.Network.Value.Domains == nil || requirements.Network.Value.Domains.Value == nil ||
-		(*requirements.Network.Value.Domains.Value)["example.com"] != protocolv2.NetworkDomainPermissionAllow {
-		t.Fatalf("configRequirements/read network requirements = %#v", requirements.Network)
-	}
 
 	records := readRecords(t, record)
 	readRecord := firstRecord(records, "recv", protocolv2.MethodConfigRequirementsRead)
@@ -833,7 +828,6 @@ func TestProcessesProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *te
 		Env:                protocolv2.Value(map[string]*protocolv2.Nullable[string]{"PATH": protocolv2.Value("/bin"), "REMOVE": protocolv2.Null[string]()}),
 		OutputBytesCap:     protocolv2.Value(uint64(1024)),
 		ProcessHandle:      "proc-1",
-		Size:               protocolv2.Value(protocolv2.ProcessTerminalSize{Cols: 120, Rows: 40}),
 		StreamStdin:        Bool(true),
 		StreamStdoutStderr: Bool(true),
 		TimeoutMS:          protocolv2.Null[int64](),
@@ -871,11 +865,9 @@ func TestProcessesProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *te
 	}
 	spawnParams := firstRecord(records, "recv", protocolv2.MethodProcessSpawn)["params"].(map[string]any)
 	spawnCommand := spawnParams["command"].([]any)
-	spawnSize := spawnParams["size"].(map[string]any)
 	spawnEnv := spawnParams["env"].(map[string]any)
 	if spawnParams["processHandle"] != "proc-1" || spawnParams["cwd"] != "/workspace/facade" ||
 		len(spawnCommand) != 3 || spawnCommand[0] != "bash" || spawnParams["outputBytesCap"] != float64(1024) ||
-		spawnSize["cols"] != float64(120) || spawnSize["rows"] != float64(40) ||
 		spawnEnv["PATH"] != "/bin" || spawnEnv["REMOVE"] != nil ||
 		spawnParams["streamStdin"] != true || spawnParams["streamStdoutStderr"] != true ||
 		spawnParams["timeoutMs"] != nil || spawnParams["tty"] != true {
@@ -1101,8 +1093,7 @@ func TestExternalAgentConfigsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResp
 		t.Fatalf("ExternalAgentConfigs().Detect returned error: %v", err)
 	}
 	if len(detect.Items) != 1 || detect.Items[0].ItemType != protocolv2.ExternalAgentConfigMigrationItemTypeCOMMANDS ||
-		detect.Items[0].Details == nil || detect.Items[0].Details.Value == nil ||
-		detect.Items[0].Details.Value.Commands == nil || len(*detect.Items[0].Details.Value.Commands) != 1 {
+		detect.Items[0].Description != "Import command" {
 		t.Fatalf("externalAgentConfig/detect response = %#v", detect)
 	}
 	records := readRecords(t, record)
@@ -1411,10 +1402,7 @@ func TestReviewAndSkillsProtocolFamilyFacadesSendTypedMethodsAndDecodeResponses(
 	}
 	if len(skills.Data) != 1 || skills.Data[0].CWD != "/repo" ||
 		len(skills.Data[0].Skills) != 1 ||
-		skills.Data[0].Skills[0].Scope != protocolv2.SkillScopeRepo ||
-		skills.Data[0].Skills[0].Dependencies == nil ||
-		skills.Data[0].Skills[0].Dependencies.Value == nil ||
-		len(skills.Data[0].Skills[0].Dependencies.Value.Tools) != 1 {
+		skills.Data[0].Skills[0].Scope != protocolv2.SkillScopeRepo {
 		t.Fatalf("skills/list response = %#v", skills)
 	}
 
@@ -1616,11 +1604,6 @@ func TestPluginsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		Discoverability: protocolv2.Value(protocolv2.PluginShareDiscoverabilityPRIVATE),
 		PluginPath:      "/plugins/plugin-one",
 		RemotePluginID:  protocolv2.Null[string](),
-		ShareTargets: protocolv2.Value([]protocolv2.PluginShareTarget{{
-			PrincipalID:   "group-1",
-			PrincipalType: protocolv2.PluginSharePrincipalTypeGroup,
-			Role:          protocolv2.PluginShareTargetRoleReader,
-		}}),
 	})
 	if err != nil {
 		t.Fatalf("Plugins().ShareSave returned error: %v", err)
@@ -1680,9 +1663,8 @@ func TestPluginsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		t.Fatalf("plugin/install params = %#v", installParams)
 	}
 	shareSaveParams := firstRecord(records, "recv", protocolv2.MethodPluginShareSave)["params"].(map[string]any)
-	shareTargets := shareSaveParams["shareTargets"].([]any)
 	if shareSaveParams["discoverability"] != "PRIVATE" || shareSaveParams["pluginPath"] != "/plugins/plugin-one" ||
-		shareSaveParams["remotePluginId"] != nil || len(shareTargets) != 1 {
+		shareSaveParams["remotePluginId"] != nil {
 		t.Fatalf("plugin/share/save params = %#v", shareSaveParams)
 	}
 	updateTargetsParams := firstRecord(records, "recv", protocolv2.MethodPluginShareUpdateTargets)["params"].(map[string]any)
@@ -1857,7 +1839,6 @@ func TestCommandProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 		Command:     []string{"bash", "-lc", "echo ok"},
 		CWD:         protocolv2.Value("/workspace"),
 		ProcessID:   protocolv2.Value("proc-1"),
-		Size:        protocolv2.Value(protocolv2.CommandExecTerminalSize{Cols: 120, Rows: 40}),
 		StreamStdin: Bool(true),
 		Tty:         Bool(false),
 	})
@@ -1900,10 +1881,8 @@ func TestCommandProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *test
 	if got := strings.Join(stringify(execParams["command"].([]any)), " "); got != "bash -lc echo ok" {
 		t.Fatalf("command/exec command params = %#v", execParams["command"])
 	}
-	execSize := execParams["size"].(map[string]any)
 	if execParams["cwd"] != "/workspace" || execParams["processId"] != "proc-1" ||
-		execParams["streamStdin"] != true || execParams["tty"] != false ||
-		execSize["cols"] != float64(120) || execSize["rows"] != float64(40) {
+		execParams["streamStdin"] != true || execParams["tty"] != false {
 		t.Fatalf("command/exec params = %#v", execParams)
 	}
 	resizeParams := firstRecord(records, "recv", protocolv2.MethodCommandExecResize)["params"].(map[string]any)
@@ -2890,19 +2869,19 @@ func TestThreadTurnsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *
 		turnsList.NextCursor == nil || turnsList.NextCursor.Value == nil || *turnsList.NextCursor.Value != "next-turn" {
 		t.Fatalf("thread/turns/list response = %#v", turnsList)
 	}
-	itemsList, err := threads.TurnsItemsList(context.Background(), protocolv2.ThreadTurnsItemsListParams{
+	itemsList, err := threads.ItemsList(context.Background(), protocolv2.ThreadItemsListParams{
 		Cursor:        protocolv2.Null[string](),
 		Limit:         protocolv2.Value(uint32(10)),
 		SortDirection: protocolv2.Value(protocolv2.SortDirectionAsc),
 		ThreadID:      "thread-1",
-		TurnID:        "turn-list-1",
+		TurnID:        protocolv2.Value("turn-list-1"),
 	})
 	if err != nil {
-		t.Fatalf("Threads().TurnsItemsList returned error after experimental opt-in: %v", err)
+		t.Fatalf("Threads().ItemsList returned error after experimental opt-in: %v", err)
 	}
 	if len(itemsList.Data) != 1 || itemsList.Data[0].Kind() != protocolv2.ThreadItemKindAgentMessage ||
 		itemsList.NextCursor == nil || itemsList.NextCursor.Value == nil || *itemsList.NextCursor.Value != "next-item" {
-		t.Fatalf("thread/turns/items/list response = %#v", itemsList)
+		t.Fatalf("thread/items/list response = %#v", itemsList)
 	}
 
 	records := readRecords(t, record)
@@ -2912,11 +2891,11 @@ func TestThreadTurnsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *
 		turnsParams["sortDirection"] != "desc" {
 		t.Fatalf("thread/turns/list params = %#v", turnsParams)
 	}
-	itemsParams := firstRecord(records, "recv", protocolv2.MethodThreadTurnsItemsList)["params"].(map[string]any)
+	itemsParams := firstRecord(records, "recv", protocolv2.MethodThreadItemsList)["params"].(map[string]any)
 	if itemsParams["threadId"] != "thread-1" || itemsParams["turnId"] != "turn-list-1" ||
 		itemsParams["cursor"] != nil || itemsParams["limit"] != float64(10) ||
 		itemsParams["sortDirection"] != "asc" {
-		t.Fatalf("thread/turns/items/list params = %#v", itemsParams)
+		t.Fatalf("thread/items/list params = %#v", itemsParams)
 	}
 }
 
@@ -2943,12 +2922,12 @@ func TestThreadTurnsProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWriteUnl
 			},
 		},
 		{
-			name:   "turnsItemsList",
-			method: protocolv2.MethodThreadTurnsItemsList,
+			name:   "itemsList",
+			method: protocolv2.MethodThreadItemsList,
 			call: func() error {
-				_, err := root.Threads().TurnsItemsList(context.Background(), protocolv2.ThreadTurnsItemsListParams{
+				_, err := root.Threads().ItemsList(context.Background(), protocolv2.ThreadItemsListParams{
 					ThreadID: "thread-1",
-					TurnID:   "turn-list-1",
+					TurnID:   protocolv2.Value("turn-list-1"),
 				})
 				return err
 			},
@@ -2968,7 +2947,7 @@ func TestThreadTurnsProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWriteUnl
 	records := readRecords(t, record)
 	for _, method := range []string{
 		protocolv2.MethodThreadTurnsList,
-		protocolv2.MethodThreadTurnsItemsList,
+		protocolv2.MethodThreadItemsList,
 	} {
 		if firstRecord(records, "recv", method) != nil {
 			t.Fatalf("%s was sent after experimental method guard failure", method)
@@ -3022,16 +3001,16 @@ func TestThreadTurnsProtocolFamilyFacadeRejectsMalformedTypedResponses(t *testin
 			wantSub: "ThreadTurnsListResponse.data",
 		},
 		{
-			name:   "turnsItemsList",
-			method: protocolv2.MethodThreadTurnsItemsList,
+			name:   "itemsList",
+			method: protocolv2.MethodThreadItemsList,
 			call: func(threads Threads) error {
-				_, err := threads.TurnsItemsList(context.Background(), protocolv2.ThreadTurnsItemsListParams{
+				_, err := threads.ItemsList(context.Background(), protocolv2.ThreadItemsListParams{
 					ThreadID: "thread-1",
-					TurnID:   "turn-list-1",
+					TurnID:   protocolv2.Value("turn-list-1"),
 				})
 				return err
 			},
-			wantSub: "ThreadTurnsItemsListResponse.data",
+			wantSub: "ThreadItemsListResponse.data",
 		},
 	}
 	for _, tc := range cases {
@@ -5272,9 +5251,7 @@ func TestTurnErrorsAndLocalCancellationAreDistinct(t *testing.T) {
 		!strings.Contains(err.Error(), "codexsdk: turn failed") ||
 		!strings.Contains(err.Error(), "thread_id=thread-1") ||
 		!strings.Contains(err.Error(), "turn_id=turn-1") ||
-		!strings.Contains(err.Error(), "status=failed") ||
-		!strings.Contains(err.Error(), "code=usageLimitExceeded") ||
-		!strings.Contains(err.Error(), `message="native failed"`) {
+		!strings.Contains(err.Error(), "status=failed") {
 		t.Fatalf("failed turn err = %v", err)
 	}
 	_ = failed.Close()
@@ -6683,12 +6660,12 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			sendProtocolResult(id, protocolv2.ThreadBackgroundTerminalsCleanResponse{})
-		case "thread/turns/items/list":
+		case "thread/items/list":
 			if mode == "thread-turns-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{"nextCursor": "next-item"}})
 				continue
 			}
-			sendProtocolResult(id, protocolv2.ThreadTurnsItemsListResponse{
+			sendProtocolResult(id, protocolv2.ThreadItemsListResponse{
 				BackwardsCursor: protocolv2.Null[string](),
 				Data:            []protocolv2.ThreadItem{facadeThreadAgentMessageItem("item-agent-1", "final text")},
 				NextCursor:      protocolv2.Value("next-item"),
@@ -6869,7 +6846,7 @@ func runFakeAppServer(mode string, extra []string) {
 			})
 			switch mode {
 			case "failed":
-				send(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "items": []map[string]any{}, "status": "failed", "error": map[string]any{"message": "native failed", "codexErrorInfo": "usageLimitExceeded"}}}})
+				send(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "items": []map[string]any{}, "status": "failed"}}})
 			case "interrupted":
 				send(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "items": []map[string]any{}, "status": "interrupted"}}})
 			case "delta-without-final":
@@ -7187,11 +7164,6 @@ func facadeConfigRequirementsReadResponse() protocolv2.ConfigRequirementsReadRes
 				"alpha": true,
 				"beta":  false,
 			}),
-			Network: protocolv2.Value(protocolv2.NetworkRequirements{
-				Domains: protocolv2.Value(map[string]protocolv2.NetworkDomainPermission{
-					"example.com": protocolv2.NetworkDomainPermissionAllow,
-				}),
-			}),
 		}),
 	}
 }
@@ -7229,12 +7201,7 @@ func facadeExternalAgentConfigDetectResponse() protocolv2.ExternalAgentConfigDet
 		Items: []protocolv2.ExternalAgentConfigMigrationItem{{
 			CWD:         protocolv2.Value("/repo"),
 			Description: "Import command",
-			Details: protocolv2.Value(protocolv2.MigrationDetails{
-				Commands: &[]protocolv2.CommandMigration{{
-					Name: "build",
-				}},
-			}),
-			ItemType: protocolv2.ExternalAgentConfigMigrationItemTypeCOMMANDS,
+			ItemType:    protocolv2.ExternalAgentConfigMigrationItemTypeCOMMANDS,
 		}},
 	}
 }
@@ -7289,16 +7256,6 @@ func facadeSkillsListResponse() protocolv2.SkillsListResponse {
 				Path:    "/repo/.codex/skills/bad/SKILL.md",
 			}},
 			Skills: []protocolv2.SkillMetadata{{
-				Dependencies: protocolv2.Value(protocolv2.SkillDependencies{
-					Tools: []protocolv2.SkillToolDependency{{
-						Command:     protocolv2.Value("rg"),
-						Description: protocolv2.Null[string](),
-						Transport:   protocolv2.Null[string](),
-						Type:        "command",
-						URL:         protocolv2.Null[string](),
-						Value:       "rg",
-					}},
-				}),
 				Description: "review docs",
 				Enabled:     true,
 				Interface: protocolv2.Value(protocolv2.SkillInterface{
@@ -7333,13 +7290,7 @@ func facadePluginSummary() protocolv2.PluginSummary {
 		Name:     "plugin-one",
 		ShareContext: protocolv2.Value(protocolv2.PluginShareContext{
 			RemotePluginID: "remote-1",
-			SharePrincipals: protocolv2.Value([]protocolv2.PluginSharePrincipal{{
-				Name:          "User One",
-				PrincipalID:   "user-1",
-				PrincipalType: protocolv2.PluginSharePrincipalTypeUser,
-				Role:          protocolv2.PluginSharePrincipalRoleOwner,
-			}}),
-			ShareURL: protocolv2.Value("https://example.test/share"),
+			ShareURL:       protocolv2.Value("https://example.test/share"),
 		}),
 		Source: protocolv2.NewPluginSourceRemote(),
 	}

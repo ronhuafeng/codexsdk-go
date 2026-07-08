@@ -74,6 +74,7 @@ const (
 	MethodCurrentTimeRead                         = "currentTime/read"
 	MethodDeprecationNotice                       = "deprecationNotice"
 	MethodEnvironmentAdd                          = "environment/add"
+	MethodEnvironmentInfo                         = "environment/info"
 	MethodError                                   = "error"
 	MethodExecCommandApproval                     = "execCommandApproval"
 	MethodExperimentalFeatureEnablementSet        = "experimentalFeature/enablement/set"
@@ -194,6 +195,7 @@ const (
 	MethodThreadGoalUpdated                       = "thread/goal/updated"
 	MethodThreadIncrementElicitation              = "thread/increment_elicitation"
 	MethodThreadInjectItems                       = "thread/inject_items"
+	MethodThreadItemsList                         = "thread/items/list"
 	MethodThreadList                              = "thread/list"
 	MethodThreadLoadedList                        = "thread/loaded/list"
 	MethodThreadMemoryModeSet                     = "thread/memoryMode/set"
@@ -225,7 +227,6 @@ const (
 	MethodThreadStarted                           = "thread/started"
 	MethodThreadStatusChanged                     = "thread/status/changed"
 	MethodThreadTokenUsageUpdated                 = "thread/tokenUsage/updated"
-	MethodThreadTurnsItemsList                    = "thread/turns/items/list"
 	MethodThreadTurnsList                         = "thread/turns/list"
 	MethodThreadUnarchive                         = "thread/unarchive"
 	MethodThreadUnarchived                        = "thread/unarchived"
@@ -596,6 +597,17 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchema:        "v2/EnvironmentAddResponse.json",
 		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
 		FacadeTarget:          "Environments().Add",
+		Stability:             MethodStabilityExperimental,
+	},
+	MethodEnvironmentInfo: {
+		Method:                MethodEnvironmentInfo,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "environment",
+		ParamsOrPayloadSchema: "EnvironmentInfoParams",
+		ResponseSchema:        "v2/EnvironmentInfoResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Environments().Info",
 		Stability:             MethodStabilityExperimental,
 	},
 	MethodError: {
@@ -1918,6 +1930,17 @@ var methodRegistry = map[string]MethodInfo{
 		FacadeTarget:          "Threads().InjectItems",
 		Stability:             MethodStabilityStable,
 	},
+	MethodThreadItemsList: {
+		Method:                MethodThreadItemsList,
+		Direction:             MethodDirectionClientToServer,
+		Kind:                  MethodKindRequest,
+		Family:                "thread",
+		ParamsOrPayloadSchema: "ThreadItemsListParams",
+		ResponseSchema:        "v2/ThreadItemsListResponse.json",
+		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
+		FacadeTarget:          "Threads().ItemsList",
+		Stability:             MethodStabilityExperimental,
+	},
 	MethodThreadList: {
 		Method:                MethodThreadList,
 		Direction:             MethodDirectionClientToServer,
@@ -2258,17 +2281,6 @@ var methodRegistry = map[string]MethodInfo{
 		ResponseSchemaStatus:  ResponseSchemaStatusNotApplicable,
 		FacadeTarget:          "ServerNotifications().ThreadTokenUsageUpdated",
 		Stability:             MethodStabilityStable,
-	},
-	MethodThreadTurnsItemsList: {
-		Method:                MethodThreadTurnsItemsList,
-		Direction:             MethodDirectionClientToServer,
-		Kind:                  MethodKindRequest,
-		Family:                "thread",
-		ParamsOrPayloadSchema: "ThreadTurnsItemsListParams",
-		ResponseSchema:        "v2/ThreadTurnsItemsListResponse.json",
-		ResponseSchemaStatus:  ResponseSchemaStatusDeclared,
-		FacadeTarget:          "Threads().TurnsItemsList",
-		Stability:             MethodStabilityExperimental,
 	},
 	MethodThreadTurnsList: {
 		Method:                MethodThreadTurnsList,

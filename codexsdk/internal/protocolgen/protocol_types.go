@@ -527,25 +527,26 @@ func SelectFirstPassGeneratedTypes(plan ProtocolTypePlan) ([]TypePlan, error) {
 			if selectedIndexes[index] {
 				continue
 			}
-			if !canGenerateFirstPassType(typ, generatedNamedTypes) {
+			selectedType, ok := firstPassGeneratedType(typ, generatedNamedTypes)
+			if !ok {
 				continue
 			}
-			if enumTypes[typ.TypeName] {
-				return nil, fmt.Errorf("generated type %s conflicts with generated enum type", typ.TypeName)
+			if enumTypes[selectedType.TypeName] {
+				return nil, fmt.Errorf("generated type %s conflicts with generated enum type", selectedType.TypeName)
 			}
-			if reservedProtocolTypeName(typ.TypeName) {
-				return nil, fmt.Errorf("generated type %s conflicts with handwritten protocolv2 type", typ.TypeName)
+			if reservedProtocolTypeName(selectedType.TypeName) {
+				return nil, fmt.Errorf("generated type %s conflicts with handwritten protocolv2 type", selectedType.TypeName)
 			}
-			if previous, ok := seenNames[typ.TypeName]; ok {
-				return nil, fmt.Errorf("generated type %s appears in both %s and %s", typ.TypeName, previous, typ.SchemaPath)
+			if previous, ok := seenNames[selectedType.TypeName]; ok {
+				return nil, fmt.Errorf("generated type %s appears in both %s and %s", selectedType.TypeName, previous, selectedType.SchemaPath)
 			}
-			if generatedNamedTypes[typ.TypeName] {
-				return nil, fmt.Errorf("generated type %s conflicts with earlier generated type", typ.TypeName)
+			if generatedNamedTypes[selectedType.TypeName] {
+				return nil, fmt.Errorf("generated type %s conflicts with earlier generated type", selectedType.TypeName)
 			}
-			seenNames[typ.TypeName] = typ.SchemaPath
+			seenNames[selectedType.TypeName] = selectedType.SchemaPath
 			selectedIndexes[index] = true
-			generatedNamedTypes[typ.TypeName] = true
-			selected = append(selected, typ)
+			generatedNamedTypes[selectedType.TypeName] = true
+			selected = append(selected, selectedType)
 			changed = true
 		}
 		if !changed {
@@ -1662,19 +1663,25 @@ func taggedUnionVariantFields(typ TypePlan, variant *Schema, discriminator strin
 	return fields, nullFields, nil
 }
 
-func canGenerateFirstPassType(typ TypePlan, enumTypes map[string]bool) bool {
+func firstPassGeneratedType(typ TypePlan, generatedNamedTypes map[string]bool) (TypePlan, bool) {
 	switch typ.Kind {
 	case TypePlanEmptyStructCandidate:
-		return true
+		return typ, true
 	case TypePlanObjectStructCandidate:
+		selected := typ
+		selected.Fields = nil
 		for _, field := range typ.Fields {
-			if !canGenerateFirstPassField(field, enumTypes) {
-				return false
+			if canGenerateFirstPassField(field, generatedNamedTypes) {
+				selected.Fields = append(selected.Fields, field)
+				continue
+			}
+			if field.Required {
+				return TypePlan{}, false
 			}
 		}
-		return true
+		return selected, true
 	default:
-		return false
+		return TypePlan{}, false
 	}
 }
 

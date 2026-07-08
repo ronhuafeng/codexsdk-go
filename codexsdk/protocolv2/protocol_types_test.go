@@ -406,13 +406,13 @@ func TestGeneratedTurnResponseCoreAdjacentPayloadsProtocolMarshalAndUnmarshal(t 
 		t.Fatalf("decoded thread turns list response = %#v", decodedTurnsList)
 	}
 
-	itemsListRaw, err := json.Marshal(ThreadTurnsItemsListResponse{
+	itemsListRaw, err := json.Marshal(ThreadItemsListResponse{
 		Data: []ThreadItem{item},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var decodedItemsList ThreadTurnsItemsListResponse
+	var decodedItemsList ThreadItemsListResponse
 	if err := json.Unmarshal(itemsListRaw, &decodedItemsList); err != nil {
 		t.Fatal(err)
 	}
@@ -1815,16 +1815,13 @@ func TestGeneratedAccountRateLimitsResponseMarshalAndUnmarshal(t *testing.T) {
 				Unlimited:  false,
 			}),
 			LimitID:              Value("codex"),
+			LimitName:            Value("Codex"),
 			PlanType:             Value(PlanTypePlus),
-			Primary:              Value(RateLimitWindow{ResetsAt: Value(int64(12345)), UsedPercent: 42, WindowDurationMins: Null[int64]()}),
 			RateLimitReachedType: Value(RateLimitReachedTypeRateLimitReached),
 		},
 		RateLimitsByLimitID: Value(map[string]RateLimitSnapshot{
 			"codex": {
 				LimitName: Value("Codex"),
-				Secondary: Value(RateLimitWindow{
-					UsedPercent: 7,
-				}),
 			},
 		}),
 	}
@@ -1832,7 +1829,7 @@ func TestGeneratedAccountRateLimitsResponseMarshalAndUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"rateLimits":{"credits":{"balance":null,"hasCredits":true,"unlimited":false},"limitId":"codex","planType":"plus","primary":{"resetsAt":12345,"usedPercent":42,"windowDurationMins":null},"rateLimitReachedType":"rate_limit_reached"},"rateLimitsByLimitId":{"codex":{"limitName":"Codex","secondary":{"usedPercent":7}}}}`
+	want := `{"rateLimits":{"credits":{"balance":null,"hasCredits":true,"unlimited":false},"limitId":"codex","limitName":"Codex","planType":"plus","rateLimitReachedType":"rate_limit_reached"},"rateLimitsByLimitId":{"codex":{"limitName":"Codex"}}}`
 	if got := string(raw); got != want {
 		t.Fatalf("GetAccountRateLimitsResponse JSON = %s, want %s", got, want)
 	}
@@ -1841,10 +1838,10 @@ func TestGeneratedAccountRateLimitsResponseMarshalAndUnmarshal(t *testing.T) {
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if decoded.RateLimits.Primary == nil || decoded.RateLimits.Primary.Value == nil || decoded.RateLimits.Primary.Value.UsedPercent != 42 {
-		t.Fatalf("decoded primary rate limit = %#v", decoded.RateLimits.Primary)
+	if decoded.RateLimits.LimitName == nil || decoded.RateLimits.LimitName.Value == nil || *decoded.RateLimits.LimitName.Value != "Codex" {
+		t.Fatalf("decoded rate limit name = %#v", decoded.RateLimits.LimitName)
 	}
-	if decoded.RateLimitsByLimitID == nil || decoded.RateLimitsByLimitID.Value == nil || (*decoded.RateLimitsByLimitID.Value)["codex"].Secondary == nil {
+	if decoded.RateLimitsByLimitID == nil || decoded.RateLimitsByLimitID.Value == nil || (*decoded.RateLimitsByLimitID.Value)["codex"].LimitName == nil {
 		t.Fatalf("decoded rateLimitsByLimitId = %#v", decoded.RateLimitsByLimitID)
 	}
 }
@@ -2322,15 +2319,6 @@ func TestGeneratedAppListProtocolMarshalAndUnmarshal(t *testing.T) {
 
 	response := AppsListResponse{
 		Data: []AppInfo{{
-			AppMetadata: Value(AppMetadata{
-				Categories: Value([]string{"productivity"}),
-				Review:     Value(AppReview{Status: "approved"}),
-				Screenshots: Value([]AppScreenshot{{
-					FileID:     Null[string](),
-					URL:        Value("https://example.com/s.png"),
-					UserPrompt: "show it",
-				}}),
-			}),
 			Branding: Value(AppBranding{
 				IsDiscoverableApp: true,
 				Website:           Value("https://example.com"),
@@ -2349,7 +2337,7 @@ func TestGeneratedAppListProtocolMarshalAndUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"data":[{"appMetadata":{"categories":["productivity"],"review":{"status":"approved"},"screenshots":[{"fileId":null,"url":"https://example.com/s.png","userPrompt":"show it"}]},"branding":{"isDiscoverableApp":true,"website":"https://example.com"},"description":"desc","id":"app-1","isAccessible":true,"isEnabled":false,"labels":{"tier":"first-party"},"name":"App One","pluginDisplayNames":["Plugin A"]}],"nextCursor":"next"}`
+	want := `{"data":[{"branding":{"isDiscoverableApp":true,"website":"https://example.com"},"description":"desc","id":"app-1","isAccessible":true,"isEnabled":false,"labels":{"tier":"first-party"},"name":"App One","pluginDisplayNames":["Plugin A"]}],"nextCursor":"next"}`
 	if got := string(responseRaw); got != want {
 		t.Fatalf("AppsListResponse JSON = %s, want %s", got, want)
 	}
@@ -2370,14 +2358,11 @@ func TestGeneratedAppListProtocolMarshalAndUnmarshal(t *testing.T) {
 	}
 
 	var nullableDecoded AppsListResponse
-	err = json.Unmarshal([]byte(`{"data":[{"id":"app-2","name":"App Two","appMetadata":null,"branding":null,"labels":null}],"nextCursor":null}`), &nullableDecoded)
+	err = json.Unmarshal([]byte(`{"data":[{"id":"app-2","name":"App Two","branding":null,"labels":null}],"nextCursor":null}`), &nullableDecoded)
 	if err != nil {
 		t.Fatal(err)
 	}
 	app := nullableDecoded.Data[0]
-	if app.AppMetadata == nil || app.AppMetadata.Value != nil {
-		t.Fatalf("decoded appMetadata = %#v, want explicit null", app.AppMetadata)
-	}
 	if app.Branding == nil || app.Branding.Value != nil {
 		t.Fatalf("decoded branding = %#v, want explicit null", app.Branding)
 	}
@@ -2392,7 +2377,7 @@ func TestGeneratedAppListProtocolMarshalAndUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(notificationRaw), `{"data":[{"appMetadata":{"categories":["productivity"],"review":{"status":"approved"},"screenshots":[{"fileId":null,"url":"https://example.com/s.png","userPrompt":"show it"}]},"branding":{"isDiscoverableApp":true,"website":"https://example.com"},"description":"desc","id":"app-1","isAccessible":true,"isEnabled":false,"labels":{"tier":"first-party"},"name":"App One","pluginDisplayNames":["Plugin A"]}]}`; got != want {
+	if got, want := string(notificationRaw), `{"data":[{"branding":{"isDiscoverableApp":true,"website":"https://example.com"},"description":"desc","id":"app-1","isAccessible":true,"isEnabled":false,"labels":{"tier":"first-party"},"name":"App One","pluginDisplayNames":["Plugin A"]}]}`; got != want {
 		t.Fatalf("AppListUpdatedNotification JSON = %s, want %s", got, want)
 	}
 
@@ -2512,34 +2497,34 @@ func TestGeneratedAppListRejectsMalformedProtocol(t *testing.T) {
 
 	err = json.Unmarshal([]byte(`{"data":[{"id":"app-1","name":"App One","appMetadata":{"review":{}}}]}`), &response)
 	if err == nil {
-		t.Fatal("expected missing app review status to fail")
+		t.Fatal("expected unknown app metadata field to fail")
 	}
-	if !strings.Contains(err.Error(), "decode AppReview.status: missing required field") {
-		t.Fatalf("unexpected missing app review status error: %v", err)
+	if !strings.Contains(err.Error(), `decode AppInfo: unknown field "appMetadata"`) {
+		t.Fatalf("unexpected unknown app metadata error: %v", err)
 	}
 
 	err = json.Unmarshal([]byte(`{"data":[{"id":"app-1","name":"App One","appMetadata":{"extra":true}}]}`), &response)
 	if err == nil {
 		t.Fatal("expected unknown app metadata field to fail")
 	}
-	if !strings.Contains(err.Error(), `decode AppMetadata: unknown field "extra"`) {
+	if !strings.Contains(err.Error(), `decode AppInfo: unknown field "appMetadata"`) {
 		t.Fatalf("unexpected unknown app metadata field error: %v", err)
 	}
 
 	err = json.Unmarshal([]byte(`{"data":[{"id":"app-1","name":"App One","appMetadata":{"screenshots":[{}]}}]}`), &response)
 	if err == nil {
-		t.Fatal("expected missing app screenshot userPrompt to fail")
+		t.Fatal("expected unknown app metadata field to fail")
 	}
-	if !strings.Contains(err.Error(), "decode AppScreenshot.userPrompt: missing required field") {
-		t.Fatalf("unexpected missing app screenshot userPrompt error: %v", err)
+	if !strings.Contains(err.Error(), `decode AppInfo: unknown field "appMetadata"`) {
+		t.Fatalf("unexpected app metadata error: %v", err)
 	}
 
 	err = json.Unmarshal([]byte(`{"data":[{"id":"app-1","name":"App One","appMetadata":{"screenshots":[{"userPrompt":"show it","extra":true}]}}]}`), &response)
 	if err == nil {
-		t.Fatal("expected unknown app screenshot field to fail")
+		t.Fatal("expected unknown app metadata field to fail")
 	}
-	if !strings.Contains(err.Error(), `decode AppScreenshot: unknown field "extra"`) {
-		t.Fatalf("unexpected unknown app screenshot field error: %v", err)
+	if !strings.Contains(err.Error(), `decode AppInfo: unknown field "appMetadata"`) {
+		t.Fatalf("unexpected app metadata error: %v", err)
 	}
 
 	err = json.Unmarshal([]byte(`{"data":[],"extra":true}`), &response)
@@ -3139,7 +3124,6 @@ func TestGeneratedProcessSpawnParamsPreserveNullableFields(t *testing.T) {
 		Env:                Value(env),
 		OutputBytesCap:     Null[uint64](),
 		ProcessHandle:      "proc-2",
-		Size:               Value(ProcessTerminalSize{Cols: 80, Rows: 24}),
 		StreamStdin:        &streamStdin,
 		StreamStdoutStderr: &streamStdoutStderr,
 		TimeoutMS:          Value(int64(1000)),
@@ -3148,13 +3132,13 @@ func TestGeneratedProcessSpawnParamsPreserveNullableFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"command":["sh"],"cwd":"/tmp","env":{"PATH":"/bin","REMOVE":null},"outputBytesCap":null,"processHandle":"proc-2","size":{"cols":80,"rows":24},"streamStdin":true,"streamStdoutStderr":true,"timeoutMs":1000,"tty":true}`
+	want := `{"command":["sh"],"cwd":"/tmp","env":{"PATH":"/bin","REMOVE":null},"outputBytesCap":null,"processHandle":"proc-2","streamStdin":true,"streamStdoutStderr":true,"timeoutMs":1000,"tty":true}`
 	if got := string(fullRaw); got != want {
 		t.Fatalf("full ProcessSpawnParams JSON = %s, want %s", got, want)
 	}
 
 	var decoded ProcessSpawnParams
-	err = json.Unmarshal([]byte(`{"command":["sh"],"cwd":"/tmp","env":{"PATH":"/bin","REMOVE":null},"outputBytesCap":0,"processHandle":"proc-3","size":null}`), &decoded)
+	err = json.Unmarshal([]byte(`{"command":["sh"],"cwd":"/tmp","env":{"PATH":"/bin","REMOVE":null},"outputBytesCap":0,"processHandle":"proc-3"}`), &decoded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3170,9 +3154,6 @@ func TestGeneratedProcessSpawnParamsPreserveNullableFields(t *testing.T) {
 	}
 	if decoded.OutputBytesCap == nil || decoded.OutputBytesCap.Value == nil || *decoded.OutputBytesCap.Value != 0 {
 		t.Fatalf("decoded outputBytesCap = %#v", decoded.OutputBytesCap)
-	}
-	if decoded.Size == nil || decoded.Size.Value != nil {
-		t.Fatalf("decoded size = %#v, want explicit null", decoded.Size)
 	}
 }
 
@@ -3283,10 +3264,10 @@ func TestGeneratedProcessFamilyRejectsMalformedProtocol(t *testing.T) {
 
 	err = json.Unmarshal([]byte(`{"command":[],"cwd":"/tmp","processHandle":"proc-1","size":{"cols":65536,"rows":24}}`), &spawn)
 	if err == nil {
-		t.Fatal("expected uint16 overflow to fail")
+		t.Fatal("expected unknown spawn size to fail")
 	}
-	if !strings.Contains(err.Error(), "decode ProcessTerminalSize.cols") {
-		t.Fatalf("unexpected uint16 overflow error: %v", err)
+	if !strings.Contains(err.Error(), `decode ProcessSpawnParams: unknown field "size"`) {
+		t.Fatalf("unexpected spawn size error: %v", err)
 	}
 
 	var resize ProcessResizePtyParams
@@ -3357,7 +3338,6 @@ func TestGeneratedCommandExecParamsPreserveNullableFields(t *testing.T) {
 		PermissionProfile:  Value("profile-1"),
 		ProcessID:          Value("proc-1"),
 		SandboxPolicy:      Value(sandboxPolicy),
-		Size:               Value(CommandExecTerminalSize{Cols: 100, Rows: 30}),
 		StreamStdin:        boolPtr(true),
 		StreamStdoutStderr: boolPtr(false),
 		TimeoutMS:          Value(int64(1000)),
@@ -3366,13 +3346,13 @@ func TestGeneratedCommandExecParamsPreserveNullableFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"command":["bash","-lc","echo ok"],"cwd":"/workspace","disableOutputCap":true,"disableTimeout":false,"env":{"DROP":null,"KEEP":"1"},"outputBytesCap":4096,"permissionProfile":"profile-1","processId":"proc-1","sandboxPolicy":{"excludeSlashTmp":true,"excludeTmpdirEnvVar":false,"networkAccess":true,"type":"workspaceWrite","writableRoots":["/workspace/out"]},"size":{"cols":100,"rows":30},"streamStdin":true,"streamStdoutStderr":false,"timeoutMs":1000,"tty":true}`
+	want := `{"command":["bash","-lc","echo ok"],"cwd":"/workspace","disableOutputCap":true,"disableTimeout":false,"env":{"DROP":null,"KEEP":"1"},"outputBytesCap":4096,"permissionProfile":"profile-1","processId":"proc-1","sandboxPolicy":{"excludeSlashTmp":true,"excludeTmpdirEnvVar":false,"networkAccess":true,"type":"workspaceWrite","writableRoots":["/workspace/out"]},"streamStdin":true,"streamStdoutStderr":false,"timeoutMs":1000,"tty":true}`
 	if got := string(fullRaw); got != want {
 		t.Fatalf("full CommandExecParams JSON = %s, want %s", got, want)
 	}
 
 	var decoded CommandExecParams
-	err = json.Unmarshal([]byte(`{"command":["sh"],"cwd":null,"env":{"DROP":null,"KEEP":"1"},"outputBytesCap":null,"permissionProfile":null,"processId":"proc-2","sandboxPolicy":{"type":"dangerFullAccess"},"size":null,"timeoutMs":0}`), &decoded)
+	err = json.Unmarshal([]byte(`{"command":["sh"],"cwd":null,"env":{"DROP":null,"KEEP":"1"},"outputBytesCap":null,"permissionProfile":null,"processId":"proc-2","sandboxPolicy":{"type":"dangerFullAccess"},"timeoutMs":0}`), &decoded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3397,9 +3377,6 @@ func TestGeneratedCommandExecParamsPreserveNullableFields(t *testing.T) {
 	}
 	if decoded.SandboxPolicy == nil || decoded.SandboxPolicy.Value == nil || decoded.SandboxPolicy.Value.Kind() != SandboxPolicyKindDangerFullAccess {
 		t.Fatalf("decoded sandboxPolicy = %#v", decoded.SandboxPolicy)
-	}
-	if decoded.Size == nil || decoded.Size.Value != nil {
-		t.Fatalf("decoded size = %#v, want explicit null", decoded.Size)
 	}
 	if decoded.TimeoutMS == nil || decoded.TimeoutMS.Value == nil || *decoded.TimeoutMS.Value != 0 {
 		t.Fatalf("decoded timeoutMs = %#v", decoded.TimeoutMS)
@@ -3649,9 +3626,9 @@ func TestGeneratedCommandExecRejectsMalformedProtocol(t *testing.T) {
 			want: `invalid NetworkAccess enum value "bogus"`,
 		},
 		{
-			name: "terminal size overflow",
+			name: "unknown terminal size",
 			raw:  `{"command":["sh"],"size":{"cols":65536,"rows":24}}`,
-			want: "decode CommandExecTerminalSize.cols",
+			want: `decode CommandExecParams: unknown field "size"`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -3869,21 +3846,13 @@ func TestGeneratedConfigWriteProtocolMarshalAndUnmarshal(t *testing.T) {
 
 	responseRaw, err := json.Marshal(ConfigWriteResponse{
 		FilePath: "/home/user/.codex/config.toml",
-		OverriddenMetadata: Value(OverriddenMetadata{
-			EffectiveValue: JSONString("managed"),
-			Message:        "overridden by managed layer",
-			OverridingLayer: ConfigLayerMetadata{
-				Name:    NewConfigLayerSourceMdm(ConfigLayerSourceMdm{Domain: "com.example", Key: "Codex"}),
-				Version: "mdm-v1",
-			},
-		}),
-		Status:  WriteStatusOkOverridden,
-		Version: "v2",
+		Status:   WriteStatusOk,
+		Version:  "v2",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantResponse := `{"filePath":"/home/user/.codex/config.toml","overriddenMetadata":{"effectiveValue":"managed","message":"overridden by managed layer","overridingLayer":{"name":{"domain":"com.example","key":"Codex","type":"mdm"},"version":"mdm-v1"}},"status":"okOverridden","version":"v2"}`
+	wantResponse := `{"filePath":"/home/user/.codex/config.toml","status":"ok","version":"v2"}`
 	if got := string(responseRaw); got != wantResponse {
 		t.Fatalf("ConfigWriteResponse JSON = %s, want %s", got, wantResponse)
 	}
@@ -3892,47 +3861,30 @@ func TestGeneratedConfigWriteProtocolMarshalAndUnmarshal(t *testing.T) {
 	if err := json.Unmarshal(responseRaw, &responseDecoded); err != nil {
 		t.Fatal(err)
 	}
-	if responseDecoded.OverriddenMetadata == nil || responseDecoded.OverriddenMetadata.Value == nil {
-		t.Fatalf("decoded overriddenMetadata = %#v", responseDecoded.OverriddenMetadata)
-	}
-	layer, ok := responseDecoded.OverriddenMetadata.Value.OverridingLayer.Name.AsMdm()
-	if !ok || layer.Domain != "com.example" {
-		t.Fatalf("decoded overriding layer = %#v ok=%t", layer, ok)
-	}
 
-	if err := json.Unmarshal([]byte(`{"filePath":"/home/user/.codex/config.toml","overriddenMetadata":null,"status":"ok","version":"v3"}`), &responseDecoded); err != nil {
+	if err := json.Unmarshal([]byte(`{"filePath":"/home/user/.codex/config.toml","status":"ok","version":"v3"}`), &responseDecoded); err != nil {
 		t.Fatal(err)
 	}
 	if responseDecoded.Status != WriteStatusOk {
 		t.Fatalf("decoded status = %s, want %s", responseDecoded.Status, WriteStatusOk)
 	}
-	if responseDecoded.OverriddenMetadata == nil || responseDecoded.OverriddenMetadata.Value != nil {
-		t.Fatalf("decoded overriddenMetadata = %#v, want explicit null", responseDecoded.OverriddenMetadata)
-	}
 
 	warningRaw, err := json.Marshal(ConfigWarningNotification{
 		Details: Null[string](),
 		Path:    Value("/home/user/.codex/config.toml"),
-		Range: Value(TextRange{
-			End:   TextPosition{Column: 5, Line: 3},
-			Start: TextPosition{Column: 1, Line: 3},
-		}),
 		Summary: "invalid config",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantWarning := `{"details":null,"path":"/home/user/.codex/config.toml","range":{"end":{"column":5,"line":3},"start":{"column":1,"line":3}},"summary":"invalid config"}`
+	wantWarning := `{"details":null,"path":"/home/user/.codex/config.toml","summary":"invalid config"}`
 	if got := string(warningRaw); got != wantWarning {
 		t.Fatalf("ConfigWarningNotification JSON = %s, want %s", got, wantWarning)
 	}
 
 	var warningDecoded ConfigWarningNotification
-	if err := json.Unmarshal([]byte(`{"range":null,"summary":"ok"}`), &warningDecoded); err != nil {
+	if err := json.Unmarshal([]byte(`{"summary":"ok"}`), &warningDecoded); err != nil {
 		t.Fatal(err)
-	}
-	if warningDecoded.Range == nil || warningDecoded.Range.Value != nil {
-		t.Fatalf("decoded warning range = %#v, want explicit null", warningDecoded.Range)
 	}
 }
 
@@ -4119,10 +4071,10 @@ func TestGeneratedConfigProtocolRejectsMalformedProtocol(t *testing.T) {
 
 	err = json.Unmarshal([]byte(`{"filePath":"/config.toml","overriddenMetadata":{"message":"m","overridingLayer":{"name":{"type":"sessionFlags"},"version":"v1"}},"status":"okOverridden","version":"v1"}`), &response)
 	if err == nil {
-		t.Fatal("expected missing overridden effectiveValue to fail")
+		t.Fatal("expected unknown overridden metadata to fail")
 	}
-	if !strings.Contains(err.Error(), "decode OverriddenMetadata.effectiveValue: missing required field") {
-		t.Fatalf("unexpected missing overridden effectiveValue error: %v", err)
+	if !strings.Contains(err.Error(), `decode ConfigWriteResponse: unknown field "overriddenMetadata"`) {
+		t.Fatalf("unexpected overridden metadata error: %v", err)
 	}
 
 	_, err = json.Marshal(ConfigWriteResponse{
@@ -4175,8 +4127,8 @@ func TestGeneratedConfigProtocolRejectsMalformedProtocol(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected missing config warning range end to fail")
 	}
-	if !strings.Contains(err.Error(), "decode TextRange.end: missing required field") {
-		t.Fatalf("unexpected nested warning range error: %v", err)
+	if !strings.Contains(err.Error(), `decode ConfigWarningNotification: unknown field "range"`) {
+		t.Fatalf("unexpected warning range error: %v", err)
 	}
 
 	err = json.Unmarshal([]byte(`{"summary":null}`), &warning)
@@ -4396,18 +4348,12 @@ func TestGeneratedConfigRequirementsProtocolMarshalAndUnmarshal(t *testing.T) {
 				"alpha": true,
 				"beta":  false,
 			}),
-			Network: Value(NetworkRequirements{
-				Domains: Value(map[string]NetworkDomainPermission{
-					"example.com": NetworkDomainPermissionAllow,
-				}),
-				UnixSockets: Null[map[string]NetworkUnixSocketPermission](),
-			}),
 		}),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantResponse := `{"requirements":{"allowedApprovalPolicies":["never",{"granular":{"mcp_elicitations":true,"request_permissions":true,"rules":false,"sandbox_approval":true}}],"featureRequirements":{"alpha":true,"beta":false},"network":{"domains":{"example.com":"allow"},"unixSockets":null}}}`
+	wantResponse := `{"requirements":{"allowedApprovalPolicies":["never",{"granular":{"mcp_elicitations":true,"request_permissions":true,"rules":false,"sandbox_approval":true}}],"featureRequirements":{"alpha":true,"beta":false}}}`
 	if got := string(responseRaw); got != wantResponse {
 		t.Fatalf("ConfigRequirementsReadResponse JSON = %s, want %s", got, wantResponse)
 	}
@@ -4431,7 +4377,7 @@ func TestGeneratedConfigRequirementsProtocolMarshalAndUnmarshal(t *testing.T) {
 	}
 
 	var decoded ConfigRequirementsReadResponse
-	if err := json.Unmarshal([]byte(`{"requirements":{"allowedApprovalPolicies":["on-request"],"allowedApprovalsReviewers":["user"],"allowedSandboxModes":["workspace-write"],"allowedWebSearchModes":null,"enforceResidency":"us","featureRequirements":{"alpha":true},"hooks":{"PermissionRequest":[{"hooks":[{"type":"prompt"}],"matcher":null}],"PostCompact":[],"PostToolUse":[],"PreCompact":[],"PreToolUse":[],"SessionStart":[],"Stop":[],"SubagentStart":[],"SubagentStop":[],"UserPromptSubmit":[],"managedDir":"/managed","windowsManagedDir":null},"network":{"allowLocalBinding":true,"allowUnixSockets":["/tmp/socket"],"domains":{"api.openai.com":"allow","blocked.example":"deny"},"httpPort":8080,"unixSockets":{"agent":"deny"}}}}`), &decoded); err != nil {
+	if err := json.Unmarshal([]byte(`{"requirements":{"allowedApprovalPolicies":["on-request"],"allowedApprovalsReviewers":["user"],"allowedSandboxModes":["workspace-write"],"allowedWebSearchModes":null,"enforceResidency":"us","featureRequirements":{"alpha":true}}}`), &decoded); err != nil {
 		t.Fatal(err)
 	}
 	if decoded.Requirements == nil || decoded.Requirements.Value == nil {
@@ -4447,22 +4393,6 @@ func TestGeneratedConfigRequirementsProtocolMarshalAndUnmarshal(t *testing.T) {
 	if requirements.AllowedWebSearchModes == nil || requirements.AllowedWebSearchModes.Value != nil {
 		t.Fatalf("decoded allowedWebSearchModes = %#v, want explicit null", requirements.AllowedWebSearchModes)
 	}
-	if requirements.Hooks == nil || requirements.Hooks.Value == nil || len(requirements.Hooks.Value.PermissionRequest) != 1 {
-		t.Fatalf("decoded hooks = %#v", requirements.Hooks)
-	}
-	hook := requirements.Hooks.Value.PermissionRequest[0].Hooks[0]
-	if hook.Kind() != ConfiguredHookHandlerKindPrompt {
-		t.Fatalf("decoded hook kind = %s, want %s", hook.Kind(), ConfiguredHookHandlerKindPrompt)
-	}
-	if requirements.Network == nil || requirements.Network.Value == nil {
-		t.Fatalf("decoded network = %#v", requirements.Network)
-	}
-	if requirements.Network.Value.HTTPPort == nil || requirements.Network.Value.HTTPPort.Value == nil || *requirements.Network.Value.HTTPPort.Value != 8080 {
-		t.Fatalf("decoded httpPort = %#v", requirements.Network.Value.HTTPPort)
-	}
-	if requirements.Network.Value.Domains == nil || requirements.Network.Value.Domains.Value == nil || (*requirements.Network.Value.Domains.Value)["blocked.example"] != NetworkDomainPermissionDeny {
-		t.Fatalf("decoded domains = %#v", requirements.Network.Value.Domains)
-	}
 }
 
 func TestGeneratedAskForApprovalUnionMarshalAndAccessors(t *testing.T) {
@@ -4473,7 +4403,6 @@ func TestGeneratedAskForApprovalUnionMarshalAndAccessors(t *testing.T) {
 		want  string
 	}{
 		{name: "untrusted", value: NewAskForApprovalUntrusted(), kind: AskForApprovalKindUntrusted, want: `"untrusted"`},
-		{name: "on failure", value: NewAskForApprovalOnFailure(), kind: AskForApprovalKindOnFailure, want: `"on-failure"`},
 		{name: "on request", value: NewAskForApprovalOnRequest(), kind: AskForApprovalKindOnRequest, want: `"on-request"`},
 		{name: "never", value: NewAskForApprovalNever(), kind: AskForApprovalKindNever, want: `"never"`},
 		{
@@ -5247,8 +5176,8 @@ func TestGeneratedSmallUtilityPayloadsProtocolMarshalAndUnmarshal(t *testing.T) 
 		{name: "experimental feature list params", value: ExperimentalFeatureListParams{Cursor: Null[string](), Limit: Value(uint32(25))}, target: &ExperimentalFeatureListParams{}, want: `{"cursor":null,"limit":25}`},
 		{name: "experimental feature list response", value: ExperimentalFeatureListResponse{Data: []ExperimentalFeature{{DefaultEnabled: true, Enabled: false, Name: "feature_a", Stage: ExperimentalFeatureStageBeta}}, NextCursor: Value("cursor-2")}, target: &ExperimentalFeatureListResponse{}, want: `{"data":[{"defaultEnabled":true,"enabled":false,"name":"feature_a","stage":"beta"}],"nextCursor":"cursor-2"}`},
 		{name: "external agent config detect params", value: ExternalAgentConfigDetectParams{CWDs: Value([]string{"/repo"}), IncludeHome: boolPtr(true)}, target: &ExternalAgentConfigDetectParams{}, want: `{"cwds":["/repo"],"includeHome":true}`},
-		{name: "external agent config detect response", value: ExternalAgentConfigDetectResponse{Items: []ExternalAgentConfigMigrationItem{{CWD: Value("/repo"), Description: "Import command", Details: Value(MigrationDetails{Commands: &[]CommandMigration{{Name: "build"}}}), ItemType: ExternalAgentConfigMigrationItemTypeCOMMANDS}}}, target: &ExternalAgentConfigDetectResponse{}, want: `{"items":[{"cwd":"/repo","description":"Import command","details":{"commands":[{"name":"build"}]},"itemType":"COMMANDS"}]}`},
-		{name: "external agent config import params", value: ExternalAgentConfigImportParams{MigrationItems: []ExternalAgentConfigMigrationItem{{CWD: Null[string](), Description: "Import plugins", Details: Value(MigrationDetails{Plugins: &[]PluginsMigration{{MarketplaceName: "local", PluginNames: []string{"plugin-a"}}}}), ItemType: ExternalAgentConfigMigrationItemTypePLUGINS}}}, target: &ExternalAgentConfigImportParams{}, want: `{"migrationItems":[{"cwd":null,"description":"Import plugins","details":{"plugins":[{"marketplaceName":"local","pluginNames":["plugin-a"]}]},"itemType":"PLUGINS"}]}`},
+		{name: "external agent config detect response", value: ExternalAgentConfigDetectResponse{Items: []ExternalAgentConfigMigrationItem{{CWD: Value("/repo"), Description: "Import command", ItemType: ExternalAgentConfigMigrationItemTypeCOMMANDS}}}, target: &ExternalAgentConfigDetectResponse{}, want: `{"items":[{"cwd":"/repo","description":"Import command","itemType":"COMMANDS"}]}`},
+		{name: "external agent config import params", value: ExternalAgentConfigImportParams{MigrationItems: []ExternalAgentConfigMigrationItem{{CWD: Null[string](), Description: "Import plugins", ItemType: ExternalAgentConfigMigrationItemTypePLUGINS}}}, target: &ExternalAgentConfigImportParams{}, want: `{"migrationItems":[{"cwd":null,"description":"Import plugins","itemType":"PLUGINS"}]}`},
 		{name: "hooks list params", value: HooksListParams{CWDs: &[]string{"/repo"}}, target: &HooksListParams{}, want: `{"cwds":["/repo"]}`},
 		{name: "hooks list response", value: HooksListResponse{Data: []HooksListEntry{{
 			CWD:    "/repo",
@@ -5278,16 +5207,6 @@ func TestGeneratedSmallUtilityPayloadsProtocolMarshalAndUnmarshal(t *testing.T) 
 			CWD:    "/repo",
 			Errors: []SkillErrorInfo{{Message: "invalid skill", Path: "/repo/.codex/skills/bad/SKILL.md"}},
 			Skills: []SkillMetadata{{
-				Dependencies: Value(SkillDependencies{
-					Tools: []SkillToolDependency{{
-						Command:     Value("rg"),
-						Description: Null[string](),
-						Transport:   Null[string](),
-						Type:        "command",
-						URL:         Null[string](),
-						Value:       "rg",
-					}},
-				}),
 				Description: "review docs",
 				Enabled:     true,
 				Interface: Value(SkillInterface{
@@ -5299,7 +5218,7 @@ func TestGeneratedSmallUtilityPayloadsProtocolMarshalAndUnmarshal(t *testing.T) 
 				Scope:            SkillScopeRepo,
 				ShortDescription: Value("Review docs"),
 			}},
-		}}}, target: &SkillsListResponse{}, want: `{"data":[{"cwd":"/repo","errors":[{"message":"invalid skill","path":"/repo/.codex/skills/bad/SKILL.md"}],"skills":[{"dependencies":{"tools":[{"command":"rg","description":null,"transport":null,"type":"command","url":null,"value":"rg"}]},"description":"review docs","enabled":true,"interface":{"displayName":"Review","shortDescription":null},"name":"review","path":"/repo/.codex/skills/review/SKILL.md","scope":"repo","shortDescription":"Review docs"}]}]}`},
+		}}}, target: &SkillsListResponse{}, want: `{"data":[{"cwd":"/repo","errors":[{"message":"invalid skill","path":"/repo/.codex/skills/bad/SKILL.md"}],"skills":[{"description":"review docs","enabled":true,"interface":{"displayName":"Review","shortDescription":null},"name":"review","path":"/repo/.codex/skills/review/SKILL.md","scope":"repo","shortDescription":"Review docs"}]}]}`},
 		{name: "guardian denied action response", value: ThreadApproveGuardianDeniedActionResponse{}, target: &ThreadApproveGuardianDeniedActionResponse{}, want: `{}`},
 		{name: "turn interrupt response", value: TurnInterruptResponse{}, target: &TurnInterruptResponse{}, want: `{}`},
 		{name: "turn steer response", value: TurnSteerResponse{TurnID: "turn-1"}, target: &TurnSteerResponse{}, want: `{"turnId":"turn-1"}`},
@@ -6324,7 +6243,7 @@ func TestGeneratedPluginPayloadsProtocolMarshalAndUnmarshal(t *testing.T) {
 		{name: "share delete params", value: PluginShareDeleteParams{RemotePluginID: "remote-1"}, target: &PluginShareDeleteParams{}, want: `{"remotePluginId":"remote-1"}`},
 		{name: "share delete response", value: PluginShareDeleteResponse{}, target: &PluginShareDeleteResponse{}, want: `{}`},
 		{name: "share list params", value: PluginShareListParams{}, target: &PluginShareListParams{}, want: `{}`},
-		{name: "share save params", value: PluginShareSaveParams{Discoverability: Value(PluginShareDiscoverabilityPRIVATE), PluginPath: "/plugins/plugin-one", RemotePluginID: Null[string](), ShareTargets: Value([]PluginShareTarget{{PrincipalID: "group-1", PrincipalType: PluginSharePrincipalTypeGroup, Role: PluginShareTargetRoleReader}})}, target: &PluginShareSaveParams{}, want: `{"discoverability":"PRIVATE","pluginPath":"/plugins/plugin-one","remotePluginId":null,"shareTargets":[{"principalId":"group-1","principalType":"group","role":"reader"}]}`},
+		{name: "share save params", value: PluginShareSaveParams{Discoverability: Value(PluginShareDiscoverabilityPRIVATE), PluginPath: "/plugins/plugin-one", RemotePluginID: Null[string]()}, target: &PluginShareSaveParams{}, want: `{"discoverability":"PRIVATE","pluginPath":"/plugins/plugin-one","remotePluginId":null}`},
 		{name: "share save response", value: PluginShareSaveResponse{RemotePluginID: "remote-1", ShareURL: "https://example.test/plugin"}, target: &PluginShareSaveResponse{}, want: `{"remotePluginId":"remote-1","shareUrl":"https://example.test/plugin"}`},
 		{name: "share update targets params", value: PluginShareUpdateTargetsParams{Discoverability: PluginShareUpdateDiscoverabilityUNLISTED, RemotePluginID: "remote-1", ShareTargets: []PluginShareTarget{{PrincipalID: "user-1", PrincipalType: PluginSharePrincipalTypeUser, Role: PluginShareTargetRoleEditor}}}, target: &PluginShareUpdateTargetsParams{}, want: `{"discoverability":"UNLISTED","remotePluginId":"remote-1","shareTargets":[{"principalId":"user-1","principalType":"user","role":"editor"}]}`},
 		{name: "share update targets response", value: PluginShareUpdateTargetsResponse{Discoverability: PluginShareDiscoverabilityUNLISTED, Principals: []PluginSharePrincipal{{Name: "User One", PrincipalID: "user-1", PrincipalType: PluginSharePrincipalTypeUser, Role: PluginSharePrincipalRoleOwner}}}, target: &PluginShareUpdateTargetsResponse{}, want: `{"discoverability":"UNLISTED","principals":[{"name":"User One","principalId":"user-1","principalType":"user","role":"owner"}]}`},
@@ -7240,14 +7159,6 @@ func TestGeneratedCommandExecutionRequestApprovalParamsMarshalNestedTypedFields(
 	params := CommandExecutionRequestApprovalParams{
 		AdditionalPermissions: Value(AdditionalPermissionProfile{
 			FileSystem: Value(AdditionalFileSystemPermissions{
-				Entries: Value([]FileSystemSandboxEntry{{
-					Access: FileSystemAccessModeRead,
-					Path: NewFileSystemPathSpecial(FileSystemPathSpecial{
-						Value: NewFileSystemSpecialPathProjectRoots(FileSystemSpecialPathProjectRoots{
-							Subpath: Value("src"),
-						}),
-					}),
-				}}),
 				GlobScanMaxDepth: Value(uint64(1)),
 				Read:             Null[[]string](),
 				Write:            Value([]string{"/repo"}),
@@ -7279,27 +7190,19 @@ func TestGeneratedCommandExecutionRequestApprovalParamsMarshalNestedTypedFields(
 				Query:   Value("needle"),
 			}),
 		}),
-		CWD:    Value("/repo"),
-		ItemID: "item-1",
-		NetworkApprovalContext: Value(NetworkApprovalContext{
-			Host:     "example.test",
-			Protocol: NetworkApprovalProtocolHttps,
-		}),
+		CWD:                         Value("/repo"),
+		ItemID:                      "item-1",
 		ProposedExecpolicyAmendment: Value([]string{"allow-rg"}),
-		ProposedNetworkPolicyAmendments: Value([]NetworkPolicyAmendment{{
-			Action: NetworkPolicyRuleActionDeny,
-			Host:   "blocked.test",
-		}}),
-		Reason:      Value("needs access"),
-		StartedAtMS: 123,
-		ThreadID:    "thread-1",
-		TurnID:      "turn-1",
+		Reason:                      Value("needs access"),
+		StartedAtMS:                 123,
+		ThreadID:                    "thread-1",
+		TurnID:                      "turn-1",
 	}
 	raw, err := json.Marshal(params)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"additionalPermissions":{"fileSystem":{"entries":[{"access":"read","path":{"type":"special","value":{"kind":"project_roots","subpath":"src"}}}],"globScanMaxDepth":1,"read":null,"write":["/repo"]},"network":{"enabled":true}},"approvalId":null,"availableDecisions":["accept",{"applyNetworkPolicyAmendment":{"network_policy_amendment":{"action":"allow","host":"example.test"}}}],"command":"rg needle","commandActions":[{"command":"cat README.md","name":"README.md","path":"/repo/README.md","type":"read"},{"command":"rg needle","path":null,"query":"needle","type":"search"}],"cwd":"/repo","itemId":"item-1","networkApprovalContext":{"host":"example.test","protocol":"https"},"proposedExecpolicyAmendment":["allow-rg"],"proposedNetworkPolicyAmendments":[{"action":"deny","host":"blocked.test"}],"reason":"needs access","startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`
+	want := `{"additionalPermissions":{"fileSystem":{"globScanMaxDepth":1,"read":null,"write":["/repo"]},"network":{"enabled":true}},"approvalId":null,"availableDecisions":["accept",{"applyNetworkPolicyAmendment":{"network_policy_amendment":{"action":"allow","host":"example.test"}}}],"command":"rg needle","commandActions":[{"command":"cat README.md","name":"README.md","path":"/repo/README.md","type":"read"},{"command":"rg needle","path":null,"query":"needle","type":"search"}],"cwd":"/repo","itemId":"item-1","proposedExecpolicyAmendment":["allow-rg"],"reason":"needs access","startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`
 	if got := string(raw); got != want {
 		t.Fatalf("CommandExecutionRequestApprovalParams nested JSON = %s, want %s", got, want)
 	}
@@ -7310,7 +7213,6 @@ func TestGeneratedCommandExecutionRequestApprovalParamsUnmarshalNestedTypedField
 	err := json.Unmarshal([]byte(`{
 		"additionalPermissions":{
 			"fileSystem":{
-				"entries":[{"access":"write","path":{"type":"path","path":"/repo"}}],
 				"globScanMaxDepth":2,
 				"read":null
 			},
@@ -7320,8 +7222,6 @@ func TestGeneratedCommandExecutionRequestApprovalParamsUnmarshalNestedTypedField
 		"commandActions":[{"command":"ls","path":null,"type":"listFiles"}],
 		"cwd":null,
 		"itemId":"item-1",
-		"networkApprovalContext":{"host":"example.test","protocol":"socks5Tcp"},
-		"proposedNetworkPolicyAmendments":[{"action":"allow","host":"example.test"}],
 		"startedAtMs":123,
 		"threadId":"thread-1",
 		"turnId":"turn-1"
@@ -7342,10 +7242,6 @@ func TestGeneratedCommandExecutionRequestApprovalParamsUnmarshalNestedTypedField
 	if fileSystem.Read == nil || fileSystem.Read.Value != nil {
 		t.Fatalf("decoded read permissions = %#v", fileSystem.Read)
 	}
-	path, ok := (*fileSystem.Entries.Value)[0].Path.AsPath()
-	if !ok || path.Path != "/repo" {
-		t.Fatalf("decoded filesystem path = %#v, ok=%t", (*fileSystem.Entries.Value)[0].Path, ok)
-	}
 	decision, ok := (*params.AvailableDecisions.Value)[0].AsDecline()
 	if !ok {
 		t.Fatalf("decoded available decision = %#v, ok=%t", decision, ok)
@@ -7353,12 +7249,6 @@ func TestGeneratedCommandExecutionRequestApprovalParamsUnmarshalNestedTypedField
 	listFiles, ok := (*params.CommandActions.Value)[0].AsListFiles()
 	if !ok || listFiles.Path == nil || listFiles.Path.Value != nil {
 		t.Fatalf("decoded command action = %#v, ok=%t", listFiles, ok)
-	}
-	if params.NetworkApprovalContext == nil || params.NetworkApprovalContext.Value == nil || params.NetworkApprovalContext.Value.Protocol != NetworkApprovalProtocolSocks5Tcp {
-		t.Fatalf("decoded networkApprovalContext = %#v", params.NetworkApprovalContext)
-	}
-	if params.ProposedNetworkPolicyAmendments == nil || params.ProposedNetworkPolicyAmendments.Value == nil || (*params.ProposedNetworkPolicyAmendments.Value)[0].Action != NetworkPolicyRuleActionAllow {
-		t.Fatalf("decoded proposedNetworkPolicyAmendments = %#v", params.ProposedNetworkPolicyAmendments)
 	}
 }
 
@@ -7385,13 +7275,8 @@ func TestGeneratedCommandExecutionRequestApprovalParamsRejectsMalformedProtocol(
 		},
 		{
 			name: "unknown filesystem special path",
-			raw:  `{"additionalPermissions":{"fileSystem":{"entries":[{"access":"read","path":{"type":"special","value":{"kind":"workspace"}}}]}},"itemId":"item-1","startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`,
-			want: `decode FileSystemSpecialPath.kind: unknown variant "workspace"`,
-		},
-		{
-			name: "invalid network approval protocol",
-			raw:  `{"itemId":"item-1","networkApprovalContext":{"host":"example.test","protocol":"ftp"},"startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`,
-			want: `invalid NetworkApprovalProtocol enum value "ftp"`,
+			raw:  `{"additionalPermissions":{"fileSystem":{"entries":[]}},"itemId":"item-1","startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`,
+			want: `decode AdditionalFileSystemPermissions: unknown field "entries"`,
 		},
 		{
 			name: "invalid glob scan depth",
@@ -7437,14 +7322,9 @@ func TestGeneratedPermissionsRequestApprovalParamsMarshalNestedProfiles(t *testi
 		ItemID: "item-1",
 		Permissions: RequestPermissionProfile{
 			FileSystem: Value(AdditionalFileSystemPermissions{
-				Entries: Value([]FileSystemSandboxEntry{{
-					Access: FileSystemAccessModeWrite,
-					Path: NewFileSystemPathPath(FileSystemPathPath{
-						Path: "/repo/src",
-					}),
-				}}),
 				GlobScanMaxDepth: Value(uint64(1)),
 				Read:             Null[[]string](),
+				Write:            Value([]string{"/repo/src"}),
 			}),
 			Network: Value(AdditionalNetworkPermissions{
 				Enabled: Value(false),
@@ -7459,7 +7339,7 @@ func TestGeneratedPermissionsRequestApprovalParamsMarshalNestedProfiles(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"cwd":"/repo","itemId":"item-1","permissions":{"fileSystem":{"entries":[{"access":"write","path":{"path":"/repo/src","type":"path"}}],"globScanMaxDepth":1,"read":null},"network":{"enabled":false}},"reason":null,"startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`
+	want := `{"cwd":"/repo","itemId":"item-1","permissions":{"fileSystem":{"globScanMaxDepth":1,"read":null,"write":["/repo/src"]},"network":{"enabled":false}},"reason":null,"startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`
 	if got := string(raw); got != want {
 		t.Fatalf("PermissionsRequestApprovalParams JSON = %s, want %s", got, want)
 	}
@@ -7472,7 +7352,7 @@ func TestGeneratedPermissionsRequestApprovalParamsUnmarshalNestedProfiles(t *tes
 		"itemId":"item-1",
 		"permissions":{
 			"fileSystem":{
-				"entries":[{"access":"read","path":{"type":"special","value":{"kind":"tmpdir"}}}],
+				"read":null,
 				"write":["/repo/out"]
 			},
 			"network":{"enabled":null}
@@ -7488,12 +7368,8 @@ func TestGeneratedPermissionsRequestApprovalParamsUnmarshalNestedProfiles(t *tes
 		t.Fatalf("decoded fileSystem permissions = %#v", params.Permissions.FileSystem)
 	}
 	fileSystem := params.Permissions.FileSystem.Value
-	if fileSystem.Entries == nil || fileSystem.Entries.Value == nil || len(*fileSystem.Entries.Value) != 1 {
-		t.Fatalf("decoded entries = %#v", fileSystem.Entries)
-	}
-	special, ok := (*fileSystem.Entries.Value)[0].Path.AsSpecial()
-	if !ok || special.Value.Kind() != FileSystemSpecialPathKindTmpdir {
-		t.Fatalf("decoded filesystem special path = %#v, ok=%t", (*fileSystem.Entries.Value)[0].Path, ok)
+	if fileSystem.Read == nil || fileSystem.Read.Value != nil {
+		t.Fatalf("decoded read permissions = %#v", fileSystem.Read)
 	}
 	if fileSystem.Write == nil || fileSystem.Write.Value == nil || (*fileSystem.Write.Value)[0] != "/repo/out" {
 		t.Fatalf("decoded write permissions = %#v", fileSystem.Write)
@@ -7510,12 +7386,7 @@ func TestGeneratedPermissionsRequestApprovalResponseMarshalAndUnmarshal(t *testi
 	response := PermissionsRequestApprovalResponse{
 		Permissions: GrantedPermissionProfile{
 			FileSystem: Value(AdditionalFileSystemPermissions{
-				Entries: Value([]FileSystemSandboxEntry{{
-					Access: FileSystemAccessModeRead,
-					Path: NewFileSystemPathGlobPattern(FileSystemPathGlobPattern{
-						Pattern: "/repo/**/*.go",
-					}),
-				}}),
+				Read: Value([]string{"/repo/**/*.go"}),
 			}),
 			Network: Value(AdditionalNetworkPermissions{
 				Enabled: Null[bool](),
@@ -7528,7 +7399,7 @@ func TestGeneratedPermissionsRequestApprovalResponseMarshalAndUnmarshal(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"permissions":{"fileSystem":{"entries":[{"access":"read","path":{"pattern":"/repo/**/*.go","type":"glob_pattern"}}]},"network":{"enabled":null}},"scope":"session","strictAutoReview":null}`
+	want := `{"permissions":{"fileSystem":{"read":["/repo/**/*.go"]},"network":{"enabled":null}},"scope":"session","strictAutoReview":null}`
 	if got := string(raw); got != want {
 		t.Fatalf("PermissionsRequestApprovalResponse JSON = %s, want %s", got, want)
 	}
@@ -7572,9 +7443,9 @@ func TestGeneratedPermissionsRequestApprovalRejectsMalformedProtocol(t *testing.
 			want: `decode RequestPermissionProfile: unknown field "extra"`,
 		},
 		{
-			name: "invalid filesystem access",
+			name: "unknown filesystem entries",
 			raw:  `{"cwd":"/repo","itemId":"item-1","permissions":{"fileSystem":{"entries":[{"access":"execute","path":{"type":"path","path":"/repo"}}]}},"startedAtMs":123,"threadId":"thread-1","turnId":"turn-1"}`,
-			want: `invalid FileSystemAccessMode enum value "execute"`,
+			want: `decode AdditionalFileSystemPermissions: unknown field "entries"`,
 		},
 		{
 			name: "invalid glob scan depth",
@@ -7749,12 +7620,7 @@ func TestGeneratedGuardianApprovalReviewActionMarshalAndUnmarshalVariants(t *tes
 			action: NewGuardianApprovalReviewActionRequestPermissions(GuardianApprovalReviewActionRequestPermissions{
 				Permissions: RequestPermissionProfile{
 					FileSystem: Value(AdditionalFileSystemPermissions{
-						Entries: Value([]FileSystemSandboxEntry{{
-							Access: FileSystemAccessModeRead,
-							Path: NewFileSystemPathPath(FileSystemPathPath{
-								Path: "/repo",
-							}),
-						}}),
+						Read: Value([]string{"/repo"}),
 					}),
 					Network: Value(AdditionalNetworkPermissions{
 						Enabled: Value(true),
@@ -7762,7 +7628,7 @@ func TestGeneratedGuardianApprovalReviewActionMarshalAndUnmarshalVariants(t *tes
 				},
 				Reason: Value("needs read"),
 			}),
-			want: `{"permissions":{"fileSystem":{"entries":[{"access":"read","path":{"path":"/repo","type":"path"}}]},"network":{"enabled":true}},"reason":"needs read","type":"requestPermissions"}`,
+			want: `{"permissions":{"fileSystem":{"read":["/repo"]},"network":{"enabled":true}},"reason":"needs read","type":"requestPermissions"}`,
 			assert: func(t *testing.T, action GuardianApprovalReviewAction) {
 				t.Helper()
 				requestPermissions, ok := action.AsRequestPermissions()
@@ -8078,14 +7944,14 @@ func TestGeneratedConstrainedInt32RejectsOverflow(t *testing.T) {
 	}
 }
 
-func TestGeneratedConstrainedUint64RejectsNegative(t *testing.T) {
+func TestGeneratedConstrainedIntegerAllowsSignedCounts(t *testing.T) {
 	var response ThreadDecrementElicitationResponse
 	err := json.Unmarshal([]byte(`{"count":-1,"paused":false}`), &response)
-	if err == nil {
-		t.Fatal("expected negative uint64 to fail")
+	if err != nil {
+		t.Fatalf("signed elicitation count failed to decode: %v", err)
 	}
-	if !strings.Contains(err.Error(), "decode ThreadDecrementElicitationResponse.count") {
-		t.Fatalf("unexpected negative uint64 error: %v", err)
+	if response.Count != -1 {
+		t.Fatalf("decoded count = %d, want -1", response.Count)
 	}
 }
 

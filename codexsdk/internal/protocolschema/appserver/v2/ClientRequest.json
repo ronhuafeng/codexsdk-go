@@ -739,15 +739,15 @@
         "method": {
           "type": "string",
           "enum": [
-            "thread/turns/items/list"
+            "thread/items/list"
           ],
-          "title": "Thread/turns/items/listRequestMethod"
+          "title": "Thread/items/listRequestMethod"
         },
         "params": {
-          "$ref": "#/definitions/ThreadTurnsItemsListParams"
+          "$ref": "#/definitions/ThreadItemsListParams"
         }
       },
-      "title": "Thread/turns/items/listRequest"
+      "title": "Thread/items/listRequest"
     },
     {
       "description": "Append raw Responses API items to the thread history without starting a user turn.",
@@ -2061,6 +2061,31 @@
       "title": "Environment/addRequest"
     },
     {
+      "description": "Reads information from a configured execution environment.",
+      "type": "object",
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "environment/info"
+          ],
+          "title": "Environment/infoRequestMethod"
+        },
+        "params": {
+          "$ref": "#/definitions/EnvironmentInfoParams"
+        }
+      },
+      "title": "Environment/infoRequest"
+    },
+    {
       "type": "object",
       "required": [
         "id",
@@ -3051,7 +3076,6 @@
           "type": "string",
           "enum": [
             "untrusted",
-            "on-failure",
             "on-request",
             "never"
           ]
@@ -3141,6 +3165,7 @@
               "type": "string"
             },
             "path": {
+              "description": "Absolute path for the root in the selected environment.",
               "type": "string"
             },
             "type": {
@@ -3496,6 +3521,13 @@
         "idempotencyKey"
       ],
       "properties": {
+        "creditId": {
+          "description": "Opaque reset-credit identifier to redeem. When omitted, the backend selects the next available credit.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "idempotencyKey": {
           "description": "Identifies one logical reset attempt. A UUID is recommended; reuse the same value when retrying that attempt.",
           "type": "string"
@@ -3701,6 +3733,17 @@
           "type": "string"
         },
         "execServerUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "EnvironmentInfoParams": {
+      "type": "object",
+      "required": [
+        "environmentId"
+      ],
+      "properties": {
+        "environmentId": {
           "type": "string"
         }
       }
@@ -4627,6 +4670,12 @@
             "type": "string"
           }
         },
+        "threadId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "timeoutSecs": {
           "type": [
             "integer",
@@ -4728,6 +4777,13 @@
             "$ref": "#/definitions/SessionMigration"
           }
         },
+        "skills": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillMigration"
+          }
+        },
         "subagents": {
           "default": [],
           "type": "array",
@@ -4789,12 +4845,28 @@
       "type": "object"
     },
     "MultiAgentMode": {
-      "description": "Controls whether the model receives multi-agent delegation instructions and, when it does, whether it should only spawn sub-agents after an explicit user request or may delegate proactively when doing so would help. `none` leaves the multi-agent tools available without injecting delegation instructions.",
-      "type": "string",
-      "enum": [
-        "none",
-        "explicitRequestOnly",
-        "proactive"
+      "description": "Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "explicitRequestOnly",
+            "proactive"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "custom"
+          ],
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "title": "CustomMultiAgentMode"
+        }
       ]
     },
     "NetworkAccess": {
@@ -5917,6 +5989,12 @@
             "name": {
               "type": "string"
             },
+            "namespace": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "status": {
               "type": [
                 "string",
@@ -6647,6 +6725,17 @@
         }
       }
     },
+    "SkillMigration": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "SkillsConfigWriteParams": {
       "type": "object",
       "required": [
@@ -6921,6 +7010,13 @@
           "description": "When true, return only thread metadata and live fork state without populating `thread.turns`. This is useful when the client plans to call `thread/turns/list` immediately after forking.",
           "type": "boolean"
         },
+        "lastTurnId": {
+          "description": "Optional last turn id to fork through, inclusive.\n\nWhen specified, turns after `last_turn_id` are omitted from the fork. The referenced turn cannot be in progress.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "model": {
           "description": "Configuration overrides for the forked thread, if any.",
           "type": [
@@ -7058,6 +7154,13 @@
         "complete"
       ]
     },
+    "ThreadHistoryMode": {
+      "type": "string",
+      "enum": [
+        "legacy",
+        "paginated"
+      ]
+    },
     "ThreadIncrementElicitationParams": {
       "description": "Parameters for `thread/increment_elicitation`.",
       "type": "object",
@@ -7088,6 +7191,51 @@
         }
       }
     },
+    "ThreadItemsListParams": {
+      "type": "object",
+      "required": [
+        "threadId"
+      ],
+      "properties": {
+        "cursor": {
+          "description": "Opaque cursor to pass to the next call to continue after the last item.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "description": "Optional item page size.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "sortDirection": {
+          "description": "Optional item pagination direction; defaults to ascending.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SortDirection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "turnId": {
+          "description": "Optional turn id to filter by. When omitted, returns items across the thread.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
     "ThreadListCwdFilter": {
       "anyOf": [
         {
@@ -7104,6 +7252,13 @@
     "ThreadListParams": {
       "type": "object",
       "properties": {
+        "ancestorThreadId": {
+          "description": "Optional ancestor thread filter. Returns spawned descendants at any depth, excluding the ancestor itself. Mutually exclusive with `parentThreadId`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "archived": {
           "description": "Optional archived filter; when set to true, only archived threads are returned. If false or null, only non-archived threads are returned.",
           "type": [
@@ -7149,7 +7304,7 @@
           }
         },
         "parentThreadId": {
-          "description": "Optional direct parent thread filter.",
+          "description": "Optional direct parent thread filter. Mutually exclusive with `ancestorThreadId`.",
           "type": [
             "string",
             "null"
@@ -7435,6 +7590,13 @@
         },
         "codexResponsesAsItems": {
           "description": "Sends automatic Codex responses as realtime conversation items instead of handoff appends.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "flushTranscriptTailOnSessionEnd": {
+          "description": "Routes any transcript tail remaining at session end through Codex. Defaults to false. TODO: Remove this rollout knob once transcript-tail flushing is always enabled.",
           "type": [
             "boolean",
             "null"
@@ -7748,6 +7910,7 @@
       }
     },
     "ThreadRollbackParams": {
+      "description": "DEPRECATED: `thread/rollback` will be removed soon.",
       "type": "object",
       "required": [
         "numTurns",
@@ -8019,6 +8182,10 @@
     "ThreadStartParams": {
       "type": "object",
       "properties": {
+        "allowProviderModelFallback": {
+          "description": "Allow a provider with an authoritative static model catalog to replace an unavailable requested model with its default.",
+          "type": "boolean"
+        },
         "approvalPolicy": {
           "anyOf": [
             {
@@ -8094,6 +8261,17 @@
         "experimentalRawEvents": {
           "description": "If true, opt into emitting raw Responses API items on the event stream. This is for internal use only (e.g. Codex Cloud).",
           "type": "boolean"
+        },
+        "historyMode": {
+          "description": "Persisted thread history contract to use for this new thread.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ThreadHistoryMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "mockExperimentalField": {
           "description": "Test-only experimental field used to validate experimental gating and schema filtering behavior in a stable way.",
@@ -8213,48 +8391,6 @@
         "startup",
         "clear"
       ]
-    },
-    "ThreadTurnsItemsListParams": {
-      "type": "object",
-      "required": [
-        "threadId",
-        "turnId"
-      ],
-      "properties": {
-        "cursor": {
-          "description": "Opaque cursor to pass to the next call to continue after the last item.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "limit": {
-          "description": "Optional item page size.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0.0
-        },
-        "sortDirection": {
-          "description": "Optional item pagination direction; defaults to ascending.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/SortDirection"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "threadId": {
-          "type": "string"
-        },
-        "turnId": {
-          "type": "string"
-        }
-      }
     },
     "ThreadTurnsListParams": {
       "type": "object",

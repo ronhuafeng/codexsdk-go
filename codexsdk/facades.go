@@ -159,9 +159,6 @@ func rejectThreadStartExperimentalFields(method string, params protocolv2.Thread
 	if params.DynamicTools != nil {
 		return experimentalFieldError(method, "dynamicTools")
 	}
-	if params.Environments != nil {
-		return experimentalFieldError(method, "environments")
-	}
 	if params.ExperimentalRawEvents != nil {
 		return experimentalFieldError(method, "experimentalRawEvents")
 	}
@@ -175,9 +172,6 @@ func rejectThreadStartExperimentalFields(method string, params protocolv2.Thread
 }
 
 func rejectTurnStartExperimentalFields(method string, params protocolv2.TurnStartParams) error {
-	if params.CollaborationMode != nil {
-		return experimentalFieldError(method, "collaborationMode")
-	}
 	if params.Environments != nil {
 		return experimentalFieldError(method, "environments")
 	}
