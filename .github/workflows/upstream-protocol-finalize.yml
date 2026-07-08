@@ -373,10 +373,74 @@ jobs:
           fi
           exit "${watch_status}"
 
+      - name: Prepare drift verification failure explanation prompt
+        if: steps.candidate.outputs.dispatch == 'true' && steps.candidate.outputs.dispatch_drift_check == 'true' && steps.verification.outcome != 'success'
+        env:
+          LANDED_COMMIT: ${{ steps.landed.outputs.landed_commit }}
+          LANDED_REF: ${{ steps.landing.outputs.landed_ref }}
+          RUN_URL: ${{ steps.verification.outputs.run_url }}
+          UPSTREAM_REF: ${{ steps.baseline.outputs.upstream_ref }}
+          UPSTREAM_SHA: ${{ steps.baseline.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/codexsdk-finalize
+          cat > .cache/codexsdk-finalize/explain-failure-prompt.md <<EOF
+          Create .cache/codexsdk-finalize/failure-explanation.md.
+
+          Analyze this failed drift verification run:
+          ${RUN_URL}
+
+          Context:
+          - Landed ref: ${LANDED_REF}
+          - Landed commit: ${LANDED_COMMIT}
+          - Upstream ref: ${UPSTREAM_REF}
+          - Upstream sha: ${UPSTREAM_SHA}
+
+          Use GitHub CLI if available. Explain briefly:
+          - what failed
+          - whether it looks like drift, runner/infrastructure, or inconclusive
+          - the next recovery action
+
+          Do not mark finalize complete. Do not suggest bypassing checks,
+          branch protection, statuses, or tags.
+          EOF
+
+      - name: Explain drift verification failure
+        if: steps.candidate.outputs.dispatch == 'true' && steps.candidate.outputs.dispatch_drift_check == 'true' && steps.verification.outcome != 'success'
+        continue-on-error: true
+        uses: openai/codex-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          openai-api-key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          responses-api-endpoint: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
+          model: gpt-5.3-codex-spark
+          prompt-file: .cache/codexsdk-finalize/explain-failure-prompt.md
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          allow-bots: "true"
+          codex-args: '["--ephemeral"]'
+
+      - name: Append drift verification failure explanation
+        if: steps.candidate.outputs.dispatch == 'true' && steps.candidate.outputs.dispatch_drift_check == 'true' && steps.verification.outcome != 'success'
+        env:
+          RUN_URL: ${{ steps.verification.outputs.run_url }}
+        run: |
+          {
+            echo
+            echo "## Drift verification failure explanation"
+            echo
+            if [[ -s .cache/codexsdk-finalize/failure-explanation.md ]]; then
+              cat .cache/codexsdk-finalize/failure-explanation.md
+            else
+              echo "Codex explanation was unavailable. Inspect the dispatched drift verification run: ${RUN_URL}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Fail when drift verification failed
         if: steps.candidate.outputs.dispatch == 'true' && steps.candidate.outputs.dispatch_drift_check == 'true' && steps.verification.outcome != 'success'
         run: |
-          echo "Finalize stopped because drift verification did not pass." >&2
+          echo "Finalize stopped because drift verification did not pass. See the job summary for the generated explanation." >&2
           exit 1
 
       - name: Configure git identity

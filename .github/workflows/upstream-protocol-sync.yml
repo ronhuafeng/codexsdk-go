@@ -357,7 +357,7 @@ jobs:
         with:
           openai-api-key: ${{ secrets.AZURE_OPENAI_API_KEY }}
           responses-api-endpoint: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
-          model: ${{ secrets.CODEX_MODEL }}
+          model: gpt-5.5
           prompt-file: ${{ env.CODEXSDK_AUTO_SYNC_DIR }}/prompt.md
           sandbox: workspace-write
           safety-strategy: drop-sudo
