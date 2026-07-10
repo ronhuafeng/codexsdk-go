@@ -2125,6 +2125,8 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 			"ConfigRequirements",
 			"ConfiguredHookMatcherGroup",
 			"ManagedHooksRequirements",
+			"ModelsRequirements",
+			"NewThreadModelDefaults",
 			"NetworkRequirements":
 			return true
 		default:
@@ -2141,6 +2143,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 			"MigrationDetails",
 			"PluginsMigration",
 			"SessionMigration",
+			"SkillMigration",
 			"SubagentMigration":
 			return true
 		default:
@@ -2164,6 +2167,7 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 	case "v2/GetAccountRateLimitsResponse.json":
 		switch name {
 		case "CreditsSnapshot",
+			"RateLimitResetCredit",
 			"RateLimitResetCreditsSummary",
 			"RateLimitSnapshot",
 			"RateLimitWindow",
@@ -2294,7 +2298,8 @@ func isGeneratedDefinitionStructCheckpoint(schemaPath string, name string) bool 
 		switch name {
 		case "ActivePermissionProfile",
 			"GitInfo",
-			"Thread":
+			"Thread",
+			"ThreadExtra":
 			return true
 		default:
 			return false
@@ -2360,6 +2365,8 @@ func isGeneratedDefinitionMixedUnionCheckpoint(schemaPath string, name string) b
 		return name == "CommandExecutionApprovalDecision"
 	case "v2/ThreadResumeParams.json":
 		return name == "MessagePhase"
+	case "v2/ThreadStartParams.json":
+		return name == "MultiAgentMode"
 	case "v2/TurnStartResponse.json":
 		switch name {
 		case "CodexErrorInfo", "TurnItemsView":

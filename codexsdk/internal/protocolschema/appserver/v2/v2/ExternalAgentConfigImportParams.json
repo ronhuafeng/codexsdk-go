@@ -138,6 +138,13 @@
             "$ref": "#/definitions/SessionMigration"
           }
         },
+        "skills": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillMigration"
+          }
+        },
         "subagents": {
           "default": [],
           "type": "array",
@@ -183,6 +190,17 @@
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "SkillMigration": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
         }
       }
     },

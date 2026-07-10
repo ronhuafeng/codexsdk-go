@@ -491,7 +491,7 @@ func protocolApprovalPolicy(value ApprovalPolicy) (*protocolv2.Nullable[protocol
 	case ApprovalPolicyUntrusted:
 		return protocolv2.Value(protocolv2.NewAskForApprovalUntrusted()), nil
 	case ApprovalPolicyOnFailure:
-		return protocolv2.Value(protocolv2.NewAskForApprovalOnFailure()), nil
+		return protocolv2.Value(protocolv2.NewAskForApprovalOnRequest()), nil
 	case ApprovalPolicyOnRequest:
 		return protocolv2.Value(protocolv2.NewAskForApprovalOnRequest()), nil
 	case ApprovalPolicyNever:

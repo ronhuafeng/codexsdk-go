@@ -3,13 +3,13 @@
   "comparison_mode": "canonical-json",
   "target": {
     "source_repo": "https://github.com/openai/codex",
-    "source_ref_name": "rust-v0.142.5",
+    "source_ref_name": "rust-v0.144.1",
     "source_ref_kind": "stable_rust_tag",
-    "source_commit": "26de83050b20f7e0ee211b9739e52ae00ce8032a",
-    "codex_version": "codex-cli 0.142.5",
+    "source_commit": "44918ea10c0f99151c6710411b4322c2f5c96bea",
+    "codex_version": "codex-cli 0.144.1",
     "generator": "cargo",
     "generator_detail": "codex app-server generate-json-schema --experimental --out codexsdk/internal/protocolschema/appserver/v2",
-    "schema_bundle_sha256": "c66670d7682c14758b8f7ae9af5d7657496c7f6c32df6bcf836f3f9dfe575bcf",
+    "schema_bundle_sha256": "1725b584aa2f417560ba7eef0679701800a716b6f840fd7dafe7b4812246d8d6",
     "canonical_json_note": "Schema comparisons use canonical JSON; object member ordering is irrelevant."
   },
   "file_diff": {
