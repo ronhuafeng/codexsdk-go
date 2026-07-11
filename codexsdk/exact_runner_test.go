@@ -2,10 +2,11 @@ package codexsdk
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"os"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -433,7 +434,6 @@ func TestNormalCloseCancelsAndJoinsExactServerRequestHandler(t *testing.T) {
 func TestCloseJoinsNotificationAndServerRequestHandlersAcceptedBeforeBoundary(t *testing.T) {
 	notificationStarted := make(chan struct{})
 	requestStarted := make(chan struct{})
-	releaseNotification := make(chan struct{})
 	requestFinished := make(chan struct{})
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
@@ -441,7 +441,7 @@ func TestCloseJoinsNotificationAndServerRequestHandlersAcceptedBeforeBoundary(t 
 		Command: fakeCommand("notification-and-approval"),
 		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
 			close(notificationStarted)
-			<-releaseNotification
+			<-requestFinished
 			return nil
 		},
 		ServerRequestHandler: func(ctx context.Context, _ protocolv2.ServerRequest) (ServerRequestResponse, error) {
@@ -462,12 +462,6 @@ func TestCloseJoinsNotificationAndServerRequestHandlersAcceptedBeforeBoundary(t 
 	<-requestStarted
 	closed := make(chan error, 1)
 	go func() { closed <- root.Close() }()
-	select {
-	case err := <-closed:
-		t.Fatalf("Close returned before accepted notification handler: %v", err)
-	case <-time.After(25 * time.Millisecond):
-	}
-	close(releaseNotification)
 	if err := <-closed; err != nil {
 		t.Fatalf("normal Close returned handler cancellation as failure: %v", err)
 	}
@@ -477,43 +471,55 @@ func TestCloseJoinsNotificationAndServerRequestHandlersAcceptedBeforeBoundary(t 
 	}
 }
 
-func TestExactServerRequestHandlerDoesNotStartAfterCloseBoundary(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	dispatcherDone := make(chan struct{})
-	close(dispatcherDone)
-	handlerCalled := make(chan struct{}, 1)
-	c := &client{
-		ctx:            ctx,
-		cancel:         cancel,
-		dispatchStop:   make(chan struct{}),
-		dispatcherDone: dispatcherDone,
-		notifications:  make(chan protocolv2.ServerNotification, 1),
-		stdin:          &recordingWriteCloser{},
-		options: ClientOptions{ServerRequestHandler: func(context.Context, protocolv2.ServerRequest) (ServerRequestResponse, error) {
-			handlerCalled <- struct{}{}
-			return ServerRequestResponse{}, nil
-		}},
-	}
-	if err := c.Close(); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := json.Marshal(map[string]any{
-		"id":     "late-request",
-		"method": protocolv2.MethodItemCommandExecutionRequestApproval,
-		"params": fakeCommandApprovalParams("thread-1", "turn-1"),
+func TestRequestArrivingDuringCloseFailsClosedWithoutStartingNewHandler(t *testing.T) {
+	record := tempRecord(t)
+	sentinel := t.TempDir() + "/admission-closed"
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondCalled := make(chan struct{}, 1)
+	var calls atomic.Int32
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("late-approval-during-close", sentinel),
+		ServerRequestHandler: func(ctx context.Context, _ protocolv2.ServerRequest) (ServerRequestResponse, error) {
+			if calls.Add(1) != 1 {
+				secondCalled <- struct{}{}
+				return ServerRequestResponse{}, errors.New("late handler invoked")
+			}
+			close(firstStarted)
+			<-ctx.Done()
+			if err := os.WriteFile(sentinel, []byte("closed"), 0o600); err != nil {
+				return ServerRequestResponse{}, err
+			}
+			<-releaseFirst
+			return ServerRequestResponse{}, ctx.Err()
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var request protocolv2.ServerRequest
-	if err := json.Unmarshal(raw, &request); err != nil {
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if err != nil {
 		t.Fatal(err)
 	}
-	c.handleExactServerRequest("late-request", request)
+	<-firstStarted
+	closed := make(chan error, 1)
+	go func() { closed <- root.Close() }()
+	if !waitForRecord(t, record, "recv-response", "", time.Second) {
+		t.Fatal("late exact request did not receive a fail-closed response")
+	}
 	select {
-	case <-handlerCalled:
-		t.Fatal("exact server-request handler started after Close closed admission")
-	case <-time.After(25 * time.Millisecond):
+	case <-secondCalled:
+		t.Fatal("exact handler started for a request arriving after Close closed admission")
+	default:
+	}
+	close(releaseFirst)
+	if err := <-closed; err != nil {
+		t.Fatalf("normal Close returned handler cancellation as failure: %v", err)
+	}
+	if !errors.Is(stream.Err(), ErrClientClosed) {
+		t.Fatalf("stream error = %v, want ErrClientClosed", stream.Err())
 	}
 }
 

@@ -6017,7 +6017,7 @@ func runFakeAppServer(mode string, extra []string) {
 		method, _ := message["method"].(string)
 		if method == "" {
 			appendRecord(record, map[string]any{"kind": "recv-response", "result": message["result"], "error": message["error"]})
-			if mode == "approval" || mode == "approval-before-turn-start" || mode == "file-approval" || mode == "user-input" || mode == "notification-and-approval" {
+			if mode == "approval" || mode == "approval-before-turn-start" || mode == "file-approval" || mode == "user-input" || mode == "notification-and-approval" || mode == "late-approval-during-close" {
 				completeTurn("thread-1", "turn-1")
 			}
 			continue
@@ -6928,6 +6928,15 @@ func runFakeAppServer(mode string, extra []string) {
 			case "notification-and-approval":
 				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "item-before-close", "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
+			case "late-approval-during-close":
+				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
+				for {
+					if _, err := os.Stat(extra[0]); err == nil {
+						break
+					}
+					time.Sleep(time.Millisecond)
+				}
+				send(map[string]any{"id": "server-approval-late", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 			case "approval-before-turn-start":
 			case "file-approval":
 				send(map[string]any{"id": "server-file-1", "method": "item/fileChange/requestApproval", "params": map[string]any{"itemId": "item-file", "startedAtMs": 1, "threadId": threadID, "turnId": turnID}})
