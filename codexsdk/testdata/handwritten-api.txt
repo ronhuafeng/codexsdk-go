@@ -52,6 +52,8 @@ func github.com/ronhuafeng/codexsdk-go/codexsdk.PermissionsApprovalResponse(valu
 func github.com/ronhuafeng/codexsdk-go/codexsdk.Text(text string) []github.com/ronhuafeng/codexsdk-go/codexsdk.InputItem
 func github.com/ronhuafeng/codexsdk-go/codexsdk.TextAndFiles(text string, paths []string) []github.com/ronhuafeng/codexsdk-go/codexsdk.InputItem
 func github.com/ronhuafeng/codexsdk-go/codexsdk.ToolUserInputResponse(value github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2.ToolRequestUserInputResponse) github.com/ronhuafeng/codexsdk-go/codexsdk.ServerRequestResponse
+method github.com/ronhuafeng/codexsdk-go/codexsdk.ExactServerRequestError.Errorfunc() string
+method github.com/ronhuafeng/codexsdk-go/codexsdk.ExactServerRequestError.Unwrapfunc() error
 method github.com/ronhuafeng/codexsdk-go/codexsdk.ProtocolError.Errorfunc() string
 method github.com/ronhuafeng/codexsdk-go/codexsdk.ProtocolError.Unwrapfunc() error
 method github.com/ronhuafeng/codexsdk-go/codexsdk.Stream.Closefunc() error
@@ -74,6 +76,7 @@ type github.com/ronhuafeng/codexsdk-go/codexsdk.Client interface{Close() error; 
 type github.com/ronhuafeng/codexsdk-go/codexsdk.ClientCapabilities struct{ExperimentalAPI bool}
 type github.com/ronhuafeng/codexsdk-go/codexsdk.ClientOptions struct{CWD string; Command []string; Initialize github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2.InitializeParams; ServerRequestHandler github.com/ronhuafeng/codexsdk-go/codexsdk.ServerRequestHandler; ServerNotificationHandler github.com/ronhuafeng/codexsdk-go/codexsdk.ServerNotificationHandler; NotificationQueueCapacity int; ClientName string; ClientTitle string; Capabilities github.com/ronhuafeng/codexsdk-go/codexsdk.ClientCapabilities; LegacyServerRequestHandler github.com/ronhuafeng/codexsdk-go/codexsdk.LegacyServerRequestHandler}
 type github.com/ronhuafeng/codexsdk-go/codexsdk.DiagnosticRef struct{Kind string; ID string; Path string; SizeBytes int64; SHA256 string}
+type github.com/ronhuafeng/codexsdk-go/codexsdk.ExactServerRequestError struct{Kind github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2.ServerRequestKind; Reason string}
 type github.com/ronhuafeng/codexsdk-go/codexsdk.ForkThreadRequest struct{ParentThreadID string; Ephemeral *bool; Model string; CWD string; ApprovalPolicy github.com/ronhuafeng/codexsdk-go/codexsdk.ApprovalPolicy; ApprovalsReviewer github.com/ronhuafeng/codexsdk-go/codexsdk.ApprovalsReviewer}
 type github.com/ronhuafeng/codexsdk-go/codexsdk.InputItem struct{Type string "json:\"type\""; Text string "json:\"text,omitempty\""; Path string "json:\"path,omitempty\""}
 type github.com/ronhuafeng/codexsdk-go/codexsdk.InputStats struct{ItemsCount int; TextBytes int; AttachmentCount int; InputItemsHash string}
@@ -109,6 +112,7 @@ type github.com/ronhuafeng/codexsdk-go/codexsdk.TurnWarningEvent struct{Code str
 type github.com/ronhuafeng/codexsdk-go/codexsdk.Usage struct{InputTokens int; CachedInputTokens int; OutputTokens int; ReasoningOutputTokens int}
 type github.com/ronhuafeng/codexsdk-go/codexsdk.WarningEvent struct{Summary string; Details string; Path string}
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrClientClosed error
+var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrExactServerRequest error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrHandlerFailed error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrNotificationBackpressure error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrStreamClosed error

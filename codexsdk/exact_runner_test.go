@@ -284,6 +284,135 @@ func TestExactServerRequestHandlerUsesGeneratedRequestAndTypedResponse(t *testin
 	}
 }
 
+func TestExactServerRequestHandlerRejectsMismatchedAndEmptyResponses(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		response ServerRequestResponse
+	}{
+		{name: "mismatched", response: FileChangeApprovalResponse(protocolv2.FileChangeRequestApprovalResponse{Decision: protocolv2.FileChangeApprovalDecisionDecline})},
+		{name: "empty", response: ServerRequestResponse{}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+			root, err := New(ClientOptions{
+				CWD:     t.TempDir(),
+				Command: fakeCommand("approval"),
+				ServerRequestHandler: func(context.Context, protocolv2.ServerRequest) (ServerRequestResponse, error) {
+					return test.response, nil
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+			if !errors.Is(runErr, ErrExactServerRequest) {
+				t.Fatalf("run error = %v, want typed exact server request failure", runErr)
+			}
+			if closeErr := root.Close(); !errors.Is(closeErr, ErrExactServerRequest) {
+				t.Fatalf("Close error = %v, want first typed exact server request failure", closeErr)
+			}
+		})
+	}
+}
+
+func TestExactRunWithoutHandlerFailsClosedInsteadOfUsingLegacyPendingQueue(t *testing.T) {
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("approval")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	result, runErr := root.ThreadRunner().Start(ctx, StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if runErr != nil {
+		t.Fatalf("nil-handler command approval should decline and complete: %v (result %#v)", runErr, result)
+	}
+	client := root.(*client)
+	client.turnMu.Lock()
+	pending := len(client.pendingServer)
+	client.turnMu.Unlock()
+	if pending != 0 {
+		t.Fatalf("exact request entered legacy pending queue: %#v", client.pendingServer)
+	}
+	if err := root.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestExactRunNilHandlerFailClosedResponsesAreDeterministic(t *testing.T) {
+	for _, mode := range []string{"approval", "file-approval", "user-input", "approval-before-turn-start"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+			root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand(mode)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			if _, err := root.ThreadRunner().Start(ctx, StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}}); err != nil {
+				t.Fatalf("exact nil-handler %s did not fail closed: %v", mode, err)
+			}
+			client := root.(*client)
+			client.turnMu.Lock()
+			pending := len(client.pendingServer)
+			client.turnMu.Unlock()
+			if pending != 0 {
+				t.Fatalf("exact request entered legacy pending queue: %#v", client.pendingServer)
+			}
+			if err := root.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestExactRunNilHandlerUnsafeRequestPreservesPartialEvidenceAndTypedFirstCause(t *testing.T) {
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("auth-refresh-after-notification")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if !errors.Is(runErr, ErrExactServerRequest) {
+		t.Fatalf("run error = %v, want typed exact server request cause", runErr)
+	}
+	if len(result.Run.Notifications) == 0 {
+		t.Fatal("exact fail-closed termination erased accepted notification evidence")
+	}
+	if closeErr := root.Close(); !errors.Is(closeErr, ErrExactServerRequest) {
+		t.Fatalf("Close error = %v, want first exact server request cause", closeErr)
+	}
+	client := root.(*client)
+	client.turnMu.Lock()
+	pending := len(client.pendingServer)
+	client.turnMu.Unlock()
+	if pending != 0 {
+		t.Fatalf("unsafe exact request entered legacy pending queue: %#v", client.pendingServer)
+	}
+}
+
+func TestExactFailClosedCoverageMatchesGeneratedRequestKinds(t *testing.T) {
+	requests := []protocolv2.ServerRequest{
+		protocolv2.NewServerRequestItemCommandExecutionRequestApproval(protocolv2.ServerRequestItemCommandExecutionRequestApproval{}),
+		protocolv2.NewServerRequestItemFileChangeRequestApproval(protocolv2.ServerRequestItemFileChangeRequestApproval{}),
+		protocolv2.NewServerRequestItemToolRequestUserInput(protocolv2.ServerRequestItemToolRequestUserInput{}),
+		protocolv2.NewServerRequestMCPServerElicitationRequest(protocolv2.ServerRequestMCPServerElicitationRequest{}),
+		protocolv2.NewServerRequestItemPermissionsRequestApproval(protocolv2.ServerRequestItemPermissionsRequestApproval{}),
+		protocolv2.NewServerRequestItemToolCall(protocolv2.ServerRequestItemToolCall{}),
+		protocolv2.NewServerRequestAccountChatGPTAuthTokensRefresh(protocolv2.ServerRequestAccountChatGPTAuthTokensRefresh{}),
+		protocolv2.NewServerRequestAttestationGenerate(protocolv2.ServerRequestAttestationGenerate{}),
+		protocolv2.NewServerRequestCurrentTimeRead(protocolv2.ServerRequestCurrentTimeRead{}),
+		protocolv2.NewServerRequestApplyPatchApproval(protocolv2.ServerRequestApplyPatchApproval{}),
+		protocolv2.NewServerRequestExecCommandApproval(protocolv2.ServerRequestExecCommandApproval{}),
+	}
+	for _, request := range requests {
+		response, synthesizable := exactFailClosedServerRequestResponse(request)
+		if synthesizable != (response.kind == request.Kind() && response.value != nil) {
+			t.Fatalf("fail-closed coverage for %s is inconsistent: %#v", request.Kind(), response)
+		}
+	}
+}
+
 func TestNormalCloseCancelsAndJoinsExactServerRequestHandler(t *testing.T) {
 	started := make(chan struct{})
 	finished := make(chan struct{})
