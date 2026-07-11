@@ -426,6 +426,12 @@ func (s *exactRunState) addDiagnostic(ref DiagnosticRef) {
 	s.mu.Unlock()
 }
 
+func (s *exactRunState) addDiagnosticOrdered(ref DiagnosticRef) {
+	s.notificationOrderMu.Lock()
+	defer s.notificationOrderMu.Unlock()
+	s.addDiagnostic(ref)
+}
+
 func (s *exactRunState) finish(err error) {
 	s.mu.Lock()
 	if s.terminal {

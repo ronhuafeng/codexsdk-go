@@ -62,6 +62,10 @@ type client struct {
 	pendingThreadEvents map[string][]rpcNotification
 	pendingGlobalEvents []rpcNotification
 
+	// testAfterExactStreamPublished pauses the deterministic test seam after an
+	// exact stream becomes live and before pending evidence is replayed.
+	testAfterExactStreamPublished func()
+
 	readerDone chan struct{}
 }
 
@@ -948,7 +952,7 @@ func (c *client) routeNotificationError(notification rpcNotification, err error)
 	}
 	c.turnMu.Unlock()
 	for _, stream := range exactTargets {
-		stream.addDiagnostic(ref)
+		stream.addDiagnosticOrdered(ref)
 	}
 	if len(exactTargets) > 0 {
 		c.failClient(err)
@@ -1090,6 +1094,9 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	c.pendingGlobal = nil
 	c.turnMu.Unlock()
 	defer stream.notificationOrderMu.Unlock()
+	if c.testAfterExactStreamPublished != nil {
+		c.testAfterExactStreamPublished()
+	}
 	for _, notification := range pending {
 		typed, err := exactNotification(notification)
 		if err != nil {

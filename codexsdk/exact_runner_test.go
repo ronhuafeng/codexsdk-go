@@ -570,111 +570,144 @@ func TestExactRunnerProducesSanitizedDiagnosticForMalformedNotification(t *testi
 	}
 }
 
-func TestExactRunPendingNotificationPrecedesLiveNotificationAtAttachBoundary(t *testing.T) {
-	state := newExactRunState(nil, "thread-1", StartedThreadRun{})
+func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
+	c := &client{
+		exactStreams:        map[string]map[*exactRunState]struct{}{},
+		exactAttaching:      map[string]map[*exactRunState]struct{}{},
+		pendingEvents:       map[string][]rpcNotification{},
+		pendingErrors:       map[string]error{},
+		pendingDiagnostics:  map[string][]DiagnosticRef{},
+		pendingThreadEvents: map[string][]rpcNotification{},
+	}
+	state := newExactRunState(nil, "thread-1", StartedThreadRun{Start: facadeThreadStartResponse("thread-1", "model")})
 	state.turnID = "turn-1"
-	pending := exactTestNotification(t, protocolv2.MethodModelRerouted, map[string]any{
-		"threadId": "thread-1", "turnId": "turn-1", "fromModel": "initial", "toModel": "pending",
-		"reason": "highRiskCyberActivity",
-	})
-	live := exactTestNotification(t, protocolv2.MethodModelRerouted, map[string]any{
-		"threadId": "thread-1", "turnId": "turn-1", "fromModel": "pending", "toModel": "live",
-		"reason": "highRiskCyberActivity",
-	})
-
-	state.notificationOrderMu.Lock()
-	liveAccepted := make(chan error, 1)
-	go func() { liveAccepted <- state.acceptOrdered(live) }()
-	select {
-	case err := <-liveAccepted:
-		t.Fatalf("live notification crossed attach gate: %v", err)
-	case <-time.After(25 * time.Millisecond):
-	}
-	if err := state.accept(pending); err != nil {
-		t.Fatal(err)
-	}
-	state.notificationOrderMu.Unlock()
-	if err := <-liveAccepted; err != nil {
-		t.Fatal(err)
-	}
-
-	result, ok := state.result.(StartedThreadRun)
-	if !ok || len(result.Run.Notifications) != 2 {
-		t.Fatalf("partial result = %#v", state.result)
-	}
-	first, _ := result.Run.Notifications[0].AsModelRerouted()
-	second, _ := result.Run.Notifications[1].AsModelRerouted()
-	if first.Params.ToModel != "pending" || second.Params.ToModel != "live" {
-		t.Fatalf("notification order = %q, %q", first.Params.ToModel, second.Params.ToModel)
-	}
-}
-
-func TestExactRunOrderGateIsPerRun(t *testing.T) {
-	blocked := newExactRunState(nil, "thread-blocked", StartedThreadRun{})
-	independent := newExactRunState(nil, "thread-independent", StartedThreadRun{})
-	notification := exactTestNotification(t, protocolv2.MethodModelRerouted, map[string]any{
-		"threadId": "thread-independent", "turnId": "turn-independent", "fromModel": "a", "toModel": "b",
-		"reason": "highRiskCyberActivity",
-	})
-
-	blocked.notificationOrderMu.Lock()
-	defer blocked.notificationOrderMu.Unlock()
-	accepted := make(chan error, 1)
-	go func() { accepted <- independent.acceptOrdered(notification) }()
-	select {
-	case err := <-accepted:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("unrelated exact run was serialized behind another run's attach gate")
-	}
-}
-
-func TestExactRunAttachGatePreservesUsageBeforeTerminalEvidence(t *testing.T) {
-	state := newExactRunState(nil, "thread-1", StartedThreadRun{})
-	state.turnID = "turn-1"
-	usage := exactTestNotification(t, protocolv2.MethodThreadTokenUsageUpdated, map[string]any{
+	c.exactAttaching[state.threadID] = map[*exactRunState]struct{}{state: {}}
+	c.pendingEvents[state.turnID] = []rpcNotification{{method: protocolv2.MethodThreadTokenUsageUpdated, params: map[string]any{
 		"threadId": "thread-1", "turnId": "turn-1",
 		"tokenUsage": map[string]any{
 			"last":               map[string]any{"cachedInputTokens": 0, "inputTokens": 3, "outputTokens": 2, "reasoningOutputTokens": 1, "totalTokens": 5},
 			"modelContextWindow": 100,
 			"total":              map[string]any{"cachedInputTokens": 0, "inputTokens": 30, "outputTokens": 20, "reasoningOutputTokens": 10, "totalTokens": 50},
 		},
-	})
-	terminal := exactTestNotification(t, protocolv2.MethodTurnCompleted, map[string]any{
+	}}}
+	terminal := rpcNotification{method: protocolv2.MethodTurnCompleted, params: map[string]any{
 		"threadId": "thread-1",
 		"turn": map[string]any{
 			"id": "turn-1", "status": "completed",
 			"items": []map[string]any{{"id": "answer", "type": "agentMessage", "text": "done", "phase": "final_answer"}},
 		},
-	})
+	}}
 
-	state.notificationOrderMu.Lock()
-	terminalAccepted := make(chan error, 1)
-	go func() { terminalAccepted <- state.acceptOrdered(terminal) }()
-	if err := state.accept(usage); err != nil {
-		t.Fatal(err)
+	published := make(chan struct{})
+	releaseReplay := make(chan struct{})
+	c.testAfterExactStreamPublished = func() {
+		close(published)
+		<-releaseReplay
 	}
-	state.notificationOrderMu.Unlock()
-	if err := <-terminalAccepted; err != nil {
-		t.Fatal(err)
+	attached := make(chan struct{})
+	go func() {
+		c.attachExactStream(state)
+		close(attached)
+	}()
+	<-published
+	liveRouted := make(chan bool, 1)
+	go func() {
+		typed, err := exactNotification(terminal)
+		if err != nil {
+			t.Error(err)
+			liveRouted <- false
+			return
+		}
+		liveRouted <- c.routeExactNotification(terminal, typed)
+	}()
+	select {
+	case <-liveRouted:
+		close(releaseReplay)
+		t.Fatal("live terminal overtook pending usage while attachment was paused")
+	case <-time.After(25 * time.Millisecond):
+		close(releaseReplay)
+	}
+	<-attached
+	if !<-liveRouted {
+		t.Fatal("live terminal was not routed to the exact run")
 	}
 
-	result := state.result.(StartedThreadRun).Run
-	if len(result.Notifications) != 2 || result.Notifications[0].Kind() != protocolv2.ServerNotificationKindThreadTokenUsageUpdated || result.Notifications[1].Kind() != protocolv2.ServerNotificationKindTurnCompleted {
-		t.Fatalf("notification evidence = %#v", result.Notifications)
+	stream := &Stream[StartedThreadRun]{state: state}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	var kinds []protocolv2.ServerNotificationKind
+	for stream.Next(ctx) {
+		kinds = append(kinds, stream.Notification().Kind())
 	}
-	if result.Usage == nil || result.Usage.Total.InputTokens != 30 || result.FinalResponse != "done" {
-		t.Fatalf("derived facts = usage %#v final %q", result.Usage, result.FinalResponse)
+	result, ok := stream.Result()
+	if !ok || stream.Err() != nil {
+		t.Fatalf("result ok=%v err=%v", ok, stream.Err())
+	}
+	want := []protocolv2.ServerNotificationKind{protocolv2.ServerNotificationKindThreadTokenUsageUpdated, protocolv2.ServerNotificationKindTurnCompleted}
+	if !reflect.DeepEqual(kinds, want) {
+		t.Fatalf("stream order = %#v, want %#v", kinds, want)
+	}
+	run := result.Run
+	if len(run.Notifications) != 2 || run.Notifications[0].Kind() != want[0] || run.Notifications[1].Kind() != want[1] {
+		t.Fatalf("notification evidence = %#v", run.Notifications)
+	}
+	if run.Usage == nil || run.Usage.Total.InputTokens != 30 || run.FinalResponse != "done" {
+		t.Fatalf("derived facts = usage %#v final %q", run.Usage, run.FinalResponse)
 	}
 }
 
-func exactTestNotification(t *testing.T, method string, params map[string]any) protocolv2.ServerNotification {
-	t.Helper()
-	notification, err := exactNotification(rpcNotification{method: method, params: params})
+func TestExactRunAttachDoesNotSerializeUnrelatedRuns(t *testing.T) {
+	c := &client{
+		exactStreams:        map[string]map[*exactRunState]struct{}{},
+		exactAttaching:      map[string]map[*exactRunState]struct{}{},
+		pendingEvents:       map[string][]rpcNotification{},
+		pendingErrors:       map[string]error{},
+		pendingDiagnostics:  map[string][]DiagnosticRef{},
+		pendingThreadEvents: map[string][]rpcNotification{},
+	}
+	attaching := newExactRunState(nil, "thread-attaching", StartedThreadRun{Start: facadeThreadStartResponse("thread-attaching", "model")})
+	attaching.turnID = "turn-attaching"
+	independent := newExactRunState(nil, "thread-independent", StartedThreadRun{Start: facadeThreadStartResponse("thread-independent", "model")})
+	independent.turnID = "turn-independent"
+	c.exactAttaching[attaching.threadID] = map[*exactRunState]struct{}{attaching: {}}
+	c.exactStreams[independent.turnID] = map[*exactRunState]struct{}{independent: {}}
+
+	published := make(chan struct{})
+	releaseReplay := make(chan struct{})
+	c.testAfterExactStreamPublished = func() {
+		close(published)
+		<-releaseReplay
+	}
+	attached := make(chan struct{})
+	go func() {
+		c.attachExactStream(attaching)
+		close(attached)
+	}()
+	<-published
+	notification := rpcNotification{method: protocolv2.MethodModelRerouted, params: map[string]any{
+		"threadId": independent.threadID, "turnId": independent.turnID, "fromModel": "a", "toModel": "b", "reason": "highRiskCyberActivity",
+	}}
+	typed, err := exactNotification(notification)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return notification
+	routed := make(chan bool, 1)
+	go func() { routed <- c.routeExactNotification(notification, typed) }()
+	select {
+	case ok := <-routed:
+		if !ok {
+			t.Fatal("independent notification was not routed")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("unrelated exact run was serialized behind attach replay")
+	}
+	close(releaseReplay)
+	<-attached
+
+	stream := &Stream[StartedThreadRun]{state: independent}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if !stream.Next(ctx) || stream.Notification().Kind() != protocolv2.ServerNotificationKindModelRerouted {
+		t.Fatal("independent stream did not expose its routed notification")
+	}
 }
