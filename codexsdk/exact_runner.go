@@ -98,14 +98,17 @@ func (r *exactRunner) StartStream(ctx context.Context, request StartThreadRunReq
 	}
 	initial := StartedThreadRun{Start: started, Run: ThreadRunResult{InputStats: exactInputStats(turnParams.Input)}}
 	state := newExactRunState(r.client, started.Thread.ID, initial)
+	r.client.registerAttachingExactStream(state)
 	stream := &Stream[StartedThreadRun]{state: state}
 	turnParams.ThreadID = started.Thread.ID
 	var turnStarted protocolv2.TurnStartResponse
 	if err := r.client.callProtocol(ctx, protocolv2.MethodTurnStart, turnParams, &turnStarted); err != nil {
+		r.client.unregisterAttachingExactStream(state)
 		state.finish(err)
 		return stream, nil
 	}
 	if turnStarted.Turn.ID == "" {
+		r.client.unregisterAttachingExactStream(state)
 		state.finish(errors.New("codexsdk: turn/start response missing turn id"))
 		return stream, nil
 	}
@@ -142,14 +145,17 @@ func (r *exactRunner) ResumeStream(ctx context.Context, request ResumeThreadRunR
 	}
 	initial := ResumedThreadRun{Resume: resumed, Run: ThreadRunResult{InputStats: exactInputStats(turnParams.Input)}}
 	state := newExactRunState(r.client, threadID, initial)
+	r.client.registerAttachingExactStream(state)
 	stream := &Stream[ResumedThreadRun]{state: state}
 	turnParams.ThreadID = threadID
 	var turnStarted protocolv2.TurnStartResponse
 	if err := r.client.callProtocol(ctx, protocolv2.MethodTurnStart, turnParams, &turnStarted); err != nil {
+		r.client.unregisterAttachingExactStream(state)
 		state.finish(err)
 		return stream, nil
 	}
 	if turnStarted.Turn.ID == "" {
+		r.client.unregisterAttachingExactStream(state)
 		state.finish(errors.New("codexsdk: turn/start response missing turn id"))
 		return stream, nil
 	}
@@ -422,8 +428,12 @@ func (s *exactRunState) finish(err error) {
 	client := s.client
 	turnID := s.turnID
 	s.mu.Unlock()
-	if client != nil && turnID != "" {
-		client.unregisterExactStream(turnID, s)
+	if client != nil {
+		if turnID != "" {
+			client.unregisterExactStream(turnID, s)
+		} else {
+			client.unregisterAttachingExactStream(s)
+		}
 	}
 }
 

@@ -4,25 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-func (c *client) handleExactServerRequest(message map[string]any) {
-	id := message["id"]
-	raw, err := json.Marshal(message)
-	if err != nil {
-		c.writeServerRequestError(id, -32602, err)
-		c.failClient(err)
-		return
-	}
-	var request protocolv2.ServerRequest
-	if err := json.Unmarshal(raw, &request); err != nil {
-		failure := fmt.Errorf("codexsdk: decode generated server request: %w", err)
-		c.writeServerRequestError(id, -32602, failure)
-		c.failClient(failure)
-		return
-	}
+func (c *client) handleExactServerRequest(id any, request protocolv2.ServerRequest) {
 	c.handlerWG.Add(1)
 	go func() {
 		defer c.handlerWG.Done()
@@ -31,6 +18,19 @@ func (c *client) handleExactServerRequest(message map[string]any) {
 }
 
 func (c *client) respondToExactServerRequest(id any, request protocolv2.ServerRequest) {
+	if c.options.ServerRequestHandler == nil {
+		response, ok := exactFailClosedServerRequestResponse(request)
+		if !ok {
+			failure := &ExactServerRequestError{Kind: request.Kind()}
+			c.writeServerRequestError(id, -32000, failure)
+			c.failClient(failure)
+			return
+		}
+		if err := c.writeExactServerRequestResponse(id, request, response); err != nil {
+			c.failClient(err)
+		}
+		return
+	}
 	response, err := invokeExactServerRequestHandler(c.ctx, c.options.ServerRequestHandler, request)
 	if err != nil {
 		if c.closingNormally() {
@@ -41,27 +41,56 @@ func (c *client) respondToExactServerRequest(id any, request protocolv2.ServerRe
 		return
 	}
 	if response.kind != request.Kind() || response.value == nil {
-		failure := fmt.Errorf("codexsdk: server request %s received mismatched or empty response %s", request.Kind(), response.kind)
+		failure := &ExactServerRequestError{Kind: request.Kind(), Reason: fmt.Sprintf("received mismatched or empty response %s", response.kind)}
 		c.writeServerRequestError(id, -32602, failure)
 		c.failClient(failure)
 		return
 	}
+	if err := c.writeExactServerRequestResponse(id, request, response); err != nil {
+		c.failClient(err)
+	}
+}
+
+func (c *client) writeExactServerRequestResponse(id any, request protocolv2.ServerRequest, response ServerRequestResponse) error {
 	raw, err := json.Marshal(response.value)
 	if err != nil {
 		failure := fmt.Errorf("codexsdk: encode %s response: %w", request.Kind(), err)
 		c.writeServerRequestError(id, -32602, failure)
-		c.failClient(failure)
-		return
+		return failure
 	}
 	var result map[string]any
 	if err := json.Unmarshal(raw, &result); err != nil {
 		failure := fmt.Errorf("codexsdk: decode %s response object: %w", request.Kind(), err)
 		c.writeServerRequestError(id, -32602, failure)
-		c.failClient(failure)
-		return
+		return failure
 	}
-	if err := c.write(map[string]any{"id": id, "result": result}); err != nil {
-		c.failClient(err)
+	return c.write(map[string]any{"id": id, "result": result})
+}
+
+func exactFailClosedServerRequestResponse(request protocolv2.ServerRequest) (ServerRequestResponse, bool) {
+	switch request.Kind() {
+	case protocolv2.ServerRequestKindItemCommandExecutionRequestApproval:
+		return CommandExecutionApprovalResponse(protocolv2.CommandExecutionRequestApprovalResponse{Decision: protocolv2.NewCommandExecutionApprovalDecisionDecline()}), true
+	case protocolv2.ServerRequestKindItemFileChangeRequestApproval:
+		return FileChangeApprovalResponse(protocolv2.FileChangeRequestApprovalResponse{Decision: protocolv2.FileChangeApprovalDecisionDecline}), true
+	case protocolv2.ServerRequestKindItemToolRequestUserInput:
+		return ToolUserInputResponse(protocolv2.ToolRequestUserInputResponse{Answers: map[string]protocolv2.ToolRequestUserInputAnswer{}}), true
+	case protocolv2.ServerRequestKindMCPServerElicitationRequest:
+		return MCPElicitationResponse(protocolv2.McpServerElicitationRequestResponse{Action: protocolv2.McpServerElicitationActionDecline}), true
+	case protocolv2.ServerRequestKindItemPermissionsRequestApproval:
+		return PermissionsApprovalResponse(protocolv2.PermissionsRequestApprovalResponse{Permissions: protocolv2.GrantedPermissionProfile{}}), true
+	case protocolv2.ServerRequestKindCurrentTimeRead:
+		return CurrentTimeResponse(protocolv2.CurrentTimeReadResponse{CurrentTimeAt: time.Now().UnixMilli()}), true
+	case protocolv2.ServerRequestKindApplyPatchApproval:
+		return ApplyPatchApprovalResponse(protocolv2.ApplyPatchApprovalResponse{Decision: protocolv2.NewReviewDecisionDenied()}), true
+	case protocolv2.ServerRequestKindExecCommandApproval:
+		return ExecCommandApprovalResponse(protocolv2.ExecCommandApprovalResponse{Decision: protocolv2.NewReviewDecisionDenied()}), true
+	case protocolv2.ServerRequestKindItemToolCall,
+		protocolv2.ServerRequestKindAccountChatGPTAuthTokensRefresh,
+		protocolv2.ServerRequestKindAttestationGenerate:
+		return ServerRequestResponse{}, false
+	default:
+		return ServerRequestResponse{}, false
 	}
 }
 

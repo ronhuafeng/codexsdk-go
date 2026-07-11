@@ -146,6 +146,15 @@ func main() {
 contains the latest immutable partial snapshot. More compile-checked examples
 live in `codexsdk/examples_test.go`.
 
+Exact server requests are lifecycle-isolated from the deprecated
+`ThreadClient` callback queue. Configure `ServerRequestHandler` when the
+application can provide generated response data. With no exact handler, the
+SDK immediately returns a generated fail-closed response for requests that
+have a safe denial or empty-answer form. Requests requiring application data,
+including authentication refresh, dynamic tool output, and attestation, return
+a JSON-RPC error and fail the exact run with `ErrExactServerRequest`; partial
+notifications and run evidence remain available in the result.
+
 The v0.1 `ThreadClient`, copied request/result models, event projections, and
 conversion helpers remain deprecated compatibility surface through v0.2. New
 code should use generated params and `ThreadRunner`.

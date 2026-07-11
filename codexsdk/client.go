@@ -53,6 +53,7 @@ type client struct {
 	turnMu              sync.Mutex
 	streams             map[string]map[*threadStreamState]struct{}
 	exactStreams        map[string]map[*exactRunState]struct{}
+	exactAttaching      map[string]map[*exactRunState]struct{}
 	pendingEvents       map[string][]rpcNotification
 	pendingErrors       map[string]error
 	pendingDiagnostics  map[string][]DiagnosticRef
@@ -103,6 +104,7 @@ func New(options ClientOptions) (Client, error) {
 		cancel:              cancel,
 		streams:             map[string]map[*threadStreamState]struct{}{},
 		exactStreams:        map[string]map[*exactRunState]struct{}{},
+		exactAttaching:      map[string]map[*exactRunState]struct{}{},
 		pendingEvents:       map[string][]rpcNotification{},
 		pendingErrors:       map[string]error{},
 		pendingDiagnostics:  map[string][]DiagnosticRef{},
@@ -863,10 +865,20 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 		for stream := range c.exactStreams[turnID] {
 			targets = append(targets, stream)
 		}
+		for stream := range c.exactAttaching[threadID] {
+			targets = append(targets, stream)
+		}
 	} else {
 		for _, streams := range c.exactStreams {
 			for stream := range streams {
 				if threadID == "" || stream.threadID == threadID {
+					targets = append(targets, stream)
+				}
+			}
+		}
+		for candidateThreadID, streams := range c.exactAttaching {
+			for stream := range streams {
+				if threadID == "" || candidateThreadID == threadID {
 					targets = append(targets, stream)
 				}
 			}
@@ -1055,6 +1067,10 @@ func (c *client) unregisterStream(turnID string, stream *threadStreamState) {
 
 func (c *client) attachExactStream(stream *exactRunState) {
 	c.turnMu.Lock()
+	delete(c.exactAttaching[stream.threadID], stream)
+	if len(c.exactAttaching[stream.threadID]) == 0 {
+		delete(c.exactAttaching, stream.threadID)
+	}
 	if c.exactStreams[stream.turnID] == nil {
 		c.exactStreams[stream.turnID] = map[*exactRunState]struct{}{}
 	}
@@ -1089,6 +1105,39 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	if err := errors.Join(pendingErr, globalErr); err != nil {
 		c.failClient(err)
 	}
+}
+
+func (c *client) registerAttachingExactStream(stream *exactRunState) {
+	c.turnMu.Lock()
+	defer c.turnMu.Unlock()
+	if c.exactAttaching[stream.threadID] == nil {
+		c.exactAttaching[stream.threadID] = map[*exactRunState]struct{}{}
+	}
+	c.exactAttaching[stream.threadID][stream] = struct{}{}
+}
+
+func (c *client) unregisterAttachingExactStream(stream *exactRunState) {
+	c.turnMu.Lock()
+	defer c.turnMu.Unlock()
+	delete(c.exactAttaching[stream.threadID], stream)
+	if len(c.exactAttaching[stream.threadID]) == 0 {
+		delete(c.exactAttaching, stream.threadID)
+	}
+}
+
+func (c *client) hasExactRun(threadID, turnID string) bool {
+	c.turnMu.Lock()
+	defer c.turnMu.Unlock()
+	if turnID != "" && len(c.exactStreams[turnID]) != 0 {
+		return true
+	}
+	if threadID != "" && len(c.exactAttaching[threadID]) != 0 {
+		return true
+	}
+	if threadID == "" && turnID == "" {
+		return len(c.exactStreams) != 0 || len(c.exactAttaching) != 0
+	}
+	return false
 }
 
 func (c *client) unregisterExactStream(turnID string, stream *exactRunState) {
@@ -1130,6 +1179,11 @@ func (c *client) failAll(err error) {
 	var exactStreams []*exactRunState
 	for _, byTurn := range c.exactStreams {
 		for stream := range byTurn {
+			exactStreams = append(exactStreams, stream)
+		}
+	}
+	for _, byThread := range c.exactAttaching {
+		for stream := range byThread {
 			exactStreams = append(exactStreams, stream)
 		}
 	}

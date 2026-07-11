@@ -11,18 +11,21 @@ import (
 )
 
 func (c *client) handleServerRequest(message map[string]any) {
-	if c.options.ServerRequestHandler != nil {
-		c.handleExactServerRequest(message)
-		return
-	}
 	id := message["id"]
 	method, _ := message["method"].(string)
 	params, _ := message["params"].(map[string]any)
-	if err := validateProtocolServerRequest(message); err != nil {
+	typed, err := decodeProtocolServerRequest(message)
+	if err != nil {
 		req := serverRequestIdentity(method, params)
 		err = serverRequestValidationError(id, req, err)
 		c.writeServerRequestError(id, -32602, err)
 		c.routeServerRequestError(req, err)
+		return
+	}
+	threadID, _ := params["threadId"].(string)
+	turnID, _ := params["turnId"].(string)
+	if c.hasExactRun(threadID, turnID) {
+		c.handleExactServerRequest(id, typed)
 		return
 	}
 	req, err := serverRequestFromMethod(method, params)
@@ -42,16 +45,21 @@ func (c *client) handleServerRequest(message map[string]any) {
 	go c.respondToServerRequest(id, method, params)
 }
 
-func validateProtocolServerRequest(message map[string]any) error {
+func decodeProtocolServerRequest(message map[string]any) (protocolv2.ServerRequest, error) {
 	raw, err := json.Marshal(message)
 	if err != nil {
-		return fmt.Errorf("codexsdk: encode server request for validation: %w", err)
+		return protocolv2.ServerRequest{}, fmt.Errorf("codexsdk: encode server request for validation: %w", err)
 	}
 	var typed protocolv2.ServerRequest
 	if err := json.Unmarshal(raw, &typed); err != nil {
-		return err
+		return protocolv2.ServerRequest{}, err
 	}
-	return nil
+	return typed, nil
+}
+
+func validateProtocolServerRequest(message map[string]any) error {
+	_, err := decodeProtocolServerRequest(message)
+	return err
 }
 
 func serverRequestValidationError(id any, req ServerRequest, err error) error {

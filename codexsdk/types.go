@@ -19,7 +19,23 @@ var (
 	ErrTurnInterrupted          = errors.New("codexsdk: turn interrupted")
 	ErrNotificationBackpressure = errors.New("codexsdk: notification backpressure")
 	ErrHandlerFailed            = errors.New("codexsdk: handler failed")
+	ErrExactServerRequest       = errors.New("codexsdk: exact server request failed closed")
 )
+
+type ExactServerRequestError struct {
+	Kind   protocolv2.ServerRequestKind
+	Reason string
+}
+
+func (e *ExactServerRequestError) Error() string {
+	reason := e.Reason
+	if reason == "" {
+		reason = "requires application data"
+	}
+	return "codexsdk: exact server request " + string(e.Kind) + " " + reason
+}
+
+func (e *ExactServerRequestError) Unwrap() error { return ErrExactServerRequest }
 
 type StartThreadRunRequest struct {
 	Thread protocolv2.ThreadStartParams

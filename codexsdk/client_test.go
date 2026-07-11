@@ -6017,7 +6017,7 @@ func runFakeAppServer(mode string, extra []string) {
 		method, _ := message["method"].(string)
 		if method == "" {
 			appendRecord(record, map[string]any{"kind": "recv-response", "result": message["result"], "error": message["error"]})
-			if mode == "approval" {
+			if mode == "approval" || mode == "approval-before-turn-start" || mode == "file-approval" || mode == "user-input" {
 				completeTurn("thread-1", "turn-1")
 			}
 			continue
@@ -6901,6 +6901,9 @@ func runFakeAppServer(mode string, extra []string) {
 				})
 				continue
 			}
+			if mode == "approval-before-turn-start" {
+				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
+			}
 			sendProtocolResult(id, protocolv2.TurnStartResponse{
 				Turn: protocolv2.Turn{
 					ID:     turnID,
@@ -6922,6 +6925,14 @@ func runFakeAppServer(mode string, extra []string) {
 			case "hang":
 			case "approval":
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
+			case "approval-before-turn-start":
+			case "file-approval":
+				send(map[string]any{"id": "server-file-1", "method": "item/fileChange/requestApproval", "params": map[string]any{"itemId": "item-file", "startedAtMs": 1, "threadId": threadID, "turnId": turnID}})
+			case "user-input":
+				send(map[string]any{"id": "server-input-1", "method": "item/tool/requestUserInput", "params": map[string]any{"itemId": "item-input", "questions": []map[string]any{{"header": "Choice", "id": "choice", "question": "Choose"}}, "threadId": threadID, "turnId": turnID}})
+			case "auth-refresh-after-notification":
+				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "item-before-auth", "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
+				send(map[string]any{"id": "server-auth-1", "method": "account/chatgptAuthTokens/refresh", "params": map[string]any{"reason": "unauthorized"}})
 			case "approval-before-attach":
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 			case "tool-call-before-attach":
