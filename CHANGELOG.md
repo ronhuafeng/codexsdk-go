@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.2.0] - 2026-07-11
+
 ### Added
 
 - Exact generated-param `ThreadRunner` start/resume composition and generic
