@@ -11,7 +11,26 @@ on:
 permissions:
   contents: read
 
+env:
+  GOWORK: "off"
+
 jobs:
+  minimum-go:
+    name: Go minimum
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up minimum supported Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test standalone module
+        run: go test ./...
+
   test:
     name: Go
     runs-on: ubuntu-latest
@@ -22,7 +41,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
           cache: true
 
       - name: Download modules
@@ -51,3 +70,38 @@ jobs:
             diff -u codexsdk/protocolv2/method_registry.gen.go -
           go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
             diff -u codexsdk/protocolv2/protocol_types.gen.go -
+
+  race:
+    name: Go race
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up current stable Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Test with race detector
+        run: go test -race ./...
+
+  runtime-repeat:
+    name: Runtime repeat
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up current stable Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Repeat deterministic runtime concurrency contracts
+        run: >-
+          go test ./codexsdk
+          -run 'Test(ExactRunAttach|ExactNotificationOverflow|ExactTerminalOverflow|ExactAttribution|ConcurrentAttribution|RequestArrivingDuringClose|CloseJoinsNotificationAndServerRequestHandlers|NormalCloseCancelsAndJoinsExactServerRequestHandler)'
+          -count=50

@@ -51,6 +51,25 @@ protocol fact guarded by generator reproducibility tests.
 
 ## Release Checks
 
+The following GitHub Actions jobs are release blockers for changes targeting a
+release:
+
+- `Go minimum` verifies the standalone module with the minimum Go version
+  declared by `go.mod`.
+- `Go` uses the current stable Go release for module metadata, formatting, vet,
+  the full test suite, script tests, and generator reproducibility.
+- `Go race` runs the full suite with the race detector.
+- `Runtime repeat` repeats only synchronization-driven runtime concurrency
+  contracts; it supplements rather than replaces their deterministic runs.
+- `Tag clean module` runs only after a `v*` tag is pushed. It resolves that tag
+  from `proxy.golang.org` in a new consumer module and compiles an import of the
+  SDK. A failed tag smoke test blocks publishing or announcing that release.
+
+All Go CI jobs run with `GOWORK=off`. The `Go`, `Go minimum`, `Go race`, and
+`Runtime repeat` jobs must pass on the exact pull-request head. The tag-only
+`Tag clean module` job must pass on the exact release tag. None of these gates
+changes the separately enforced protocol-baseline finalization policy.
+
 ```sh
 git ls-files -z -- '*.go' ':!:vendor/**' | xargs -0 gofmt -w
 GOWORK=off go vet ./...
