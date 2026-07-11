@@ -13,13 +13,58 @@ import (
 )
 
 var (
-	ErrClientClosed = errors.New("codexsdk: client closed")
-	ErrStreamClosed = errors.New("codexsdk: stream closed")
+	ErrClientClosed             = errors.New("codexsdk: client closed")
+	ErrStreamClosed             = errors.New("codexsdk: stream closed")
+	ErrTurnFailed               = errors.New("codexsdk: turn failed")
+	ErrTurnInterrupted          = errors.New("codexsdk: turn interrupted")
+	ErrNotificationBackpressure = errors.New("codexsdk: notification backpressure")
+	ErrHandlerFailed            = errors.New("codexsdk: handler failed")
 )
 
+type StartThreadRunRequest struct {
+	Thread protocolv2.ThreadStartParams
+	Turn   protocolv2.TurnStartParams
+}
+
+type ResumeThreadRunRequest struct {
+	Thread protocolv2.ThreadResumeParams
+	Turn   protocolv2.TurnStartParams
+}
+
+type ThreadRunResult struct {
+	Turn          protocolv2.Turn
+	Usage         *protocolv2.ThreadTokenUsage
+	Notifications []protocolv2.ServerNotification
+	FinalResponse string
+	InputStats    InputStats
+	Diagnostics   []DiagnosticRef
+}
+
+type StartedThreadRun struct {
+	Start protocolv2.ThreadStartResponse
+	Run   ThreadRunResult
+}
+
+type ResumedThreadRun struct {
+	Resume protocolv2.ThreadResumeResponse
+	Run    ThreadRunResult
+}
+
+type ThreadRunner interface {
+	Start(context.Context, StartThreadRunRequest) (StartedThreadRun, error)
+	Resume(context.Context, ResumeThreadRunRequest) (ResumedThreadRun, error)
+	StartStream(context.Context, StartThreadRunRequest) (*Stream[StartedThreadRun], error)
+	ResumeStream(context.Context, ResumeThreadRunRequest) (*Stream[ResumedThreadRun], error)
+}
+
+type ServerNotificationHandler func(context.Context, protocolv2.ServerNotification) error
+
+// ThreadClient is the v0.1 projected lifecycle API.
+//
+// Deprecated: use ThreadRunner.
 type ThreadClient interface {
-	StartThread(ctx context.Context, req StartThreadRequest) (ThreadRunResult, error)
-	ResumeThread(ctx context.Context, req ResumeThreadRequest) (ThreadRunResult, error)
+	StartThread(ctx context.Context, req StartThreadRequest) (LegacyThreadRunResult, error)
+	ResumeThread(ctx context.Context, req ResumeThreadRequest) (LegacyThreadRunResult, error)
 	StartThreadStream(ctx context.Context, req StartThreadRequest) (*ThreadStream, error)
 	ResumeThreadStream(ctx context.Context, req ResumeThreadRequest) (*ThreadStream, error)
 	ForkThread(ctx context.Context, req ForkThreadRequest) (ThreadForkResult, error)
@@ -27,23 +72,32 @@ type ThreadClient interface {
 
 type Client interface {
 	SDKSurface
+	ThreadRunner() ThreadRunner
 	ThreadClient(options ThreadClientOptions) ThreadClient
 	Close() error
 }
 
 type ClientOptions struct {
-	CWD                  string
-	Command              []string
-	ClientName           string
-	ClientTitle          string
-	Capabilities         ClientCapabilities
-	ServerRequestHandler ServerRequestHandler
+	CWD                       string
+	Command                   []string
+	Initialize                protocolv2.InitializeParams
+	ServerRequestHandler      ServerRequestHandler
+	ServerNotificationHandler ServerNotificationHandler
+	NotificationQueueCapacity int
+
+	// Deprecated compatibility fields. Prefer Initialize.
+	ClientName                 string
+	ClientTitle                string
+	Capabilities               ClientCapabilities
+	LegacyServerRequestHandler LegacyServerRequestHandler
 }
 
+// Deprecated: set ClientOptions.Initialize capabilities directly.
 type ClientCapabilities struct {
 	ExperimentalAPI bool
 }
 
+// Deprecated: use exact generated request params with ThreadRunner.
 type ThreadClientOptions struct {
 	DefaultModel             string
 	DefaultCWD               string
@@ -53,6 +107,7 @@ type ThreadClientOptions struct {
 	DefaultEphemeral         *bool
 }
 
+// Deprecated: use protocolv2.UserInput.
 type InputItem struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
@@ -64,25 +119,26 @@ const (
 	InputItemFile = "file"
 )
 
+// Deprecated: use protocolv2.NewUserInputText.
 func Text(text string) []InputItem {
 	return []InputItem{{Type: InputItemText, Text: text}}
 }
 
+// Deprecated: construct exact protocolv2.UserInput values.
 func TextAndFiles(text string, paths []string) []InputItem {
 	items := []InputItem{{Type: InputItemText, Text: text}}
 	for _, path := range paths {
-		if strings.TrimSpace(path) == "" {
-			continue
-		}
 		items = append(items, InputItem{Type: InputItemFile, Path: path})
 	}
 	return items
 }
 
+// Deprecated: use protocolv2.Value.
 func Bool(value bool) *bool {
 	return &value
 }
 
+// Deprecated: use protocolv2.ReasoningEffort.
 type ReasoningEffort string
 
 const (
@@ -94,6 +150,7 @@ const (
 	ReasoningEffortXHigh   ReasoningEffort = "xhigh"
 )
 
+// Deprecated: use protocolv2.AskForApproval.
 type ApprovalPolicy string
 
 const (
@@ -103,6 +160,7 @@ const (
 	ApprovalPolicyNever     ApprovalPolicy = "never"
 )
 
+// Deprecated: use protocolv2.ApprovalsReviewer.
 type ApprovalsReviewer string
 
 const (
@@ -111,6 +169,7 @@ const (
 	ApprovalsReviewerGuardianSubagent ApprovalsReviewer = "guardian_subagent"
 )
 
+// Deprecated: use StartThreadRunRequest.
 type StartThreadRequest struct {
 	Input             []InputItem
 	OutputSchema      protocolv2.OutputSchema
@@ -122,6 +181,7 @@ type StartThreadRequest struct {
 	ApprovalsReviewer ApprovalsReviewer
 }
 
+// Deprecated: use ResumeThreadRunRequest.
 type ResumeThreadRequest struct {
 	ThreadID          string
 	Input             []InputItem
@@ -133,6 +193,7 @@ type ResumeThreadRequest struct {
 	ApprovalsReviewer ApprovalsReviewer
 }
 
+// Deprecated: call the generated Threads.Fork facade directly.
 type ForkThreadRequest struct {
 	ParentThreadID    string
 	Ephemeral         *bool
@@ -142,7 +203,17 @@ type ForkThreadRequest struct {
 	ApprovalsReviewer ApprovalsReviewer
 }
 
-type ServerRequestHandler func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error)
+type ServerRequestHandler func(context.Context, protocolv2.ServerRequest) (ServerRequestResponse, error)
+
+type ServerRequestResponse struct {
+	kind  protocolv2.ServerRequestKind
+	value any
+}
+
+// LegacyServerRequestHandler is the v0.1 projected callback.
+//
+// Deprecated: use ServerRequestHandler.
+type LegacyServerRequestHandler func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error)
 
 type ServerRequestKind string
 
@@ -179,7 +250,8 @@ type ServerRequest struct {
 	MCPElicitation           *protocolv2.McpServerElicitationRequestParams
 }
 
-type ServerRequestResponse struct {
+// Deprecated: use opaque ServerRequestResponse constructors.
+type LegacyServerRequestResponse struct {
 	ApprovalDecision ApprovalDecision
 
 	ApplyPatchApproval       *protocolv2.ApplyPatchApprovalResponse
@@ -213,7 +285,10 @@ const (
 	ApprovalCancel           ApprovalDecision = "cancel"
 )
 
-type ThreadRunResult struct {
+// LegacyThreadRunResult is the v0.1 projected thread result.
+//
+// Deprecated: use ThreadRunner and ThreadRunResult.
+type LegacyThreadRunResult struct {
 	ThreadID                 string
 	TurnID                   string
 	FinalResponse            string
@@ -290,7 +365,7 @@ type ThreadEvent struct {
 	TurnWarning *TurnWarningEvent
 	Model       *ModelEvent
 	Warning     *WarningEvent
-	Result      *ThreadRunResult
+	Result      *LegacyThreadRunResult
 }
 
 type TurnWarningEvent struct {

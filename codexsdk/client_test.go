@@ -82,6 +82,13 @@ func TestNewValidationInitializeAndExactCommand(t *testing.T) {
 	}
 }
 
+func TestTextAndFilesPreservesBlankPathForValidation(t *testing.T) {
+	items := TextAndFiles("prompt", []string{""})
+	if len(items) != 2 || items[1].Type != InputItemFile || items[1].Path != "" {
+		t.Fatalf("TextAndFiles silently discarded blank path: %#v", items)
+	}
+}
+
 func TestNewExperimentalCapabilityOptIn(t *testing.T) {
 	record := tempRecord(t)
 	t.Setenv("CODEXSDK_FAKE_RECORD", record)
@@ -101,6 +108,40 @@ func TestNewExperimentalCapabilityOptIn(t *testing.T) {
 	capabilities := init["params"].(map[string]any)["capabilities"].(map[string]any)
 	if capabilities["experimentalApi"] != true {
 		t.Fatalf("initialize capabilities = %#v, want experimentalApi true", capabilities)
+	}
+}
+
+func TestNewUsesExactGeneratedInitializeParams(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	experimental := true
+	capabilities := protocolv2.InitializeCapabilities{ExperimentalAPI: &experimental}
+	options := ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("happy"),
+		Initialize: protocolv2.InitializeParams{
+			Capabilities: protocolv2.Value(capabilities),
+			ClientInfo: protocolv2.ClientInfo{
+				Name:    "exact-client",
+				Title:   protocolv2.Value("Exact Client"),
+				Version: "v0.2-test",
+			},
+		},
+	}
+	client, err := New(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	experimental = false
+	defer client.Close()
+	init := firstRecord(readRecords(t, record), "recv", protocolv2.MethodInitialize)
+	params := init["params"].(map[string]any)
+	info := params["clientInfo"].(map[string]any)
+	if info["name"] != "exact-client" || info["title"] != "Exact Client" || info["version"] != "v0.2-test" {
+		t.Fatalf("initialize params = %#v", params)
+	}
+	if params["capabilities"].(map[string]any)["experimentalApi"] != true {
+		t.Fatalf("initialize capabilities = %#v", params["capabilities"])
 	}
 }
 
@@ -4618,9 +4659,9 @@ func TestFailClosedServerRequestDoesNotInvokeHandler(t *testing.T) {
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
-		options: ClientOptions{ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+		options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 			handlerCalled <- struct{}{}
-			return ServerRequestResponse{ApprovalDecision: ApprovalAccept}, nil
+			return LegacyServerRequestResponse{ApprovalDecision: ApprovalAccept}, nil
 		}},
 	}
 
@@ -4836,9 +4877,9 @@ func TestServerRequestRejectsMalformedTypedApprovalBeforeHandler(t *testing.T) {
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
-		options: ClientOptions{ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+		options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 			handlerCalled <- struct{}{}
-			return ServerRequestResponse{ApprovalDecision: ApprovalAccept}, nil
+			return LegacyServerRequestResponse{ApprovalDecision: ApprovalAccept}, nil
 		}},
 	}
 
@@ -4869,7 +4910,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 		name     string
 		method   string
 		params   map[string]any
-		response ServerRequestResponse
+		response LegacyServerRequestResponse
 		assert   func(t *testing.T, req ServerRequest, result map[string]any)
 	}{
 		{
@@ -4882,7 +4923,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 					"/repo/file.txt": map[string]any{"content": "old", "type": "delete"},
 				},
 			},
-			response: ServerRequestResponse{ApprovalDecision: ApprovalAccept},
+			response: LegacyServerRequestResponse{ApprovalDecision: ApprovalAccept},
 			assert: func(t *testing.T, req ServerRequest, result map[string]any) {
 				if req.Kind != ServerRequestApplyPatchApproval || req.ApplyPatchApproval == nil || req.ThreadID != "thread-1" || req.ItemID != "call-1" {
 					t.Fatalf("applyPatchApproval request = %#v", req)
@@ -4902,7 +4943,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 				"cwd":            "/repo",
 				"parsedCmd":      []any{},
 			},
-			response: ServerRequestResponse{ApprovalDecision: ApprovalAcceptForSession},
+			response: LegacyServerRequestResponse{ApprovalDecision: ApprovalAcceptForSession},
 			assert: func(t *testing.T, req ServerRequest, result map[string]any) {
 				if req.Kind != ServerRequestExecCommandApproval || req.ExecCommandApproval == nil || !reflect.DeepEqual(req.Approval.Command, []string{"echo", "ok"}) {
 					t.Fatalf("execCommandApproval request = %#v", req)
@@ -4916,7 +4957,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 			name:     "command execution",
 			method:   protocolv2.MethodItemCommandExecutionRequestApproval,
 			params:   fakeCommandApprovalParams("thread-1", "turn-1"),
-			response: ServerRequestResponse{ApprovalDecision: ApprovalCancel},
+			response: LegacyServerRequestResponse{ApprovalDecision: ApprovalCancel},
 			assert: func(t *testing.T, req ServerRequest, result map[string]any) {
 				if req.Kind != ServerRequestCommandApproval || req.CommandExecutionApproval == nil || req.TurnID != "turn-1" {
 					t.Fatalf("command execution request = %#v", req)
@@ -4935,7 +4976,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 				"threadId":    "thread-1",
 				"turnId":      "turn-1",
 			},
-			response: ServerRequestResponse{ApprovalDecision: ApprovalAcceptForSession},
+			response: LegacyServerRequestResponse{ApprovalDecision: ApprovalAcceptForSession},
 			assert: func(t *testing.T, req ServerRequest, result map[string]any) {
 				if req.Kind != ServerRequestFileChangeApproval || req.FileChangeApproval == nil || req.ItemID != "item-file" {
 					t.Fatalf("file change request = %#v", req)
@@ -4956,7 +4997,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 				"threadId":    "thread-1",
 				"turnId":      "turn-1",
 			},
-			response: ServerRequestResponse{
+			response: LegacyServerRequestResponse{
 				PermissionsApproval: &protocolv2.PermissionsRequestApprovalResponse{
 					Permissions: protocolv2.GrantedPermissionProfile{
 						Network: protocolv2.Value(protocolv2.AdditionalNetworkPermissions{
@@ -4986,7 +5027,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 			var seen ServerRequest
 			c := &client{
 				stdin: writer,
-				options: ClientOptions{ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+				options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 					seen = req
 					return tc.response, nil
 				}},
@@ -5010,14 +5051,14 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 		name     string
 		method   string
 		params   map[string]any
-		response ServerRequestResponse
+		response LegacyServerRequestResponse
 		assert   func(t *testing.T, req ServerRequest, result map[string]any)
 	}{
 		{
 			name:   "chatgpt auth refresh",
 			method: protocolv2.MethodAccountChatGPTAuthTokensRefresh,
 			params: fakeAuthRefreshParams(),
-			response: ServerRequestResponse{
+			response: LegacyServerRequestResponse{
 				ChatGPTAuthTokensRefresh: &protocolv2.ChatgptAuthTokensRefreshResponse{
 					AccessToken:      "access-token",
 					ChatGPTAccountID: "account-1",
@@ -5038,7 +5079,7 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 			name:   "tool call",
 			method: protocolv2.MethodItemToolCall,
 			params: fakeDynamicToolCallParams("thread-1", "turn-tool"),
-			response: ServerRequestResponse{
+			response: LegacyServerRequestResponse{
 				DynamicToolCall: &protocolv2.DynamicToolCallResponse{
 					ContentItems: []protocolv2.DynamicToolCallOutputContentItem{
 						protocolv2.NewDynamicToolCallOutputContentItemInputText(protocolv2.DynamicToolCallOutputContentItemInputText{Text: "ok"}),
@@ -5062,7 +5103,7 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 			name:   "tool user input",
 			method: protocolv2.MethodItemToolRequestUserInput,
 			params: fakeToolUserInputParams("thread-1", "turn-input"),
-			response: ServerRequestResponse{
+			response: LegacyServerRequestResponse{
 				ToolRequestUserInput: &protocolv2.ToolRequestUserInputResponse{
 					Answers: map[string]protocolv2.ToolRequestUserInputAnswer{
 						"q1": {Answers: []string{"yes"}},
@@ -5086,7 +5127,7 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 			name:   "mcp elicitation",
 			method: protocolv2.MethodMCPServerElicitationRequest,
 			params: fakeMCPElicitationParams("thread-1", "turn-mcp"),
-			response: ServerRequestResponse{
+			response: LegacyServerRequestResponse{
 				MCPElicitation: &protocolv2.McpServerElicitationRequestResponse{
 					Action:  protocolv2.McpServerElicitationActionAccept,
 					Content: jsonValuePtr(protocolv2.JSONObject(map[string]protocolv2.JSONValue{"name": protocolv2.JSONString("Ada")})),
@@ -5110,7 +5151,7 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 			var seen ServerRequest
 			c := &client{
 				stdin: writer,
-				options: ClientOptions{ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+				options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 					seen = req
 					return tc.response, nil
 				}},
@@ -5138,8 +5179,8 @@ func TestServerRequestPermissionsCancelShortcutFailsClosed(t *testing.T) {
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
-		options: ClientOptions{ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
-			return ServerRequestResponse{ApprovalDecision: ApprovalCancel}, nil
+		options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
+			return LegacyServerRequestResponse{ApprovalDecision: ApprovalCancel}, nil
 		}},
 	}
 
@@ -5175,8 +5216,8 @@ func TestServerRequestHandlerInvalidApprovalDecisionFailsClosed(t *testing.T) {
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
-		options: ClientOptions{ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
-			return ServerRequestResponse{ApprovalDecision: ApprovalDecision("bogus")}, nil
+		options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
+			return LegacyServerRequestResponse{ApprovalDecision: ApprovalDecision("bogus")}, nil
 		}},
 	}
 
@@ -5239,9 +5280,9 @@ func TestTypedServerRequestsRejectMalformedBeforeHandler(t *testing.T) {
 				stdin:         writer,
 				streams:       map[string]map[*threadStreamState]struct{}{},
 				pendingErrors: map[string]error{},
-				options: ClientOptions{ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+				options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 					handlerCalled <- struct{}{}
-					return ServerRequestResponse{}, errors.New("handler should not be called")
+					return LegacyServerRequestResponse{}, errors.New("handler should not be called")
 				}},
 			}
 
@@ -5373,14 +5414,14 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 	root, err = New(ClientOptions{
 		CWD:     t.TempDir(),
 		Command: fakeCommand("approval"),
-		ServerRequestHandler: func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+		LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 			if req.Kind != ServerRequestCommandApproval || req.Approval == nil || req.CommandExecutionApproval == nil ||
 				req.CommandExecutionApproval.Command == nil || req.CommandExecutionApproval.Command.Value == nil ||
 				*req.CommandExecutionApproval.Command.Value != "echo ok" ||
 				!reflect.DeepEqual(req.Approval.Command, []string{"echo ok"}) {
-				return ServerRequestResponse{}, fmt.Errorf("approval request = %#v", req)
+				return LegacyServerRequestResponse{}, fmt.Errorf("approval request = %#v", req)
 			}
-			return ServerRequestResponse{ApprovalDecision: ApprovalAcceptForSession}, nil
+			return LegacyServerRequestResponse{ApprovalDecision: ApprovalAcceptForSession}, nil
 		},
 	})
 	if err != nil {
@@ -5407,9 +5448,9 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 	_ = unsupported.Close()
 
 	handlerCalled := make(chan struct{}, 1)
-	unsupported = newFakeClient(t, "unsupported", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	unsupported = newFakeClient(t, "unsupported", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		handlerCalled <- struct{}{}
-		return ServerRequestResponse{}, errors.New("handler observation failed")
+		return LegacyServerRequestResponse{}, errors.New("handler observation failed")
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -5431,9 +5472,9 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 	_ = unsupported.Close()
 
 	noTurnHandlerCalled := make(chan struct{}, 1)
-	noTurn := newFakeClient(t, "unsupported-no-turn", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	noTurn := newFakeClient(t, "unsupported-no-turn", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		noTurnHandlerCalled <- struct{}{}
-		return ServerRequestResponse{}, nil
+		return LegacyServerRequestResponse{}, nil
 	})
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -5455,13 +5496,13 @@ func TestServerRequestFailClosedApprovalHandlerAndUnsupported(t *testing.T) {
 func TestServerRequestHandlerDoesNotBlockReaderLoop(t *testing.T) {
 	handlerSeen := make(chan struct{})
 	releaseHandler := make(chan struct{})
-	client := newFakeClient(t, "blocking-approval-concurrent", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	client := newFakeClient(t, "blocking-approval-concurrent", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		close(handlerSeen)
 		select {
 		case <-releaseHandler:
-			return ServerRequestResponse{ApprovalDecision: ApprovalDecline}, nil
+			return LegacyServerRequestResponse{ApprovalDecision: ApprovalDecline}, nil
 		case <-ctx.Done():
-			return ServerRequestResponse{}, ctx.Err()
+			return LegacyServerRequestResponse{}, ctx.Err()
 		}
 	})
 	defer client.Close()
@@ -5507,15 +5548,15 @@ func TestServerRequestHandlerDoesNotBlockReaderLoop(t *testing.T) {
 func TestTypedNonApprovalServerRequestBeforeAttachUsesStreamContextOnClose(t *testing.T) {
 	handlerSeen := make(chan struct{})
 	handlerDone := make(chan error, 1)
-	client := newFakeClient(t, "tool-call-before-attach", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	client := newFakeClient(t, "tool-call-before-attach", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		if req.Kind != ServerRequestToolCall || req.DynamicToolCall == nil || req.TurnID == "" {
 			handlerDone <- fmt.Errorf("typed tool server request = %#v", req)
-			return ServerRequestResponse{}, nil
+			return LegacyServerRequestResponse{}, nil
 		}
 		close(handlerSeen)
 		<-ctx.Done()
 		handlerDone <- ctx.Err()
-		return ServerRequestResponse{}, ctx.Err()
+		return LegacyServerRequestResponse{}, ctx.Err()
 	})
 	defer client.Close()
 
@@ -5552,11 +5593,11 @@ func TestTypedNonApprovalServerRequestBeforeAttachUsesStreamContextOnClose(t *te
 func TestServerRequestHandlerContextCancelsOnClientClose(t *testing.T) {
 	handlerSeen := make(chan struct{})
 	handlerDone := make(chan error, 1)
-	client := newFakeClient(t, "blocking-approval-concurrent", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	client := newFakeClient(t, "blocking-approval-concurrent", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		close(handlerSeen)
 		<-ctx.Done()
 		handlerDone <- ctx.Err()
-		return ServerRequestResponse{}, ctx.Err()
+		return LegacyServerRequestResponse{}, ctx.Err()
 	})
 
 	stream, err := client.StartThreadStream(context.Background(), StartThreadRequest{Input: Text("blocked approval")})
@@ -5587,11 +5628,11 @@ func TestServerRequestHandlerContextCancelsOnClientClose(t *testing.T) {
 func TestServerRequestHandlerContextCancelsOnStreamClose(t *testing.T) {
 	handlerSeen := make(chan struct{})
 	handlerDone := make(chan error, 1)
-	client := newFakeClient(t, "blocking-approval-delayed", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	client := newFakeClient(t, "blocking-approval-delayed", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		close(handlerSeen)
 		<-ctx.Done()
 		handlerDone <- ctx.Err()
-		return ServerRequestResponse{}, ctx.Err()
+		return LegacyServerRequestResponse{}, ctx.Err()
 	})
 	defer client.Close()
 
@@ -5626,11 +5667,11 @@ func TestServerRequestHandlerContextCancelsOnStreamClose(t *testing.T) {
 func TestPendingServerRequestBeforeAttachUsesStreamContextOnClose(t *testing.T) {
 	handlerSeen := make(chan struct{})
 	handlerDone := make(chan error, 1)
-	client := newFakeClient(t, "approval-before-attach", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	client := newFakeClient(t, "approval-before-attach", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		close(handlerSeen)
 		<-ctx.Done()
 		handlerDone <- ctx.Err()
-		return ServerRequestResponse{}, ctx.Err()
+		return LegacyServerRequestResponse{}, ctx.Err()
 	})
 	defer client.Close()
 
@@ -5665,11 +5706,11 @@ func TestPendingServerRequestBeforeAttachUsesStreamContextOnClose(t *testing.T) 
 func TestServerRequestHandlerContextCancelsOnNextTimeout(t *testing.T) {
 	handlerSeen := make(chan struct{})
 	handlerDone := make(chan error, 1)
-	client := newFakeClient(t, "blocking-approval-delayed", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	client := newFakeClient(t, "blocking-approval-delayed", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		close(handlerSeen)
 		<-ctx.Done()
 		handlerDone <- ctx.Err()
-		return ServerRequestResponse{}, ctx.Err()
+		return LegacyServerRequestResponse{}, ctx.Err()
 	})
 	defer client.Close()
 
@@ -5706,11 +5747,11 @@ func TestServerRequestHandlerContextCancelsOnNextTimeout(t *testing.T) {
 func TestPendingServerRequestBeforeAttachUsesStreamContextOnNextTimeout(t *testing.T) {
 	handlerSeen := make(chan struct{})
 	handlerDone := make(chan error, 1)
-	client := newFakeClient(t, "approval-before-attach", func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+	client := newFakeClient(t, "approval-before-attach", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		close(handlerSeen)
 		<-ctx.Done()
 		handlerDone <- ctx.Err()
-		return ServerRequestResponse{}, ctx.Err()
+		return LegacyServerRequestResponse{}, ctx.Err()
 	})
 	defer client.Close()
 
@@ -5808,13 +5849,13 @@ func (c testThreadClient) Close() error {
 	return c.close()
 }
 
-func newFakeClient(t *testing.T, mode string, handler ServerRequestHandler) testThreadClient {
+func newFakeClient(t *testing.T, mode string, handler LegacyServerRequestHandler) testThreadClient {
 	t.Helper()
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
-		CWD:                  t.TempDir(),
-		Command:              fakeCommand(mode),
-		ServerRequestHandler: handler,
+		CWD:                        t.TempDir(),
+		Command:                    fakeCommand(mode),
+		LegacyServerRequestHandler: handler,
 	})
 	if err != nil {
 		t.Fatalf("New(%s) error: %v", mode, err)
@@ -7398,9 +7439,10 @@ func facadeThread(threadID string, forkedFromID *string) protocolv2.Thread {
 }
 
 func completeTurn(threadID, turnID string) {
-	send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1234, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "item-" + turnID, "type": "agentMessage", "text": "final-" + turnID, "phase": "final_answer"}}})
+	item := map[string]any{"id": "item-" + turnID, "type": "agentMessage", "text": "final-" + turnID, "phase": "final_answer"}
+	send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1234, "threadId": threadID, "turnId": turnID, "item": item}})
 	send(map[string]any{"method": "thread/tokenUsage/updated", "params": map[string]any{"threadId": threadID, "turnId": turnID, "tokenUsage": map[string]any{"last": fakeTokenUsageBreakdown(3, 1, 2, 1, 5), "total": fakeTokenUsageBreakdown(30, 10, 20, 5, 50)}}})
-	send(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "status": "completed", "items": []map[string]any{}}}})
+	send(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "status": "completed", "items": []map[string]any{item}}}})
 }
 
 func fakeTokenUsageBreakdown(inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens, totalTokens int) map[string]any {

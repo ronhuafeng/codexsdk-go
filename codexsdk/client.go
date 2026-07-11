@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,8 +31,16 @@ type client struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 
-	closeMu sync.Mutex
-	closed  bool
+	closeMu       sync.Mutex
+	closed        bool
+	failure       error
+	normalClosing bool
+	handlerWG     sync.WaitGroup
+
+	shutdownOnce   sync.Once
+	dispatchStop   chan struct{}
+	dispatcherDone chan struct{}
+	notifications  chan protocolv2.ServerNotification
 
 	writeMu sync.Mutex
 	stdin   io.WriteCloser
@@ -43,8 +52,10 @@ type client struct {
 
 	turnMu              sync.Mutex
 	streams             map[string]map[*threadStreamState]struct{}
+	exactStreams        map[string]map[*exactRunState]struct{}
 	pendingEvents       map[string][]rpcNotification
 	pendingErrors       map[string]error
+	pendingDiagnostics  map[string][]DiagnosticRef
 	pendingServer       map[string][]rpcServerRequest
 	pendingGlobal       error
 	pendingThreadEvents map[string][]rpcNotification
@@ -91,19 +102,29 @@ func New(options ClientOptions) (Client, error) {
 		ctx:                 clientCtx,
 		cancel:              cancel,
 		streams:             map[string]map[*threadStreamState]struct{}{},
+		exactStreams:        map[string]map[*exactRunState]struct{}{},
 		pendingEvents:       map[string][]rpcNotification{},
 		pendingErrors:       map[string]error{},
+		pendingDiagnostics:  map[string][]DiagnosticRef{},
 		pendingServer:       map[string][]rpcServerRequest{},
 		pendingThreadEvents: map[string][]rpcNotification{},
 		readerDone:          make(chan struct{}),
+		dispatchStop:        make(chan struct{}),
+		dispatcherDone:      make(chan struct{}),
 	}
+	queueCapacity := normalized.NotificationQueueCapacity
+	if queueCapacity == 0 {
+		queueCapacity = 64
+	}
+	c.notifications = make(chan protocolv2.ServerNotification, queueCapacity)
+	go c.notificationDispatcher()
 	if err := c.start(); err != nil {
 		cancel()
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	initializeParamsMap, err := encodeProtocolParams(protocolv2.MethodInitialize, initializeParams(normalized))
+	initializeParamsMap, err := encodeProtocolParams(protocolv2.MethodInitialize, normalized.Initialize)
 	if err != nil {
 		_ = c.Close()
 		return nil, err
@@ -166,6 +187,21 @@ func validateOptions(options ClientOptions) (ClientOptions, error) {
 		return ClientOptions{}, errors.New("codexsdk: ClientOptions.Command is required")
 	}
 	options.Command = append([]string(nil), options.Command...)
+	if reflect.DeepEqual(options.Initialize, protocolv2.InitializeParams{}) {
+		options.Initialize = initializeParams(options)
+	} else {
+		cloned, err := cloneJSON(options.Initialize)
+		if err != nil {
+			return ClientOptions{}, fmt.Errorf("codexsdk: invalid ClientOptions.Initialize: %w", err)
+		}
+		options.Initialize = cloned
+	}
+	if strings.TrimSpace(options.Initialize.ClientInfo.Name) == "" || strings.TrimSpace(options.Initialize.ClientInfo.Version) == "" {
+		return ClientOptions{}, errors.New("codexsdk: ClientOptions.Initialize.ClientInfo name and version are required")
+	}
+	if options.NotificationQueueCapacity < 0 {
+		return ClientOptions{}, errors.New("codexsdk: ClientOptions.NotificationQueueCapacity must not be negative")
+	}
 	return options, nil
 }
 
@@ -173,33 +209,33 @@ func (c *client) ThreadClient(options ThreadClientOptions) ThreadClient {
 	return &threadClient{client: c, options: options}
 }
 
-func (tc *threadClient) StartThread(ctx context.Context, req StartThreadRequest) (ThreadRunResult, error) {
+func (tc *threadClient) StartThread(ctx context.Context, req StartThreadRequest) (LegacyThreadRunResult, error) {
 	stream, err := tc.StartThreadStream(ctx, req)
 	if err != nil {
-		return ThreadRunResult{}, err
+		return LegacyThreadRunResult{}, err
 	}
 	return drainStream(ctx, stream)
 }
 
-func (tc *threadClient) ResumeThread(ctx context.Context, req ResumeThreadRequest) (ThreadRunResult, error) {
+func (tc *threadClient) ResumeThread(ctx context.Context, req ResumeThreadRequest) (LegacyThreadRunResult, error) {
 	stream, err := tc.ResumeThreadStream(ctx, req)
 	if err != nil {
-		return ThreadRunResult{}, err
+		return LegacyThreadRunResult{}, err
 	}
 	return drainStream(ctx, stream)
 }
 
-func drainStream(ctx context.Context, stream *ThreadStream) (ThreadRunResult, error) {
+func drainStream(ctx context.Context, stream *ThreadStream) (LegacyThreadRunResult, error) {
 	defer stream.Close()
 	for stream.Next(ctx) {
 	}
 	if err := stream.Err(); err != nil {
-		return ThreadRunResult{}, err
+		return LegacyThreadRunResult{}, err
 	}
 	if result, ok := stream.Result(); ok {
 		return result, nil
 	}
-	return ThreadRunResult{}, errors.New("codexsdk: stream ended without result")
+	return LegacyThreadRunResult{}, errors.New("codexsdk: stream ended without result")
 }
 
 func (tc *threadClient) StartThreadStream(ctx context.Context, req StartThreadRequest) (*ThreadStream, error) {
@@ -562,40 +598,13 @@ func (c *client) startTurnStream(ctx context.Context, threadID string, input []I
 }
 
 func (c *client) Close() error {
-	c.closeMu.Lock()
-	if c.closed {
-		c.closeMu.Unlock()
+	if c == nil {
 		return nil
 	}
-	c.closed = true
-	cancel := c.cancel
-	stdin := c.stdin
-	stdout := c.stdout
-	cmd := c.cmd
-	c.closeMu.Unlock()
-
-	if cancel != nil {
-		cancel()
-	}
-	if stdin != nil {
-		_ = stdin.Close()
-	}
-	if stdout != nil {
-		_ = stdout.Close()
-	}
-	if cmd != nil && cmd.Process != nil {
-		_ = cmd.Process.Signal(os.Interrupt)
-		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-			_ = cmd.Process.Kill()
-			<-done
-		}
-	}
-	c.failAll(ErrClientClosed)
-	return nil
+	c.shutdownOnce.Do(c.shutdown)
+	c.closeMu.Lock()
+	defer c.closeMu.Unlock()
+	return c.failure
 }
 
 func (c *client) checkOpen() error {
@@ -692,18 +701,22 @@ func (c *client) readLoop(stdout io.Reader) {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			c.failAll(err)
+			if c.isClosed() {
+				c.failAll(ErrClientClosed)
+				return
+			}
+			c.failClient(err)
 			return
 		}
 		if err := validateJSONRPCEnvelope(line); err != nil {
 			sum := sha256.Sum256(line)
-			c.failAll(fmt.Errorf("codexsdk: invalid app-server JSON-RPC line bytes=%d sha256=%s: %w", len(line), hex.EncodeToString(sum[:]), err))
+			c.failClient(fmt.Errorf("codexsdk: invalid app-server JSON-RPC line bytes=%d sha256=%s: %w", len(line), hex.EncodeToString(sum[:]), err))
 			return
 		}
 		var message map[string]any
 		if err := json.Unmarshal(line, &message); err != nil {
 			sum := sha256.Sum256(line)
-			c.failAll(fmt.Errorf("codexsdk: invalid app-server JSON-RPC line bytes=%d sha256=%s: %w", len(line), hex.EncodeToString(sum[:]), err))
+			c.failClient(fmt.Errorf("codexsdk: invalid app-server JSON-RPC line bytes=%d sha256=%s: %w", len(line), hex.EncodeToString(sum[:]), err))
 			return
 		}
 		c.handleMessage(message)
@@ -711,7 +724,11 @@ func (c *client) readLoop(stdout io.Reader) {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			c.failAll(err)
+			if c.isClosed() {
+				c.failAll(ErrClientClosed)
+				return
+			}
+			c.failClient(err)
 			return
 		}
 	}
@@ -719,7 +736,7 @@ func (c *client) readLoop(stdout io.Reader) {
 		c.failAll(ErrClientClosed)
 		return
 	}
-	c.failAll(errors.New("codexsdk: app-server closed stdout"))
+	c.failClient(errors.New("codexsdk: app-server closed stdout"))
 }
 
 func (c *client) handleMessage(message map[string]any) {
@@ -747,7 +764,7 @@ func (c *client) routeResponse(message map[string]any) {
 	}
 	pending := raw.(pendingCall)
 	if rawError := message["error"]; rawError != nil {
-		pending.response <- rpcResponse{err: fmt.Errorf("codexsdk: app-server error from %s: %s", pending.method, compactJSON(rawError))}
+		pending.response <- rpcResponse{err: protocolError(message["id"], pending.method, rawError)}
 		return
 	}
 	result, _ := message["result"].(map[string]any)
@@ -764,9 +781,43 @@ func (c *client) routeResponse(message map[string]any) {
 	pending.response <- rpcResponse{result: result}
 }
 
+func protocolError(id any, method string, rawError any) error {
+	errorObject, _ := rawError.(map[string]any)
+	code := int64(intFromAny(errorObject["code"]))
+	message, _ := errorObject["message"].(string)
+	var data *protocolv2.JSONValue
+	if rawData, ok := errorObject["data"]; ok {
+		encoded, err := json.Marshal(rawData)
+		if err == nil {
+			parsed, err := protocolv2.ParseJSONValue(encoded)
+			if err == nil {
+				data = &parsed
+			}
+		}
+	}
+	requestID := protocolv2.NewRequestIdString(fmt.Sprint(id))
+	return &ProtocolError{
+		RequestID: requestID,
+		Method:    method,
+		Code:      code,
+		Message:   message,
+		Data:      data,
+		Err:       errors.New("codexsdk: protocol request failed"),
+	}
+}
+
 func (c *client) routeNotification(notification rpcNotification) {
-	if err := validateStreamNotification(notification.method, notification.params); err != nil {
+	typed, err := exactNotification(notification)
+	if err != nil {
 		c.routeNotificationError(notification, err)
+		return
+	}
+	defer func() {
+		if err := c.enqueueNotification(typed); err != nil {
+			c.failClient(err)
+		}
+	}()
+	if c.routeExactNotification(notification, typed) {
 		return
 	}
 	turnID := turnIDFromNotification(notification.method, notification.params)
@@ -789,6 +840,47 @@ func (c *client) routeNotification(notification rpcNotification) {
 	for _, stream := range targets {
 		stream.handleNotification(notification.method, notification.params)
 	}
+}
+
+func exactNotification(notification rpcNotification) (protocolv2.ServerNotification, error) {
+	raw, err := json.Marshal(map[string]any{"method": notification.method, "params": notification.params})
+	if err != nil {
+		return protocolv2.ServerNotification{}, fmt.Errorf("codexsdk: decode %s notification: %w", notification.method, err)
+	}
+	var typed protocolv2.ServerNotification
+	if err := json.Unmarshal(raw, &typed); err != nil {
+		return protocolv2.ServerNotification{}, fmt.Errorf("codexsdk: decode %s notification: %w", notification.method, err)
+	}
+	return typed, nil
+}
+
+func (c *client) routeExactNotification(notification rpcNotification, typed protocolv2.ServerNotification) bool {
+	turnID := turnIDFromNotification(notification.method, notification.params)
+	threadID := threadIDFromNotification(notification.params)
+	c.turnMu.Lock()
+	var targets []*exactRunState
+	if turnID != "" {
+		for stream := range c.exactStreams[turnID] {
+			targets = append(targets, stream)
+		}
+	} else {
+		for _, streams := range c.exactStreams {
+			for stream := range streams {
+				if threadID == "" || stream.threadID == threadID {
+					targets = append(targets, stream)
+				}
+			}
+		}
+	}
+	c.turnMu.Unlock()
+	for _, stream := range targets {
+		if err := stream.accept(typed); err != nil {
+			failure := fmt.Errorf("%w: turn_id=%s: %v", ErrNotificationBackpressure, stream.turnID, err)
+			c.failClient(failure)
+			return true
+		}
+	}
+	return len(targets) > 0
 }
 
 func (c *client) routeNoTurnNotification(notification rpcNotification) {
@@ -822,7 +914,34 @@ func (c *client) routeNoTurnNotification(notification rpcNotification) {
 }
 
 func (c *client) routeNotificationError(notification rpcNotification, err error) {
+	raw, _ := json.Marshal(notification.params)
+	sum := sha256.Sum256(raw)
+	ref := DiagnosticRef{
+		Kind:      "notification_decode_error",
+		ID:        turnIDFromNotification(notification.method, notification.params),
+		Path:      notification.method,
+		SizeBytes: int64(len(raw)),
+		SHA256:    hex.EncodeToString(sum[:]),
+	}
 	turnID := turnIDFromNotification(notification.method, notification.params)
+	threadID := threadIDFromNotification(notification.params)
+	c.turnMu.Lock()
+	var exactTargets []*exactRunState
+	for candidateTurnID, streams := range c.exactStreams {
+		for stream := range streams {
+			if (turnID != "" && candidateTurnID == turnID) || (turnID == "" && (threadID == "" || stream.threadID == threadID)) {
+				exactTargets = append(exactTargets, stream)
+			}
+		}
+	}
+	c.turnMu.Unlock()
+	for _, stream := range exactTargets {
+		stream.addDiagnostic(ref)
+	}
+	if len(exactTargets) > 0 {
+		c.failClient(err)
+		return
+	}
 	if turnID != "" {
 		c.turnMu.Lock()
 		streams := c.streams[turnID]
@@ -835,15 +954,17 @@ func (c *client) routeNotificationError(notification rpcNotification, err error)
 				c.pendingErrors = map[string]error{}
 			}
 			c.pendingErrors[turnID] = err
+			c.pendingDiagnostics[turnID] = append(c.pendingDiagnostics[turnID], ref)
 		}
 		c.turnMu.Unlock()
 		for _, stream := range targets {
 			stream.finishErr(err)
 		}
+		c.failClient(err)
 		return
 	}
 
-	threadID := threadIDFromNotification(notification.params)
+	threadID = threadIDFromNotification(notification.params)
 	c.turnMu.Lock()
 	targets := make([]*threadStreamState, 0)
 	for _, streams := range c.streams {
@@ -858,12 +979,13 @@ func (c *client) routeNotificationError(notification rpcNotification, err error)
 	}
 	c.turnMu.Unlock()
 	if len(targets) == 0 {
-		c.failAll(err)
+		c.failClient(err)
 		return
 	}
 	for _, stream := range targets {
 		stream.finishErr(err)
 	}
+	c.failClient(err)
 }
 
 func validateStreamNotification(method string, params map[string]any) error {
@@ -931,6 +1053,53 @@ func (c *client) unregisterStream(turnID string, stream *threadStreamState) {
 	}
 }
 
+func (c *client) attachExactStream(stream *exactRunState) {
+	c.turnMu.Lock()
+	if c.exactStreams[stream.turnID] == nil {
+		c.exactStreams[stream.turnID] = map[*exactRunState]struct{}{}
+	}
+	c.exactStreams[stream.turnID][stream] = struct{}{}
+	pending := append([]rpcNotification(nil), c.pendingGlobalEvents...)
+	c.pendingGlobalEvents = nil
+	pending = append(pending, c.pendingThreadEvents[stream.threadID]...)
+	delete(c.pendingThreadEvents, stream.threadID)
+	pending = append(pending, c.pendingEvents[stream.turnID]...)
+	delete(c.pendingEvents, stream.turnID)
+	pendingErr := c.pendingErrors[stream.turnID]
+	delete(c.pendingErrors, stream.turnID)
+	diagnostics := append([]DiagnosticRef(nil), c.pendingDiagnostics[stream.turnID]...)
+	delete(c.pendingDiagnostics, stream.turnID)
+	globalErr := c.pendingGlobal
+	c.pendingGlobal = nil
+	c.turnMu.Unlock()
+	for _, notification := range pending {
+		typed, err := exactNotification(notification)
+		if err != nil {
+			stream.finish(err)
+			return
+		}
+		if err := stream.accept(typed); err != nil {
+			stream.finish(err)
+			return
+		}
+	}
+	for _, diagnostic := range diagnostics {
+		stream.addDiagnostic(diagnostic)
+	}
+	if err := errors.Join(pendingErr, globalErr); err != nil {
+		c.failClient(err)
+	}
+}
+
+func (c *client) unregisterExactStream(turnID string, stream *exactRunState) {
+	c.turnMu.Lock()
+	defer c.turnMu.Unlock()
+	delete(c.exactStreams[turnID], stream)
+	if len(c.exactStreams[turnID]) == 0 {
+		delete(c.exactStreams, turnID)
+	}
+}
+
 func (c *client) streamContext(turnID string) context.Context {
 	if turnID == "" {
 		return nil
@@ -958,9 +1127,18 @@ func (c *client) failAll(err error) {
 			streams = append(streams, stream)
 		}
 	}
+	var exactStreams []*exactRunState
+	for _, byTurn := range c.exactStreams {
+		for stream := range byTurn {
+			exactStreams = append(exactStreams, stream)
+		}
+	}
 	c.turnMu.Unlock()
 	for _, stream := range streams {
 		stream.finishErr(err)
+	}
+	for _, stream := range exactStreams {
+		stream.finish(err)
 	}
 }
 
@@ -1110,7 +1288,7 @@ func (s *threadStreamState) handleTurnCompleted(params map[string]any) {
 	s.mu.Lock()
 	for _, item := range itemsFromTurn(turn) {
 		threadItem := threadItemFromMap(item)
-		if threadItem.Type != "" {
+		if threadItem.Type != "" && !containsThreadItem(s.items, threadItem.ID) {
 			s.items = append(s.items, threadItem)
 		}
 	}
@@ -1141,7 +1319,7 @@ func (s *threadStreamState) handleTurnCompleted(params map[string]any) {
 		s.finishErr(errors.New("codexsdk: turn completed without final_answer agent message"))
 		return
 	}
-	result := ThreadRunResult{
+	result := LegacyThreadRunResult{
 		ThreadID:                 s.threadID,
 		TurnID:                   turnID,
 		FinalResponse:            final,
@@ -1158,6 +1336,18 @@ func (s *threadStreamState) handleTurnCompleted(params map[string]any) {
 	if s.client != nil {
 		s.client.unregisterStream(turnID, s)
 	}
+}
+
+func containsThreadItem(items []ThreadItem, id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func threadItemFromMap(item map[string]any) ThreadItem {

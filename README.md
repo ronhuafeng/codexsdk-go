@@ -21,8 +21,8 @@ launched Codex app-server over stdio.
 
 ## Packages
 
-- `codexsdk`: ergonomic client, stdio transport, typed facades, `ThreadClient`,
-  streaming, approval/server-request handling, and high-level thread helpers.
+- `codexsdk`: stdio client, generated typed facades, exact `ThreadRunner`, exact
+  notification streaming, and generated server-request handling.
 - `codexsdk/protocolv2`: generated app-server v2 params, responses,
   notifications, enums, unions, JSON helpers, and method registry.
 - `codexsdk/internal/protocolgen`: generator internals for the checked-in schema
@@ -83,10 +83,11 @@ func main() {
 }
 ```
 
-## Quick Start: ThreadClient
+## Quick Start: Exact ThreadRunner
 
-`ThreadClient` wraps the lower-level `thread/start` and `turn/start` flow and
-drains the stream into a final result.
+`ThreadRunner` transparently composes exact generated `thread/start` and
+`turn/start` params. The result retains the exact start response, terminal turn,
+usage, and every attributable generated notification.
 
 ```go
 package main
@@ -97,6 +98,7 @@ import (
 	"os"
 
 	"github.com/ronhuafeng/codexsdk-go/codexsdk"
+	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
 func main() {
@@ -119,29 +121,34 @@ func main() {
 	}
 	defer root.Close()
 
-	threads := root.ThreadClient(codexsdk.ThreadClientOptions{
-		DefaultModel:          model,
-		DefaultCWD:            workspace,
-		DefaultEffort:         codexsdk.ReasoningEffortLow,
-		DefaultApprovalPolicy: codexsdk.ApprovalPolicyNever,
-		DefaultEphemeral:      codexsdk.Bool(true),
-	})
-
-	result, err := threads.StartThread(ctx, codexsdk.StartThreadRequest{
-		Input: codexsdk.Text("Reply with a short confirmation."),
+	result, err := root.ThreadRunner().Start(ctx, codexsdk.StartThreadRunRequest{
+		Thread: protocolv2.ThreadStartParams{
+			Ephemeral: protocolv2.Value(true),
+			Model:     protocolv2.Value(model),
+		},
+		Turn: protocolv2.TurnStartParams{
+			Input: []protocolv2.UserInput{
+				protocolv2.NewUserInputText(protocolv2.UserInputText{
+					Text: "Reply with a short confirmation.",
+				}),
+			},
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(result.FinalResponse)
+	log.Println(result.Run.FinalResponse)
 }
 ```
 
-More compile-checked examples live in `codexsdk/examples_test.go`.
+`StartStream` and `ResumeStream` expose every exact
+`protocolv2.ServerNotification`; `Result` remains available on failures and
+contains the latest immutable partial snapshot. More compile-checked examples
+live in `codexsdk/examples_test.go`.
 
-`ThreadClientOptions` can default model, working directory, reasoning effort,
-approval policy, approvals reviewer, and ephemeral thread creation. Request
-fields override those defaults when set.
+The v0.1 `ThreadClient`, copied request/result models, event projections, and
+conversion helpers remain deprecated compatibility surface through v0.2. New
+code should use generated params and `ThreadRunner`.
 
 ## Real App-Server Smoke Test
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -78,6 +79,14 @@ func TestCodexSDKPublicSurfaceHasNoRawProtocolEscapeHatch(t *testing.T) {
 
 	publicRootStructs := []reflect.Type{
 		reflect.TypeOf(ClientOptions{}),
+		reflect.TypeOf(StartThreadRunRequest{}),
+		reflect.TypeOf(ResumeThreadRunRequest{}),
+		reflect.TypeOf(ThreadRunResult{}),
+		reflect.TypeOf(StartedThreadRun{}),
+		reflect.TypeOf(ResumedThreadRun{}),
+		reflect.TypeOf(ServerRequestResponse{}),
+		reflect.TypeOf(ProtocolError{}),
+		reflect.TypeOf(TurnError{}),
 		reflect.TypeOf(ClientCapabilities{}),
 		reflect.TypeOf(ThreadClientOptions{}),
 		reflect.TypeOf(InputItem{}),
@@ -85,9 +94,9 @@ func TestCodexSDKPublicSurfaceHasNoRawProtocolEscapeHatch(t *testing.T) {
 		reflect.TypeOf(ResumeThreadRequest{}),
 		reflect.TypeOf(ForkThreadRequest{}),
 		reflect.TypeOf(ServerRequest{}),
-		reflect.TypeOf(ServerRequestResponse{}),
+		reflect.TypeOf(LegacyServerRequestResponse{}),
 		reflect.TypeOf(ApprovalRequest{}),
-		reflect.TypeOf(ThreadRunResult{}),
+		reflect.TypeOf(LegacyThreadRunResult{}),
 		reflect.TypeOf(ThreadItem{}),
 		reflect.TypeOf(ThreadForkResult{}),
 		reflect.TypeOf(Usage{}),
@@ -124,33 +133,57 @@ func publicProtocolInterfaces() []reflect.Type {
 	return out
 }
 
-func TestCodexSDKDoesNotPublishProtocolErrorStructs(t *testing.T) {
+func TestCodexSDKPublishesTypedFactPreservingErrors(t *testing.T) {
+	protocolErr := reflect.TypeOf(ProtocolError{})
+	for _, field := range []string{"RequestID", "Method", "Code", "Message", "Data", "Err"} {
+		if _, ok := protocolErr.FieldByName(field); !ok {
+			t.Fatalf("ProtocolError missing %s", field)
+		}
+	}
+	turnErr := reflect.TypeOf(TurnError{})
+	for _, field := range []string{"ThreadID", "Turn", "Err"} {
+		if _, ok := turnErr.FieldByName(field); !ok {
+			t.Fatalf("TurnError missing %s", field)
+		}
+	}
+}
+
+func TestServerRequestResponseConstructorsCoverGeneratedKinds(t *testing.T) {
 	root, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"types.go"} {
-		file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, path), nil, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, decl := range file.Decls {
-			gen, ok := decl.(*ast.GenDecl)
-			if !ok || gen.Tok != token.TYPE {
-				continue
-			}
-			for _, spec := range gen.Specs {
-				typeSpec, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				switch typeSpec.Name.Name {
-				case "TurnError", "TurnInterruptedError", "UnsupportedServerRequestError", "ProtocolValidationError", "ProtocolValidationKind":
-					t.Fatalf("codexsdk must return ordinary Go errors, not publish %s", typeSpec.Name.Name)
-				}
-			}
-		}
+	generated := referencedNames(t, filepath.Join(root, "protocolv2", "protocol_types.gen.go"), func(name string) bool {
+		return strings.HasPrefix(name, "ServerRequestKind") && name != "ServerRequestKind"
+	})
+	covered := referencedNames(t, filepath.Join(root, "server_response.go"), func(name string) bool {
+		return strings.HasPrefix(name, "ServerRequestKind") && name != "ServerRequestKind"
+	})
+	if !reflect.DeepEqual(generated, covered) {
+		t.Fatalf("generated server request kinds and response constructors differ:\ngenerated=%v\ncovered=%v", generated, covered)
 	}
+}
+
+func referencedNames(t *testing.T, path string, include func(string) bool) []string {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := map[string]bool{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		identifier, ok := node.(*ast.Ident)
+		if ok && include(identifier.Name) {
+			set[identifier.Name] = true
+		}
+		return true
+	})
+	values := make([]string, 0, len(set))
+	for value := range set {
+		values = append(values, value)
+	}
+	slices.Sort(values)
+	return values
 }
 
 func TestProtocolV2PublicSourceHasNoRawPayloadPassthrough(t *testing.T) {

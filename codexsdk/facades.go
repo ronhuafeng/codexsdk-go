@@ -57,14 +57,14 @@ func (c *client) checkProtocolMethodAllowed(method string) error {
 	if !ok {
 		return fmt.Errorf("codexsdk: unknown app-server method %q", method)
 	}
-	if info.Stability == protocolv2.MethodStabilityExperimental && !c.options.Capabilities.ExperimentalAPI {
+	if info.Stability == protocolv2.MethodStabilityExperimental && !c.experimentalAPIEnabled() {
 		return fmt.Errorf("codexsdk: experimental app-server method %q requires ClientCapabilities.ExperimentalAPI", method)
 	}
 	return nil
 }
 
 func (c *client) checkProtocolParamsAllowed(method string, params any) error {
-	if c.options.Capabilities.ExperimentalAPI {
+	if c.experimentalAPIEnabled() {
 		return nil
 	}
 	switch typed := params.(type) {
@@ -113,6 +113,14 @@ func (c *client) checkProtocolParamsAllowed(method string, params any) error {
 	default:
 		return nil
 	}
+}
+
+func (c *client) experimentalAPIEnabled() bool {
+	if c == nil {
+		return false
+	}
+	capabilities := c.options.Initialize.Capabilities
+	return capabilities != nil && capabilities.Value != nil && capabilities.Value.ExperimentalAPI != nil && *capabilities.Value.ExperimentalAPI
 }
 
 func experimentalFieldError(method, field string) error {
