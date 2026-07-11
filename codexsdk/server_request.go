@@ -82,14 +82,7 @@ func (c *client) handleAdmittedLegacyServerRequest(handlerCtx context.Context, i
 
 func (c *client) dispatchBufferedLegacyServerRequest(request rpcServerRequest, parent context.Context, failClosed bool) {
 	if request.admitted {
-		handlerCtx := c.handlerCtx
-		if handlerCtx == nil {
-			handlerCtx = c.ctx
-		}
-		if handlerCtx == nil {
-			handlerCtx = context.Background()
-		}
-		c.handleAdmittedLegacyServerRequest(handlerCtx, request.id, request.method, request.params, parent, failClosed)
+		c.handleAdmittedLegacyServerRequest(c.callbackContext(), request.id, request.method, request.params, parent, failClosed)
 		return
 	}
 	c.handleLegacyServerRequest(request.id, request.method, request.params, parent, failClosed)
@@ -157,13 +150,7 @@ func (c *client) admitOrBufferLegacyServerRequest(turnID string, request rpcServ
 		return nil, nil, false, false
 	}
 	c.handlerWG.Add(1)
-	handlerCtx := c.handlerCtx
-	if handlerCtx == nil {
-		handlerCtx = c.ctx
-	}
-	if handlerCtx == nil {
-		handlerCtx = context.Background()
-	}
+	handlerCtx := c.callbackContext()
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	for stream := range c.streams[turnID] {

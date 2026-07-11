@@ -80,13 +80,19 @@ func (c *client) beginHandler() (context.Context, bool) {
 		return nil, false
 	}
 	c.handlerWG.Add(1)
+	return c.callbackContext(), true
+}
+
+// callbackContext returns the immutable client-scoped callback context.
+// Callers that admit new work must still hold closeMu while adding its WG count.
+func (c *client) callbackContext() context.Context {
 	if c.handlerCtx != nil {
-		return c.handlerCtx, true
+		return c.handlerCtx
 	}
 	if c.ctx != nil {
-		return c.ctx, true
+		return c.ctx
 	}
-	return context.Background(), true
+	return context.Background()
 }
 
 func (c *client) endHandler() {
