@@ -371,7 +371,14 @@ func TestExactRunNilHandlerFailClosedResponsesAreDeterministic(t *testing.T) {
 
 func TestExactRunNilHandlerUnsafeRequestPreservesPartialEvidenceAndTypedFirstCause(t *testing.T) {
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
-	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("auth-refresh-after-notification")})
+	notificationAccepted := filepath.Join(t.TempDir(), "notification-accepted")
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("auth-refresh-after-notification", notificationAccepted),
+		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+			return os.WriteFile(notificationAccepted, []byte("accepted"), 0o600)
+		},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

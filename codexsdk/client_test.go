@@ -6992,6 +6992,7 @@ func runFakeAppServer(mode string, extra []string) {
 				send(map[string]any{"id": "server-input-1", "method": "item/tool/requestUserInput", "params": map[string]any{"itemId": "item-input", "questions": []map[string]any{{"header": "Choice", "id": "choice", "question": "Choose"}}, "threadId": threadID, "turnId": turnID}})
 			case "auth-refresh-after-notification":
 				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "item-before-auth", "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
+				waitForFakePath(extra[0])
 				send(map[string]any{"id": "server-auth-1", "method": "account/chatgptAuthTokens/refresh", "params": map[string]any{"reason": "unauthorized"}})
 			case "approval-before-attach":
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
