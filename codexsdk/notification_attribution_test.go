@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -55,15 +54,18 @@ func TestIdentifierFreeGlobalFamiliesOnlyReachGlobalQueue(t *testing.T) {
 		{method: "account/rateLimits/updated", params: map[string]any{"rateLimits": map[string]any{}}},
 		{method: "configWarning", params: map[string]any{"summary": "check config"}},
 	}
-	for _, input := range inputs {
-		want, err := exactNotification(input)
-		if err != nil {
-			t.Fatal(err)
-		}
+	wants := []protocolv2.ServerNotification{
+		protocolv2.NewServerNotificationAccountUpdated(protocolv2.ServerNotificationAccountUpdated{Params: protocolv2.AccountUpdatedNotification{}}),
+		protocolv2.NewServerNotificationAccountRateLimitsUpdated(protocolv2.ServerNotificationAccountRateLimitsUpdated{Params: protocolv2.AccountRateLimitsUpdatedNotification{RateLimits: protocolv2.RateLimitSnapshot{}}}),
+		protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{Params: protocolv2.ConfigWarningNotification{Summary: "check config"}}),
+	}
+	for index, input := range inputs {
 		c.routeNotification(input)
 		got := <-c.notifications
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("global queue value = %#v, want validated exact value %#v", got, want)
+		gotJSON, gotErr := got.MarshalJSON()
+		wantJSON, wantErr := wants[index].MarshalJSON()
+		if gotErr != nil || wantErr != nil || string(gotJSON) != string(wantJSON) {
+			t.Fatalf("global queue value = %s (%v), want independently constructed %s (%v)", gotJSON, gotErr, wantJSON, wantErr)
 		}
 	}
 	if len(exactNotificationKinds(first)) != 0 || len(exactNotificationKinds(second)) != 0 {
