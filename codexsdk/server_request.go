@@ -39,11 +39,15 @@ func (c *client) handleServerRequest(message map[string]any) {
 		return
 	}
 	if isSupportedServerRequest(req) && req.TurnID != "" {
-		streamCtx, buffered := c.streamContextOrBufferServerRequest(req.TurnID, rpcServerRequest{id: id, method: method, params: params})
+		handlerCtx, streamCtx, buffered, ok := c.admitOrBufferLegacyServerRequest(req.TurnID, rpcServerRequest{id: id, method: method, params: params, admitted: true})
+		if !ok {
+			c.respondToServerRequestFailClosed(id, method, params)
+			return
+		}
 		if buffered {
 			return
 		}
-		c.handleLegacyServerRequest(id, method, params, streamCtx, false)
+		c.handleAdmittedLegacyServerRequest(handlerCtx, id, method, params, streamCtx, false)
 		return
 	}
 	c.handleLegacyServerRequest(id, method, params, nil, false)
@@ -55,6 +59,10 @@ func (c *client) handleLegacyServerRequest(id any, method string, params map[str
 		c.respondToServerRequestFailClosed(id, method, params)
 		return
 	}
+	c.handleAdmittedLegacyServerRequest(handlerCtx, id, method, params, parent, failClosed)
+}
+
+func (c *client) handleAdmittedLegacyServerRequest(handlerCtx context.Context, id any, method string, params map[string]any, parent context.Context, failClosed bool) {
 	if parent == nil {
 		parent = handlerCtx
 	}
@@ -70,6 +78,21 @@ func (c *client) handleLegacyServerRequest(id any, method string, params map[str
 		}
 		c.respondToServerRequestWithContext(id, method, params, ctx)
 	}()
+}
+
+func (c *client) dispatchBufferedLegacyServerRequest(request rpcServerRequest, parent context.Context, failClosed bool) {
+	if request.admitted {
+		handlerCtx := c.handlerCtx
+		if handlerCtx == nil {
+			handlerCtx = c.ctx
+		}
+		if handlerCtx == nil {
+			handlerCtx = context.Background()
+		}
+		c.handleAdmittedLegacyServerRequest(handlerCtx, request.id, request.method, request.params, parent, failClosed)
+		return
+	}
+	c.handleLegacyServerRequest(request.id, request.method, request.params, parent, failClosed)
 }
 
 func decodeProtocolServerRequest(message map[string]any) (protocolv2.ServerRequest, error) {
@@ -127,19 +150,32 @@ func requestIDString(id any) string {
 	return fmt.Sprint(id)
 }
 
-func (c *client) streamContextOrBufferServerRequest(turnID string, request rpcServerRequest) (context.Context, bool) {
+func (c *client) admitOrBufferLegacyServerRequest(turnID string, request rpcServerRequest) (context.Context, context.Context, bool, bool) {
+	c.closeMu.Lock()
+	defer c.closeMu.Unlock()
+	if c.closed {
+		return nil, nil, false, false
+	}
+	c.handlerWG.Add(1)
+	handlerCtx := c.handlerCtx
+	if handlerCtx == nil {
+		handlerCtx = c.ctx
+	}
+	if handlerCtx == nil {
+		handlerCtx = context.Background()
+	}
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	for stream := range c.streams[turnID] {
 		if stream.ctx != nil {
-			return stream.ctx, false
+			return handlerCtx, stream.ctx, false, true
 		}
 	}
 	if c.pendingServer == nil {
 		c.pendingServer = map[string][]rpcServerRequest{}
 	}
 	c.pendingServer[turnID] = append(c.pendingServer[turnID], request)
-	return nil, true
+	return handlerCtx, nil, true, true
 }
 
 func (c *client) respondToServerRequest(id any, method string, params map[string]any) {

@@ -93,9 +93,10 @@ type rpcNotification struct {
 }
 
 type rpcServerRequest struct {
-	id     any
-	method string
-	params map[string]any
+	id       any
+	method   string
+	params   map[string]any
+	admitted bool
 }
 
 func New(options ClientOptions) (Client, error) {
@@ -598,12 +599,12 @@ func (c *client) startTurnStream(ctx context.Context, threadID string, input []I
 	stream.state.notificationOrderMu.Unlock()
 	if terminal {
 		for _, request := range serverRequests {
-			c.handleLegacyServerRequest(request.id, request.method, request.params, nil, true)
+			c.dispatchBufferedLegacyServerRequest(request, nil, true)
 		}
 		return stream, nil
 	}
 	for _, request := range serverRequests {
-		c.handleLegacyServerRequest(request.id, request.method, request.params, stream.state.ctx, false)
+		c.dispatchBufferedLegacyServerRequest(request, stream.state.ctx, false)
 	}
 	return stream, nil
 }
@@ -1201,12 +1202,20 @@ func (c *client) failAll(err error) {
 			exactStreams = append(exactStreams, stream)
 		}
 	}
+	var serverRequests []rpcServerRequest
+	for turnID, requests := range c.pendingServer {
+		serverRequests = append(serverRequests, requests...)
+		delete(c.pendingServer, turnID)
+	}
 	c.turnMu.Unlock()
 	for _, stream := range streams {
 		stream.finishErr(err)
 	}
 	for _, stream := range exactStreams {
 		stream.finish(err)
+	}
+	for _, request := range serverRequests {
+		c.dispatchBufferedLegacyServerRequest(request, nil, true)
 	}
 }
 
