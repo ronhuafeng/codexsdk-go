@@ -24,6 +24,10 @@ func (c *client) handleServerRequest(message map[string]any) {
 	}
 	threadID, _ := params["threadId"].(string)
 	turnID, _ := params["turnId"].(string)
+	if c.isClosed() {
+		c.rejectExactServerRequestAfterAdmissionClosed(id, typed)
+		return
+	}
 	if c.hasExactRun(threadID, turnID) {
 		c.handleExactServerRequest(id, typed)
 		return

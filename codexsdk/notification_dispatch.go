@@ -81,7 +81,7 @@ func (c *client) beginHandler() (context.Context, bool) {
 		return nil, false
 	}
 	c.handlerWG.Add(1)
-	return c.ctx, true
+	return c.handlerCtx, true
 }
 
 func (c *client) endHandler() {
@@ -154,6 +154,9 @@ func (c *client) shutdown() {
 		}
 	} else if c.cancel != nil {
 		c.cancel()
+	}
+	if c.handlerCancel != nil {
+		c.handlerCancel()
 	}
 	if c.dispatcherDone != nil {
 		<-c.dispatcherDone

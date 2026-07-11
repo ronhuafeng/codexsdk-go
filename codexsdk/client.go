@@ -27,9 +27,11 @@ const (
 )
 
 type client struct {
-	options ClientOptions
-	ctx     context.Context
-	cancel  context.CancelFunc
+	options       ClientOptions
+	ctx           context.Context
+	cancel        context.CancelFunc
+	handlerCtx    context.Context
+	handlerCancel context.CancelFunc
 
 	closeMu       sync.Mutex
 	closed        bool
@@ -102,10 +104,13 @@ func New(options ClientOptions) (Client, error) {
 		return nil, err
 	}
 	clientCtx, cancel := context.WithCancel(context.Background())
+	handlerCtx, handlerCancel := context.WithCancel(clientCtx)
 	c := &client{
 		options:             normalized,
 		ctx:                 clientCtx,
 		cancel:              cancel,
+		handlerCtx:          handlerCtx,
+		handlerCancel:       handlerCancel,
 		streams:             map[string]map[*threadStreamState]struct{}{},
 		exactStreams:        map[string]map[*exactRunState]struct{}{},
 		exactAttaching:      map[string]map[*exactRunState]struct{}{},
