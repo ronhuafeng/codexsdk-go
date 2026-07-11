@@ -6941,12 +6941,7 @@ func runFakeAppServer(mode string, extra []string) {
 			switch mode {
 			case "exact-overflow-live":
 				if turnCounter == 2 {
-					for {
-						if _, err := os.Stat(extra[0]); err == nil {
-							break
-						}
-						time.Sleep(time.Millisecond)
-					}
+					waitForFakePath(extra[0])
 					sendExactReroute(threadID, turnID, "model-a", "model-b")
 					sendExactReroute(threadID, turnID, "model-b", "model-c")
 				}
@@ -6969,43 +6964,24 @@ func runFakeAppServer(mode string, extra []string) {
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 			case "late-approval-during-close":
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
-				for {
-					if _, err := os.Stat(extra[0]); err == nil {
-						break
-					}
-					time.Sleep(time.Millisecond)
-				}
+				waitForFakePath(extra[0])
 				send(map[string]any{"id": "server-approval-late", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 			case "late-approval-during-failure":
 				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "partial", "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
-				for {
-					if _, err := os.Stat(extra[0]); err == nil {
-						break
-					}
-					time.Sleep(time.Millisecond)
-				}
+				waitForFakePath(extra[0])
 				send(map[string]any{"id": "server-approval-late", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 				if err := os.WriteFile(extra[1], []byte("sent"), 0o600); err != nil {
 					return
 				}
 			case "handler-error-then-transport-close":
 				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "partial", "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
-				for {
-					if _, err := os.Stat(extra[0]); err == nil {
-						return
-					}
-					time.Sleep(time.Millisecond)
-				}
+				waitForFakePath(extra[0])
+				return
 			case "protocol-failure-multiple-streams":
 				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": int64(turnCounter), "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "partial-" + turnID, "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
 				if turnCounter == 2 {
-					for {
-						if _, err := os.Stat(extra[0]); err == nil {
-							break
-						}
-						time.Sleep(time.Millisecond)
-					}
+					waitForFakePath(extra[0])
 					_, _ = fmt.Fprintln(os.Stdout, "{")
 					return
 				}
@@ -7143,6 +7119,15 @@ func runFakeAppServer(mode string, extra []string) {
 		default:
 			send(map[string]any{"id": id, "result": map[string]any{}})
 		}
+	}
+}
+
+func waitForFakePath(path string) {
+	for {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 
