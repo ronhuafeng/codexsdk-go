@@ -3,7 +3,6 @@ package codexsdk
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -525,72 +524,142 @@ func TestRequestArrivingDuringCloseFailsClosedWithoutStartingNewHandler(t *testi
 	}
 }
 
-func TestFailureShutdownRejectsRequestAdmissionAtBoundary(t *testing.T) {
-	c := &client{}
-	admitted := make(chan bool, 1)
-	c.closeMu.Lock()
-	go func() {
-		_, ok := c.beginHandler()
-		admitted <- ok
-	}()
-	c.failure = errors.New("protocol failure")
-	c.closed = true
-	c.closeMu.Unlock()
-
-	if <-admitted {
-		c.endHandler()
-		t.Fatal("request handler was admitted after failure shutdown closed admission")
+func TestFailureShutdownRejectsLateRequestWithoutStartingHandler(t *testing.T) {
+	record := tempRecord(t)
+	release := filepath.Join(t.TempDir(), "failure-observed")
+	lateSent := filepath.Join(t.TempDir(), "late-request-sent")
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	firstStarted := make(chan struct{})
+	notificationStarted := make(chan struct{})
+	allowNotificationFinish := make(chan struct{})
+	lateCalled := make(chan struct{}, 1)
+	var calls atomic.Int32
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("late-approval-during-failure", release, lateSent),
+		ServerNotificationHandler: func(ctx context.Context, _ protocolv2.ServerNotification) error {
+			close(notificationStarted)
+			<-ctx.Done()
+			<-allowNotificationFinish
+			return ctx.Err()
+		},
+		ServerRequestHandler: func(context.Context, protocolv2.ServerRequest) (ServerRequestResponse, error) {
+			if calls.Add(1) != 1 {
+				lateCalled <- struct{}{}
+				return ServerRequestResponse{}, errors.New("late handler invoked")
+			}
+			close(firstStarted)
+			return ServerRequestResponse{}, errors.New("request handler failed")
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-notificationStarted
+	<-firstStarted
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for stream.Next(ctx) {
+	}
+	if stream.Err() == nil {
+		t.Fatal("request handler failure did not terminate the active stream")
+	}
+	if err := os.WriteFile(release, []byte("failed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for {
+		if _, err := os.Stat(lateSent); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("fake app-server did not send the request after failure shutdown")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	select {
+	case <-lateCalled:
+		t.Fatal("exact handler started after failure shutdown closed admission")
+	default:
+	}
+	close(allowNotificationFinish)
+	if closeErr := root.Close(); closeErr != stream.Err() {
+		t.Fatalf("Close error = %v, want first request failure %v", closeErr, stream.Err())
 	}
 }
 
 func TestFailureShutdownPreservesHandlerCauseOverLaterTransportError(t *testing.T) {
 	handlerCause := errors.New("handler failed first")
-	transportCause := errors.New("transport failed later")
-	c := &client{}
-
-	c.failClient(fmt.Errorf("%w: %w", ErrHandlerFailed, handlerCause))
-	c.failClient(transportCause)
-	closeErr := c.Close()
-	if !errors.Is(closeErr, ErrHandlerFailed) || !errors.Is(closeErr, handlerCause) {
-		t.Fatalf("Close error = %v, want first handler cause", closeErr)
+	release := filepath.Join(t.TempDir(), "handler-failure-observed")
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("handler-error-then-transport-close", release),
+		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+			return handlerCause
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if errors.Is(closeErr, transportCause) {
-		t.Fatalf("later transport error replaced first cause: %v", closeErr)
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for stream.Next(ctx) {
+	}
+	if !errors.Is(stream.Err(), ErrHandlerFailed) || !errors.Is(stream.Err(), handlerCause) {
+		t.Fatalf("stream error = %v, want first handler cause", stream.Err())
+	}
+	if err := os.WriteFile(release, []byte("release"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if closeErr := root.Close(); !errors.Is(closeErr, ErrHandlerFailed) || !errors.Is(closeErr, handlerCause) {
+		t.Fatalf("Close error = %v, want preserved handler cause", closeErr)
 	}
 }
 
 func TestProtocolFailureFinishesActiveStreamsWithIndependentPartialResults(t *testing.T) {
-	protocolCause := errors.New("invalid protocol envelope")
-	c := &client{
-		exactStreams:   map[string]map[*exactRunState]struct{}{},
-		exactAttaching: map[string]map[*exactRunState]struct{}{},
+	release := filepath.Join(t.TempDir(), "release-protocol-failure")
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("protocol-failure-multiple-streams", release)})
+	if err != nil {
+		t.Fatal(err)
 	}
-	first := newExactRunState(c, "thread-1", StartedThreadRun{
-		Start: facadeThreadStartResponse("thread-1", "model"),
-		Run:   ThreadRunResult{FinalResponse: "partial-1"},
-	})
-	first.turnID = "turn-1"
-	second := newExactRunState(c, "thread-2", StartedThreadRun{
-		Start: facadeThreadStartResponse("thread-2", "model"),
-		Run:   ThreadRunResult{FinalResponse: "partial-2"},
-	})
-	second.turnID = "turn-2"
-	c.exactStreams[first.turnID] = map[*exactRunState]struct{}{first: {}}
-	c.exactStreams[second.turnID] = map[*exactRunState]struct{}{second: {}}
-
-	c.failClient(protocolCause)
-	for index, state := range []*exactRunState{first, second} {
-		if state.err != protocolCause {
-			t.Fatalf("stream %d error = %v, want shared protocol cause", index, state.err)
+	first, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(release, []byte("release"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for _, stream := range []*Stream[StartedThreadRun]{first, second} {
+		for stream.Next(ctx) {
 		}
-		result, ok := (&Stream[StartedThreadRun]{state: state}).Result()
-		want := fmt.Sprintf("partial-%d", index+1)
-		if !ok || result.Run.FinalResponse != want {
+	}
+	if first.Err() == nil || first.Err() != second.Err() {
+		t.Fatalf("active stream causes = %v and %v, want one shared protocol cause", first.Err(), second.Err())
+	}
+	for index, stream := range []*Stream[StartedThreadRun]{first, second} {
+		result, ok := stream.Result()
+		if !ok || len(result.Run.Notifications) != 1 {
 			t.Fatalf("stream %d partial result = %#v, ok=%v", index, result.Run, ok)
 		}
 	}
-	if closeErr := c.Close(); closeErr != protocolCause {
-		t.Fatalf("Close error = %v, want shared protocol cause", closeErr)
+	if closeErr := root.Close(); closeErr != first.Err() {
+		t.Fatalf("Close error = %v, want shared protocol cause %v", closeErr, first.Err())
 	}
 }
 
@@ -659,11 +728,6 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	if !reflect.DeepEqual(kinds, want) {
 		t.Fatalf("notification order = %#v, want %#v", kinds, want)
 	}
-	stream.state.mu.Lock()
-	stored := stream.state.result.(StartedThreadRun)
-	stored.Run.Diagnostics = []DiagnosticRef{{Kind: "source", ID: "diagnostic-1"}}
-	stream.state.result = stored
-	stream.state.mu.Unlock()
 	first, ok := stream.Result()
 	if !ok || stream.Err() != nil {
 		t.Fatalf("result ok=%v err=%v", ok, stream.Err())
@@ -675,7 +739,6 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	first.Run.Turn.Items = nil
 	first.Run.Usage.Total.InputTokens = 999
 	first.Run.Notifications[0] = protocolv2.ServerNotification{}
-	first.Run.Diagnostics[0].Kind = "mutated"
 	second, ok := stream.Result()
 	if !ok {
 		t.Fatal("second result snapshot unavailable")
@@ -692,7 +755,7 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	if len(second.Run.Notifications) != 3 || second.Run.Notifications[0].Kind() != want[0] {
 		t.Fatalf("notification snapshot was mutable: %#v", second.Run.Notifications)
 	}
-	if len(second.Run.Diagnostics) != 1 || second.Run.Diagnostics[0].Kind != "source" {
+	if len(second.Run.Diagnostics) != 0 {
 		t.Fatalf("diagnostic snapshot was mutable: %#v", second.Run.Diagnostics)
 	}
 
@@ -701,6 +764,33 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	third, ok := stream.Result()
 	if !ok || third.Start.Thread.ID == "second-consumer" || third.Run.Usage.Total.InputTokens != 30 {
 		t.Fatalf("result snapshot was mutable: %#v", second.Run)
+	}
+}
+
+func TestExactRunnerDiagnosticSnapshotsAreIsolated(t *testing.T) {
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("malformed-notification")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for stream.Next(ctx) {
+	}
+	first, ok := stream.Result()
+	if !ok || len(first.Run.Diagnostics) != 1 {
+		t.Fatalf("diagnostic result = %#v, ok=%v", first.Run.Diagnostics, ok)
+	}
+	want := first.Run.Diagnostics[0]
+	first.Run.Diagnostics[0].Kind = "mutated"
+	second, ok := stream.Result()
+	if !ok || len(second.Run.Diagnostics) != 1 || second.Run.Diagnostics[0] != want {
+		t.Fatalf("diagnostic snapshot was mutable: %#v", second.Run.Diagnostics)
 	}
 }
 
