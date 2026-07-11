@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,6 +29,89 @@ func TestEveryGeneratedServerNotificationKindHasAttribution(t *testing.T) {
 		if !seen[kind] {
 			t.Errorf("attribution manifest contains non-generated notification %q", kind)
 		}
+	}
+}
+
+func TestUnknownFutureNotificationKindFailsClosed(t *testing.T) {
+	future := protocolv2.ServerNotificationKind("future/generated-notification")
+	if got := attributionClassForKind(future); got != notificationAttributionUnsupported {
+		t.Fatalf("future kind attribution = %v, want unsupported until explicitly classified", got)
+	}
+}
+
+func TestIdentifierFreeGlobalFamiliesOnlyReachGlobalQueue(t *testing.T) {
+	c := &client{
+		ctx: context.Background(), notifications: make(chan protocolv2.ServerNotification, 3),
+		exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{},
+	}
+	first := newExactRunState(c, "thread-a", StartedThreadRun{})
+	first.turnID = "turn-a"
+	second := newExactRunState(c, "thread-b", StartedThreadRun{})
+	second.turnID = "turn-b"
+	c.exactStreams[first.turnID] = map[*exactRunState]struct{}{first: {}}
+	c.exactStreams[second.turnID] = map[*exactRunState]struct{}{second: {}}
+	inputs := []rpcNotification{
+		{method: "account/updated", params: map[string]any{}},
+		{method: "account/rateLimits/updated", params: map[string]any{"rateLimits": map[string]any{}}},
+		{method: "configWarning", params: map[string]any{"summary": "check config"}},
+	}
+	for _, input := range inputs {
+		want, err := exactNotification(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.routeNotification(input)
+		got := <-c.notifications
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("global queue value = %#v, want validated exact value %#v", got, want)
+		}
+	}
+	if len(exactNotificationKinds(first)) != 0 || len(exactNotificationKinds(second)) != 0 {
+		t.Fatalf("global families contaminated runs: %#v / %#v", exactNotificationKinds(first), exactNotificationKinds(second))
+	}
+}
+
+func TestConcurrentAttributionDoesNotDuplicateOrCrossRuns(t *testing.T) {
+	c := &client{exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{}}
+	first := newExactRunState(c, "thread-shared", StartedThreadRun{})
+	first.turnID = "turn-1"
+	second := newExactRunState(c, "thread-shared", StartedThreadRun{})
+	second.turnID = "turn-2"
+	other := newExactRunState(c, "thread-other", StartedThreadRun{})
+	other.turnID = "turn-3"
+	for _, state := range []*exactRunState{first, second, other} {
+		c.exactStreams[state.turnID] = map[*exactRunState]struct{}{state: {}}
+	}
+	const repetitions = 20
+	var wg sync.WaitGroup
+	route := func(n rpcNotification) {
+		defer wg.Done()
+		typed, err := exactNotification(n)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		c.routeExactNotification(n, typed)
+	}
+	for index := 0; index < repetitions; index++ {
+		for _, state := range []*exactRunState{first, second, other} {
+			wg.Add(1)
+			go route(rpcNotification{method: "model/rerouted", params: map[string]any{
+				"threadId": state.threadID, "turnId": state.turnID, "fromModel": "a", "toModel": "b", "reason": "highRiskCyberActivity",
+			}})
+		}
+		wg.Add(1)
+		go route(rpcNotification{method: "guardianWarning", params: map[string]any{"threadId": "thread-shared", "message": "notice"}})
+	}
+	wg.Wait()
+	if got := len(exactNotificationKinds(first)); got != repetitions*2 {
+		t.Fatalf("first evidence count = %d", got)
+	}
+	if got := len(exactNotificationKinds(second)); got != repetitions*2 {
+		t.Fatalf("second evidence count = %d", got)
+	}
+	if got := len(exactNotificationKinds(other)); got != repetitions {
+		t.Fatalf("other evidence count = %d", got)
 	}
 }
 

@@ -64,8 +64,8 @@ var notificationAttribution = func() map[protocolv2.ServerNotificationKind]notif
 }()
 
 func attributionFor(notification protocolv2.ServerNotification) (notificationAttributionClass, notificationIdentity) {
-	class, ok := notificationAttribution[notification.Kind()]
-	if !ok {
+	class := attributionClassForKind(notification.Kind())
+	if class == notificationAttributionUnsupported {
 		return notificationAttributionUnsupported, notificationIdentity{}
 	}
 	raw, err := json.Marshal(notification)
@@ -88,4 +88,11 @@ func attributionFor(notification protocolv2.ServerNotification) (notificationAtt
 		envelope.Params.TurnID = envelope.Params.Turn.ID
 	}
 	return class, notificationIdentity{threadID: envelope.Params.ThreadID, turnID: envelope.Params.TurnID}
+}
+
+func attributionClassForKind(kind protocolv2.ServerNotificationKind) notificationAttributionClass {
+	if class, ok := notificationAttribution[kind]; ok {
+		return class
+	}
+	return notificationAttributionUnsupported
 }
