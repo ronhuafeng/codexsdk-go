@@ -63,7 +63,9 @@ release:
   contracts; it supplements rather than replaces their deterministic runs.
 - `Tag clean module` runs only after a `v*` tag is pushed. It resolves that tag
   from `proxy.golang.org` in a new consumer module and compiles an import of the
-  SDK. A failed tag smoke test blocks publishing or announcing that release.
+  SDK. Because this is a post-tag verification gate, it cannot prevent the tag
+  push itself; a failure blocks treating the release as complete or announcing
+  it as verified.
 
 All Go CI jobs run with `GOWORK=off`. The `Go`, `Go minimum`, `Go race`, and
 `Runtime repeat` jobs must pass on the exact pull-request head. The tag-only

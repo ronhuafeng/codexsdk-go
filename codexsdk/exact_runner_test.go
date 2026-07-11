@@ -3,6 +3,7 @@ package codexsdk
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -524,6 +525,75 @@ func TestRequestArrivingDuringCloseFailsClosedWithoutStartingNewHandler(t *testi
 	}
 }
 
+func TestFailureShutdownRejectsRequestAdmissionAtBoundary(t *testing.T) {
+	c := &client{}
+	admitted := make(chan bool, 1)
+	c.closeMu.Lock()
+	go func() {
+		_, ok := c.beginHandler()
+		admitted <- ok
+	}()
+	c.failure = errors.New("protocol failure")
+	c.closed = true
+	c.closeMu.Unlock()
+
+	if <-admitted {
+		c.endHandler()
+		t.Fatal("request handler was admitted after failure shutdown closed admission")
+	}
+}
+
+func TestFailureShutdownPreservesHandlerCauseOverLaterTransportError(t *testing.T) {
+	handlerCause := errors.New("handler failed first")
+	transportCause := errors.New("transport failed later")
+	c := &client{}
+
+	c.failClient(fmt.Errorf("%w: %w", ErrHandlerFailed, handlerCause))
+	c.failClient(transportCause)
+	closeErr := c.Close()
+	if !errors.Is(closeErr, ErrHandlerFailed) || !errors.Is(closeErr, handlerCause) {
+		t.Fatalf("Close error = %v, want first handler cause", closeErr)
+	}
+	if errors.Is(closeErr, transportCause) {
+		t.Fatalf("later transport error replaced first cause: %v", closeErr)
+	}
+}
+
+func TestProtocolFailureFinishesActiveStreamsWithIndependentPartialResults(t *testing.T) {
+	protocolCause := errors.New("invalid protocol envelope")
+	c := &client{
+		exactStreams:   map[string]map[*exactRunState]struct{}{},
+		exactAttaching: map[string]map[*exactRunState]struct{}{},
+	}
+	first := newExactRunState(c, "thread-1", StartedThreadRun{
+		Start: facadeThreadStartResponse("thread-1", "model"),
+		Run:   ThreadRunResult{FinalResponse: "partial-1"},
+	})
+	first.turnID = "turn-1"
+	second := newExactRunState(c, "thread-2", StartedThreadRun{
+		Start: facadeThreadStartResponse("thread-2", "model"),
+		Run:   ThreadRunResult{FinalResponse: "partial-2"},
+	})
+	second.turnID = "turn-2"
+	c.exactStreams[first.turnID] = map[*exactRunState]struct{}{first: {}}
+	c.exactStreams[second.turnID] = map[*exactRunState]struct{}{second: {}}
+
+	c.failClient(protocolCause)
+	for index, state := range []*exactRunState{first, second} {
+		if state.err != protocolCause {
+			t.Fatalf("stream %d error = %v, want shared protocol cause", index, state.err)
+		}
+		result, ok := (&Stream[StartedThreadRun]{state: state}).Result()
+		want := fmt.Sprintf("partial-%d", index+1)
+		if !ok || result.Run.FinalResponse != want {
+			t.Fatalf("stream %d partial result = %#v, ok=%v", index, result.Run, ok)
+		}
+	}
+	if closeErr := c.Close(); closeErr != protocolCause {
+		t.Fatalf("Close error = %v, want shared protocol cause", closeErr)
+	}
+}
+
 func TestServerRequestResponseConstructorsCoverGeneratedRequestKinds(t *testing.T) {
 	responses := []ServerRequestResponse{
 		CommandExecutionApprovalResponse(protocolv2.CommandExecutionRequestApprovalResponse{}),
@@ -589,6 +659,11 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	if !reflect.DeepEqual(kinds, want) {
 		t.Fatalf("notification order = %#v, want %#v", kinds, want)
 	}
+	stream.state.mu.Lock()
+	stored := stream.state.result.(StartedThreadRun)
+	stored.Run.Diagnostics = []DiagnosticRef{{Kind: "source", ID: "diagnostic-1"}}
+	stream.state.result = stored
+	stream.state.mu.Unlock()
 	first, ok := stream.Result()
 	if !ok || stream.Err() != nil {
 		t.Fatalf("result ok=%v err=%v", ok, stream.Err())
@@ -600,7 +675,7 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	first.Run.Turn.Items = nil
 	first.Run.Usage.Total.InputTokens = 999
 	first.Run.Notifications[0] = protocolv2.ServerNotification{}
-	first.Run.Diagnostics = append(first.Run.Diagnostics, DiagnosticRef{Kind: "mutated"})
+	first.Run.Diagnostics[0].Kind = "mutated"
 	second, ok := stream.Result()
 	if !ok {
 		t.Fatal("second result snapshot unavailable")
@@ -617,7 +692,7 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	if len(second.Run.Notifications) != 3 || second.Run.Notifications[0].Kind() != want[0] {
 		t.Fatalf("notification snapshot was mutable: %#v", second.Run.Notifications)
 	}
-	if len(second.Run.Diagnostics) != 0 {
+	if len(second.Run.Diagnostics) != 1 || second.Run.Diagnostics[0].Kind != "source" {
 		t.Fatalf("diagnostic snapshot was mutable: %#v", second.Run.Diagnostics)
 	}
 
