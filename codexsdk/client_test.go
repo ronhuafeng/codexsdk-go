@@ -6917,6 +6917,20 @@ func runFakeAppServer(mode string, extra []string) {
 			if mode == "approval-before-turn-start" {
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 			}
+			if turnCounter == 2 && (mode == "exact-overflow-pending" || mode == "exact-overflow-terminal") {
+				sendExactReroute(threadID, turnID, "model-a", "model-b")
+				if mode == "exact-overflow-terminal" {
+					send(map[string]any{"method": "turn/completed", "params": map[string]any{
+						"threadId": threadID,
+						"turn": map[string]any{
+							"id": turnID, "status": "completed",
+							"items": []map[string]any{{"id": "answer", "type": "agentMessage", "text": "done", "phase": "final_answer"}},
+						},
+					}})
+				} else {
+					sendExactReroute(threadID, turnID, "model-b", "model-c")
+				}
+			}
 			sendProtocolResult(id, protocolv2.TurnStartResponse{
 				Turn: protocolv2.Turn{
 					ID:     turnID,
@@ -6925,6 +6939,18 @@ func runFakeAppServer(mode string, extra []string) {
 				},
 			})
 			switch mode {
+			case "exact-overflow-live":
+				if turnCounter == 2 {
+					for {
+						if _, err := os.Stat(extra[0]); err == nil {
+							break
+						}
+						time.Sleep(time.Millisecond)
+					}
+					sendExactReroute(threadID, turnID, "model-a", "model-b")
+					sendExactReroute(threadID, turnID, "model-b", "model-c")
+				}
+			case "exact-overflow-pending", "exact-overflow-terminal":
 			case "failed":
 				send(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "items": []map[string]any{}, "status": "failed", "error": map[string]any{"message": "native failed", "codexErrorInfo": "usageLimitExceeded"}}}})
 			case "interrupted":
@@ -7097,6 +7123,16 @@ func fakeCommandApprovalParams(threadID, turnID string) map[string]any {
 		"threadId":    threadID,
 		"turnId":      turnID,
 	}
+}
+
+func sendExactReroute(threadID, turnID, fromModel, toModel string) {
+	send(map[string]any{"method": "model/rerouted", "params": map[string]any{
+		"threadId":  threadID,
+		"turnId":    turnID,
+		"fromModel": fromModel,
+		"toModel":   toModel,
+		"reason":    "highRiskCyberActivity",
+	}})
 }
 
 func fakeAuthRefreshParams() map[string]any {

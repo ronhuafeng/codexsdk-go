@@ -32,13 +32,14 @@ type exactRunState struct {
 	// notificationOrderMu preserves the ingestion order of pending and live
 	// notifications across attachment. It is per run so unrelated turns do not
 	// serialize behind one another.
-	notificationOrderMu         sync.Mutex
-	testAtNotificationOrderGate func()
-	mu                          sync.Mutex
-	result                      any
-	hasResult                   bool
-	err                         error
-	terminal                    bool
+	notificationOrderMu              sync.Mutex
+	testAtNotificationOrderGate      func()
+	testAfterNotificationOrderLocked func()
+	mu                               sync.Mutex
+	result                           any
+	hasResult                        bool
+	err                              error
+	terminal                         bool
 }
 
 type TurnError struct {
@@ -102,7 +103,7 @@ func (r *exactRunner) StartStream(ctx context.Context, request StartThreadRunReq
 		return nil, errors.New("codexsdk: thread/start response missing thread id")
 	}
 	initial := StartedThreadRun{Start: started, Run: ThreadRunResult{InputStats: exactInputStats(turnParams.Input)}}
-	state := newExactRunState(r.client, started.Thread.ID, initial)
+	state := r.client.newExactRunState(started.Thread.ID, initial)
 	r.client.registerAttachingExactStream(state)
 	stream := &Stream[StartedThreadRun]{state: state}
 	turnParams.ThreadID = started.Thread.ID
@@ -149,7 +150,7 @@ func (r *exactRunner) ResumeStream(ctx context.Context, request ResumeThreadRunR
 		return nil, errors.New("codexsdk: thread/resume response missing thread id")
 	}
 	initial := ResumedThreadRun{Resume: resumed, Run: ThreadRunResult{InputStats: exactInputStats(turnParams.Input)}}
-	state := newExactRunState(r.client, threadID, initial)
+	state := r.client.newExactRunState(threadID, initial)
 	r.client.registerAttachingExactStream(state)
 	stream := &Stream[ResumedThreadRun]{state: state}
 	turnParams.ThreadID = threadID
@@ -324,10 +325,22 @@ func (s *Stream[R]) Close() error {
 }
 
 func newExactRunState(client *client, threadID string, result any) *exactRunState {
+	return newExactRunStateWithQueueCapacity(client, threadID, result, exactStreamQueueCapacity)
+}
+
+func (c *client) newExactRunState(threadID string, result any) *exactRunState {
+	queueCapacity := exactStreamQueueCapacity
+	if c.testExactStreamQueueCapacity > 0 {
+		queueCapacity = c.testExactStreamQueueCapacity
+	}
+	return newExactRunStateWithQueueCapacity(c, threadID, result, queueCapacity)
+}
+
+func newExactRunStateWithQueueCapacity(client *client, threadID string, result any, queueCapacity int) *exactRunState {
 	return &exactRunState{
 		client:    client,
 		threadID:  threadID,
-		events:    make(chan protocolv2.ServerNotification, exactStreamQueueCapacity),
+		events:    make(chan protocolv2.ServerNotification, queueCapacity),
 		done:      make(chan struct{}),
 		result:    result,
 		hasResult: true,
@@ -342,14 +355,22 @@ func (s *exactRunState) setTurn(turn protocolv2.Turn) {
 }
 
 func (s *exactRunState) accept(notification protocolv2.ServerNotification) error {
+	finished, err := s.acceptState(notification)
+	if finished {
+		s.unregister()
+	}
+	return err
+}
+
+func (s *exactRunState) acceptState(notification protocolv2.ServerNotification) (bool, error) {
 	cloned, err := cloneJSON(notification)
 	if err != nil {
-		return err
+		return false, err
 	}
 	s.mu.Lock()
 	if s.terminal {
 		s.mu.Unlock()
-		return nil
+		return false, nil
 	}
 	s.updateRunLocked(func(run *ThreadRunResult) {
 		run.Notifications = append(run.Notifications, cloned)
@@ -364,14 +385,14 @@ func (s *exactRunState) accept(notification protocolv2.ServerNotification) error
 	select {
 	case s.events <- cloned:
 	case <-s.done:
-		return nil
+		return false, nil
 	default:
-		return ErrNotificationBackpressure
+		return false, ErrNotificationBackpressure
 	}
 	if terminal {
-		s.finish(terminalErr)
+		return s.finishState(terminalErr), nil
 	}
-	return nil
+	return false, nil
 }
 
 func (s *exactRunState) acceptOrdered(notification protocolv2.ServerNotification) error {
@@ -379,8 +400,15 @@ func (s *exactRunState) acceptOrdered(notification protocolv2.ServerNotification
 		s.testAtNotificationOrderGate()
 	}
 	s.notificationOrderMu.Lock()
-	defer s.notificationOrderMu.Unlock()
-	return s.accept(notification)
+	if s.testAfterNotificationOrderLocked != nil {
+		s.testAfterNotificationOrderLocked()
+	}
+	finished, err := s.acceptState(notification)
+	s.notificationOrderMu.Unlock()
+	if finished {
+		s.unregister()
+	}
+	return err
 }
 
 func (s *exactRunState) applyTerminalLocked(notification protocolv2.ServerNotification) (bool, error) {
@@ -437,23 +465,30 @@ func (s *exactRunState) addDiagnosticOrdered(ref DiagnosticRef) {
 }
 
 func (s *exactRunState) finish(err error) {
+	if s.finishState(err) {
+		s.unregister()
+	}
+}
+
+func (s *exactRunState) finishState(err error) bool {
 	s.mu.Lock()
 	if s.terminal {
 		s.mu.Unlock()
-		return
+		return false
 	}
 	s.err = err
 	s.terminal = true
 	close(s.done)
+	s.mu.Unlock()
+	return true
+}
+
+func (s *exactRunState) unregister() {
+	s.mu.Lock()
 	client := s.client
-	turnID := s.turnID
 	s.mu.Unlock()
 	if client != nil {
-		if turnID != "" {
-			client.unregisterExactStream(turnID, s)
-		} else {
-			client.unregisterAttachingExactStream(s)
-		}
+		client.unregisterExactRun(s)
 	}
 }
 

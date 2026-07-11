@@ -66,7 +66,9 @@ type client struct {
 
 	// testAfterExactStreamPublished pauses the deterministic test seam after an
 	// exact stream becomes live and before pending evidence is replayed.
-	testAfterExactStreamPublished func()
+	testAfterExactStreamPublished  func()
+	testBeforeExactStreamOrderGate func()
+	testExactStreamQueueCapacity   int
 
 	readerDone chan struct{}
 }
@@ -819,6 +821,9 @@ func protocolError(id any, method string, rawError any) error {
 }
 
 func (c *client) routeNotification(notification rpcNotification) {
+	if c.isClosed() {
+		return
+	}
 	typed, err := exactNotification(notification)
 	if err != nil {
 		c.routeNotificationError(notification, err)
@@ -895,14 +900,27 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 		}
 	}
 	c.turnMu.Unlock()
+	var deliveryErr error
+	var failedStream *exactRunState
 	for _, stream := range targets {
 		if err := stream.acceptOrdered(typed); err != nil {
-			failure := fmt.Errorf("%w: turn_id=%s: %v", ErrNotificationBackpressure, stream.turnID, err)
-			c.failClient(failure)
-			return true
+			if deliveryErr == nil {
+				deliveryErr = err
+				failedStream = stream
+			}
 		}
 	}
+	if deliveryErr != nil {
+		c.failExactNotificationDelivery(failedStream, deliveryErr)
+	}
 	return len(targets) > 0
+}
+
+func (c *client) failExactNotificationDelivery(stream *exactRunState, err error) {
+	if errors.Is(err, ErrNotificationBackpressure) {
+		err = fmt.Errorf("%w: turn_id=%s", ErrNotificationBackpressure, stream.turnID)
+	}
+	c.failClient(err)
 }
 
 func (c *client) routeNoTurnNotification(notification rpcNotification) {
@@ -952,6 +970,13 @@ func (c *client) routeNotificationError(notification rpcNotification, err error)
 	for candidateTurnID, streams := range c.exactStreams {
 		for stream := range streams {
 			if (turnID != "" && candidateTurnID == turnID) || (turnID == "" && (threadID == "" || stream.threadID == threadID)) {
+				exactTargets = append(exactTargets, stream)
+			}
+		}
+	}
+	for candidateThreadID, streams := range c.exactAttaching {
+		for stream := range streams {
+			if threadID == "" || candidateThreadID == threadID {
 				exactTargets = append(exactTargets, stream)
 			}
 		}
@@ -1077,10 +1102,21 @@ func (c *client) unregisterStream(turnID string, stream *threadStreamState) {
 
 func (c *client) attachExactStream(stream *exactRunState) {
 	c.turnMu.Lock()
+	if c.testBeforeExactStreamOrderGate != nil {
+		c.testBeforeExactStreamOrderGate()
+	}
 	stream.notificationOrderMu.Lock()
+	stream.mu.Lock()
+	terminal := stream.terminal
+	stream.mu.Unlock()
 	delete(c.exactAttaching[stream.threadID], stream)
 	if len(c.exactAttaching[stream.threadID]) == 0 {
 		delete(c.exactAttaching, stream.threadID)
+	}
+	if terminal {
+		c.turnMu.Unlock()
+		stream.notificationOrderMu.Unlock()
+		return
 	}
 	if c.exactStreams[stream.turnID] == nil {
 		c.exactStreams[stream.turnID] = map[*exactRunState]struct{}{}
@@ -1110,7 +1146,7 @@ func (c *client) attachExactStream(stream *exactRunState) {
 			return
 		}
 		if err := stream.accept(typed); err != nil {
-			stream.finish(err)
+			c.failExactNotificationDelivery(stream, err)
 			return
 		}
 	}
@@ -1155,9 +1191,14 @@ func (c *client) hasExactRun(threadID, turnID string) bool {
 	return false
 }
 
-func (c *client) unregisterExactStream(turnID string, stream *exactRunState) {
+func (c *client) unregisterExactRun(stream *exactRunState) {
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
+	delete(c.exactAttaching[stream.threadID], stream)
+	if len(c.exactAttaching[stream.threadID]) == 0 {
+		delete(c.exactAttaching, stream.threadID)
+	}
+	turnID := stream.turnID
 	delete(c.exactStreams[turnID], stream)
 	if len(c.exactStreams[turnID]) == 0 {
 		delete(c.exactStreams, turnID)

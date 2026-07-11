@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -751,6 +752,193 @@ func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 	}
 	if run.Usage == nil || run.Usage.Total.InputTokens != 30 || run.FinalResponse != "done" {
 		t.Fatalf("derived facts = usage %#v final %q", run.Usage, run.FinalResponse)
+	}
+}
+
+func TestExactTerminalDeliveryDoesNotDeadlockWithAttachment(t *testing.T) {
+	c := &client{
+		exactStreams:        map[string]map[*exactRunState]struct{}{},
+		exactAttaching:      map[string]map[*exactRunState]struct{}{},
+		pendingEvents:       map[string][]rpcNotification{},
+		pendingErrors:       map[string]error{},
+		pendingDiagnostics:  map[string][]DiagnosticRef{},
+		pendingThreadEvents: map[string][]rpcNotification{},
+	}
+	state := newExactRunState(c, "thread-deadlock", StartedThreadRun{Start: facadeThreadStartResponse("thread-deadlock", "model")})
+	state.turnID = "turn-deadlock"
+	c.exactAttaching[state.threadID] = map[*exactRunState]struct{}{state: {}}
+	terminal := rpcNotification{method: protocolv2.MethodTurnCompleted, params: map[string]any{
+		"threadId": state.threadID,
+		"turn": map[string]any{
+			"id": state.turnID, "status": "completed",
+			"items": []map[string]any{{"id": "answer", "type": "agentMessage", "text": "done", "phase": "final_answer"}},
+		},
+	}}
+	typed, err := exactNotification(terminal)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orderLocked := make(chan struct{})
+	releaseDelivery := make(chan struct{})
+	state.testAfterNotificationOrderLocked = func() {
+		close(orderLocked)
+		<-releaseDelivery
+	}
+	delivered := make(chan struct{})
+	go func() {
+		c.routeExactNotification(terminal, typed)
+		close(delivered)
+	}()
+	<-orderLocked
+
+	attachHasTurnLock := make(chan struct{})
+	c.testBeforeExactStreamOrderGate = func() { close(attachHasTurnLock) }
+	attached := make(chan struct{})
+	go func() {
+		c.attachExactStream(state)
+		close(attached)
+	}()
+	<-attachHasTurnLock
+	close(releaseDelivery)
+
+	for name, done := range map[string]<-chan struct{}{"delivery": delivered, "attachment": attached} {
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatalf("%s deadlocked", name)
+		}
+	}
+	if !state.terminal || state.err != nil {
+		t.Fatalf("terminal state = %v, error = %v", state.terminal, state.err)
+	}
+}
+
+func TestExactTerminalBeforeAttachmentIsNotPublishedAsLive(t *testing.T) {
+	c := &client{
+		exactStreams:        map[string]map[*exactRunState]struct{}{},
+		exactAttaching:      map[string]map[*exactRunState]struct{}{},
+		pendingEvents:       map[string][]rpcNotification{},
+		pendingErrors:       map[string]error{},
+		pendingDiagnostics:  map[string][]DiagnosticRef{},
+		pendingThreadEvents: map[string][]rpcNotification{},
+	}
+	state := newExactRunState(c, "thread-terminal-first", StartedThreadRun{Start: facadeThreadStartResponse("thread-terminal-first", "model")})
+	state.turnID = "turn-terminal-first"
+	c.exactAttaching[state.threadID] = map[*exactRunState]struct{}{state: {}}
+	terminal := rpcNotification{method: protocolv2.MethodTurnCompleted, params: map[string]any{
+		"threadId": state.threadID,
+		"turn": map[string]any{
+			"id": state.turnID, "status": "completed",
+			"items": []map[string]any{{"id": "answer", "type": "agentMessage", "text": "done", "phase": "final_answer"}},
+		},
+	}}
+	typed, err := exactNotification(terminal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.routeExactNotification(terminal, typed) {
+		t.Fatal("terminal notification was not attributed")
+	}
+	c.attachExactStream(state)
+	if c.hasExactRun(state.threadID, state.turnID) {
+		t.Fatal("terminal exact run was published as live")
+	}
+	result, ok := (&Stream[StartedThreadRun]{state: state}).Result()
+	if !ok || result.Run.FinalResponse != "done" {
+		t.Fatalf("terminal result = %#v, ok=%v", result.Run, ok)
+	}
+}
+
+func TestExactNotificationOverflowHasTimingIndependentClientFailureSemantics(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		mode string
+	}{
+		{name: "live", mode: "exact-overflow-live"},
+		{name: "pending replay", mode: "exact-overflow-pending"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assertExactOverflowClientContract(t, test.mode, false)
+		})
+	}
+}
+
+func TestExactTerminalOverflowPreservesTerminalEvidence(t *testing.T) {
+	assertExactOverflowClientContract(t, "exact-overflow-terminal", true)
+}
+
+func assertExactOverflowClientContract(t *testing.T, mode string, terminal bool) {
+	t.Helper()
+	release := filepath.Join(t.TempDir(), "release-overflow")
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand(mode, release)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	concrete := root.(*client)
+	concrete.testExactStreamQueueCapacity = 1
+
+	other, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	overflowing, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode == "exact-overflow-live" {
+		if err := os.WriteFile(release, []byte("release"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.Now().Add(time.Second)
+	for overflowing.Err() == nil && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if overflowing.Err() == nil {
+		t.Fatal("overflow did not finish the exact stream")
+	}
+
+	if !errors.Is(overflowing.Err(), ErrNotificationBackpressure) {
+		t.Fatalf("overflowing stream error = %v", overflowing.Err())
+	}
+	if !errors.Is(other.Err(), ErrNotificationBackpressure) {
+		t.Fatalf("other stream error = %v", other.Err())
+	}
+	if overflowing.Err() != other.Err() {
+		t.Fatalf("active streams received different first causes: %v and %v", overflowing.Err(), other.Err())
+	}
+	result, ok := overflowing.Result()
+	if !ok || len(result.Run.Notifications) != 2 {
+		t.Fatalf("partial notification history = %d, ok=%v", len(result.Run.Notifications), ok)
+	}
+	last := result.Run.Notifications[1]
+	if terminal {
+		if last.Kind() != protocolv2.ServerNotificationKindTurnCompleted || result.Run.FinalResponse != "done" {
+			t.Fatalf("terminal evidence = %#v, final response = %q", last, result.Run.FinalResponse)
+		}
+	} else {
+		rerouted, ok := last.AsModelRerouted()
+		if !ok || rerouted.Params.ToModel != "model-c" {
+			t.Fatalf("overflowing generated fact not preserved: %#v", last)
+		}
+	}
+	otherResult, ok := other.Result()
+	if !ok || len(otherResult.Run.Notifications) != 0 {
+		t.Fatalf("other partial result = %#v, ok=%v", otherResult.Run, ok)
+	}
+	if _, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	}); !errors.Is(err, ErrClientClosed) {
+		t.Fatalf("new operation error = %v, want ErrClientClosed", err)
+	}
+	if closeErr := root.Close(); !errors.Is(closeErr, ErrNotificationBackpressure) {
+		t.Fatalf("Close error = %v, want ErrNotificationBackpressure", closeErr)
 	}
 }
 
