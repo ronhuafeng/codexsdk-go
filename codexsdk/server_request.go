@@ -43,10 +43,33 @@ func (c *client) handleServerRequest(message map[string]any) {
 		if buffered {
 			return
 		}
-		go c.respondToServerRequestWithContext(id, method, params, streamCtx)
+		c.handleLegacyServerRequest(id, method, params, streamCtx, false)
 		return
 	}
-	go c.respondToServerRequest(id, method, params)
+	c.handleLegacyServerRequest(id, method, params, nil, false)
+}
+
+func (c *client) handleLegacyServerRequest(id any, method string, params map[string]any, parent context.Context, failClosed bool) {
+	handlerCtx, ok := c.beginHandler()
+	if !ok {
+		c.respondToServerRequestFailClosed(id, method, params)
+		return
+	}
+	if parent == nil {
+		parent = handlerCtx
+	}
+	ctx, cancel := context.WithCancel(parent)
+	stopShutdownCancel := context.AfterFunc(handlerCtx, cancel)
+	go func() {
+		defer c.endHandler()
+		defer cancel()
+		defer stopShutdownCancel()
+		if failClosed {
+			c.respondToServerRequestFailClosed(id, method, params)
+			return
+		}
+		c.respondToServerRequestWithContext(id, method, params, ctx)
+	}()
 }
 
 func decodeProtocolServerRequest(message map[string]any) (protocolv2.ServerRequest, error) {
