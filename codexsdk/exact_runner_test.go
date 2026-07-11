@@ -561,7 +561,7 @@ func TestServerRequestResponseConstructorsCoverGeneratedRequestKinds(t *testing.
 	}
 }
 
-func TestExactRunnerStreamOrdersNotificationsAndReturnsSnapshots(t *testing.T) {
+func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *testing.T) {
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
 	if err != nil {
@@ -593,10 +593,38 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsSnapshots(t *testing.T) {
 	if !ok || stream.Err() != nil {
 		t.Fatalf("result ok=%v err=%v", ok, stream.Err())
 	}
-	first.Run.Notifications = nil
+	first.Start.Model = "mutated-model"
+	first.Start.Thread.ID = "mutated-thread"
+	first.Start.Thread.Turns = nil
+	first.Run.Turn.ID = "mutated-turn"
+	first.Run.Turn.Items = nil
 	first.Run.Usage.Total.InputTokens = 999
+	first.Run.Notifications[0] = protocolv2.ServerNotification{}
+	first.Run.Diagnostics = append(first.Run.Diagnostics, DiagnosticRef{Kind: "mutated"})
 	second, ok := stream.Result()
-	if !ok || len(second.Run.Notifications) != 3 || second.Run.Usage.Total.InputTokens != 30 {
+	if !ok {
+		t.Fatal("second result snapshot unavailable")
+	}
+	if second.Start.Model != "gpt-exact" || second.Start.Thread.ID == "mutated-thread" || second.Start.Thread.Turns == nil {
+		t.Fatalf("start response snapshot was mutable: %#v", second.Start)
+	}
+	if second.Run.Turn.ID == "mutated-turn" || second.Run.Turn.Items == nil {
+		t.Fatalf("turn snapshot was mutable: %#v", second.Run.Turn)
+	}
+	if second.Run.Usage == nil || second.Run.Usage.Total.InputTokens != 30 {
+		t.Fatalf("usage snapshot was mutable: %#v", second.Run.Usage)
+	}
+	if len(second.Run.Notifications) != 3 || second.Run.Notifications[0].Kind() != want[0] {
+		t.Fatalf("notification snapshot was mutable: %#v", second.Run.Notifications)
+	}
+	if len(second.Run.Diagnostics) != 0 {
+		t.Fatalf("diagnostic snapshot was mutable: %#v", second.Run.Diagnostics)
+	}
+
+	second.Start.Thread.ID = "second-consumer"
+	second.Run.Usage.Total.InputTokens = 777
+	third, ok := stream.Result()
+	if !ok || third.Start.Thread.ID == "second-consumer" || third.Run.Usage.Total.InputTokens != 30 {
 		t.Fatalf("result snapshot was mutable: %#v", second.Run)
 	}
 }
