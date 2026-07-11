@@ -2,6 +2,7 @@ package codexsdk
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"sync"
@@ -413,12 +414,106 @@ func TestNormalCloseCancelsAndJoinsExactServerRequestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-started
-	if err := root.Close(); err != nil {
-		t.Fatalf("normal Close returned handler cancellation as failure: %v", err)
+	const callers = 8
+	closed := make(chan error, callers)
+	for range callers {
+		go func() { closed <- root.Close() }()
+	}
+	for range callers {
+		if err := <-closed; err != nil {
+			t.Fatalf("concurrent normal Close returned handler cancellation as failure: %v", err)
+		}
 	}
 	<-finished
 	if !errors.Is(stream.Err(), ErrClientClosed) {
 		t.Fatalf("stream error = %v, want ErrClientClosed", stream.Err())
+	}
+}
+
+func TestCloseJoinsNotificationAndServerRequestHandlersAcceptedBeforeBoundary(t *testing.T) {
+	notificationStarted := make(chan struct{})
+	requestStarted := make(chan struct{})
+	releaseNotification := make(chan struct{})
+	requestFinished := make(chan struct{})
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("notification-and-approval"),
+		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+			close(notificationStarted)
+			<-releaseNotification
+			return nil
+		},
+		ServerRequestHandler: func(ctx context.Context, _ protocolv2.ServerRequest) (ServerRequestResponse, error) {
+			close(requestStarted)
+			<-ctx.Done()
+			close(requestFinished)
+			return ServerRequestResponse{}, ctx.Err()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-notificationStarted
+	<-requestStarted
+	closed := make(chan error, 1)
+	go func() { closed <- root.Close() }()
+	select {
+	case err := <-closed:
+		t.Fatalf("Close returned before accepted notification handler: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+	close(releaseNotification)
+	if err := <-closed; err != nil {
+		t.Fatalf("normal Close returned handler cancellation as failure: %v", err)
+	}
+	<-requestFinished
+	if !errors.Is(stream.Err(), ErrClientClosed) {
+		t.Fatalf("stream error = %v, want ErrClientClosed", stream.Err())
+	}
+}
+
+func TestExactServerRequestHandlerDoesNotStartAfterCloseBoundary(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	dispatcherDone := make(chan struct{})
+	close(dispatcherDone)
+	handlerCalled := make(chan struct{}, 1)
+	c := &client{
+		ctx:            ctx,
+		cancel:         cancel,
+		dispatchStop:   make(chan struct{}),
+		dispatcherDone: dispatcherDone,
+		notifications:  make(chan protocolv2.ServerNotification, 1),
+		stdin:          &recordingWriteCloser{},
+		options: ClientOptions{ServerRequestHandler: func(context.Context, protocolv2.ServerRequest) (ServerRequestResponse, error) {
+			handlerCalled <- struct{}{}
+			return ServerRequestResponse{}, nil
+		}},
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(map[string]any{
+		"id":     "late-request",
+		"method": protocolv2.MethodItemCommandExecutionRequestApproval,
+		"params": fakeCommandApprovalParams("thread-1", "turn-1"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request protocolv2.ServerRequest
+	if err := json.Unmarshal(raw, &request); err != nil {
+		t.Fatal(err)
+	}
+	c.handleExactServerRequest("late-request", request)
+	select {
+	case <-handlerCalled:
+		t.Fatal("exact server-request handler started after Close closed admission")
+	case <-time.After(25 * time.Millisecond):
 	}
 }
 

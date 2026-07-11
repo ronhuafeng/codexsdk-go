@@ -10,14 +10,18 @@ import (
 )
 
 func (c *client) handleExactServerRequest(id any, request protocolv2.ServerRequest) {
-	c.handlerWG.Add(1)
+	ctx, ok := c.beginHandler()
+	if !ok {
+		c.rejectExactServerRequestAfterAdmissionClosed(id, request)
+		return
+	}
 	go func() {
-		defer c.handlerWG.Done()
-		c.respondToExactServerRequest(id, request)
+		defer c.endHandler()
+		c.respondToExactServerRequest(ctx, id, request)
 	}()
 }
 
-func (c *client) respondToExactServerRequest(id any, request protocolv2.ServerRequest) {
+func (c *client) respondToExactServerRequest(ctx context.Context, id any, request protocolv2.ServerRequest) {
 	if c.options.ServerRequestHandler == nil {
 		response, ok := exactFailClosedServerRequestResponse(request)
 		if !ok {
@@ -31,7 +35,7 @@ func (c *client) respondToExactServerRequest(id any, request protocolv2.ServerRe
 		}
 		return
 	}
-	response, err := invokeExactServerRequestHandler(c.ctx, c.options.ServerRequestHandler, request)
+	response, err := invokeExactServerRequestHandler(ctx, c.options.ServerRequestHandler, request)
 	if err != nil {
 		if c.closingNormally() {
 			return
@@ -49,6 +53,17 @@ func (c *client) respondToExactServerRequest(id any, request protocolv2.ServerRe
 	if err := c.writeExactServerRequestResponse(id, request, response); err != nil {
 		c.failClient(err)
 	}
+}
+
+func (c *client) rejectExactServerRequestAfterAdmissionClosed(id any, request protocolv2.ServerRequest) {
+	if response, ok := exactFailClosedServerRequestResponse(request); ok {
+		_ = c.writeExactServerRequestResponse(id, request, response)
+		return
+	}
+	c.writeServerRequestError(id, -32000, &ExactServerRequestError{
+		Kind:   request.Kind(),
+		Reason: "callback admission is closed",
+	})
 }
 
 func (c *client) writeExactServerRequestResponse(id any, request protocolv2.ServerRequest, response ServerRequestResponse) error {

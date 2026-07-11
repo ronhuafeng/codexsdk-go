@@ -155,6 +155,14 @@ including authentication refresh, dynamic tool output, and attestation, return
 a JSON-RPC error and fail the exact run with `ErrExactServerRequest`; partial
 notifications and run evidence remain available in the result.
 
+Callback admission is atomic with client shutdown. Once `Close` or failure
+shutdown closes admission, no new server-request or notification handler is
+started. Normal close cancels exact server-request handler contexts and joins
+every callback accepted before that boundary before transport teardown;
+failure shutdown cancels accepted callbacks immediately while preserving the
+first failure cause and partial run evidence. Handlers must return when their
+context is canceled and must not call `Close` reentrantly.
+
 The v0.1 `ThreadClient`, copied request/result models, event projections, and
 conversion helpers remain deprecated compatibility surface through v0.2. New
 code should use generated params and `ThreadRunner`.

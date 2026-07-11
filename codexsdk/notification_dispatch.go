@@ -15,10 +15,17 @@ func (c *client) enqueueNotification(notification protocolv2.ServerNotification)
 	if c.closed {
 		return nil
 	}
+	hasHandler := c.options.ServerNotificationHandler != nil
+	if hasHandler {
+		c.handlerWG.Add(1)
+	}
 	select {
 	case c.notifications <- notification:
 		return nil
 	default:
+		if hasHandler {
+			c.handlerWG.Done()
+		}
 		return ErrNotificationBackpressure
 	}
 }
@@ -30,13 +37,18 @@ func (c *client) notificationDispatcher() {
 		select {
 		case notification := <-c.notifications:
 			if c.ctx.Err() != nil {
+				c.endNotificationHandler()
+				c.discardAcceptedNotifications()
 				return
 			}
 			if handler != nil {
 				if err := invokeNotificationHandler(c.ctx, handler, notification); err != nil {
+					c.endNotificationHandler()
+					c.discardAcceptedNotifications()
 					c.failClient(err)
 					return
 				}
+				c.endNotificationHandler()
 			}
 		case <-c.dispatchStop:
 			for {
@@ -44,15 +56,53 @@ func (c *client) notificationDispatcher() {
 				case notification := <-c.notifications:
 					if handler != nil {
 						if err := invokeNotificationHandler(c.ctx, handler, notification); err != nil {
+							c.endNotificationHandler()
+							c.discardAcceptedNotifications()
 							c.failClient(err)
 							return
 						}
+						c.endNotificationHandler()
 					}
 				default:
 					return
 				}
 			}
 		case <-c.ctx.Done():
+			c.discardAcceptedNotifications()
+			return
+		}
+	}
+}
+
+func (c *client) beginHandler() (context.Context, bool) {
+	c.closeMu.Lock()
+	defer c.closeMu.Unlock()
+	if c.closed {
+		return nil, false
+	}
+	c.handlerWG.Add(1)
+	return c.ctx, true
+}
+
+func (c *client) endHandler() {
+	c.handlerWG.Done()
+}
+
+func (c *client) endNotificationHandler() {
+	if c.options.ServerNotificationHandler != nil {
+		c.handlerWG.Done()
+	}
+}
+
+func (c *client) discardAcceptedNotifications() {
+	if c.options.ServerNotificationHandler == nil {
+		return
+	}
+	for {
+		select {
+		case <-c.notifications:
+			c.handlerWG.Done()
+		default:
 			return
 		}
 	}
@@ -112,9 +162,11 @@ func (c *client) shutdown() {
 		c.cancel()
 	}
 	c.handlerWG.Wait()
+	c.writeMu.Lock()
 	if c.stdin != nil {
 		_ = c.stdin.Close()
 	}
+	c.writeMu.Unlock()
 	if c.stdout != nil {
 		_ = c.stdout.Close()
 	}
