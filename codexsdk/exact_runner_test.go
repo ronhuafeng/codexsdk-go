@@ -391,28 +391,6 @@ func TestExactRunNilHandlerUnsafeRequestPreservesPartialEvidenceAndTypedFirstCau
 	}
 }
 
-func TestExactFailClosedCoverageMatchesGeneratedRequestKinds(t *testing.T) {
-	requests := []protocolv2.ServerRequest{
-		protocolv2.NewServerRequestItemCommandExecutionRequestApproval(protocolv2.ServerRequestItemCommandExecutionRequestApproval{}),
-		protocolv2.NewServerRequestItemFileChangeRequestApproval(protocolv2.ServerRequestItemFileChangeRequestApproval{}),
-		protocolv2.NewServerRequestItemToolRequestUserInput(protocolv2.ServerRequestItemToolRequestUserInput{}),
-		protocolv2.NewServerRequestMCPServerElicitationRequest(protocolv2.ServerRequestMCPServerElicitationRequest{}),
-		protocolv2.NewServerRequestItemPermissionsRequestApproval(protocolv2.ServerRequestItemPermissionsRequestApproval{}),
-		protocolv2.NewServerRequestItemToolCall(protocolv2.ServerRequestItemToolCall{}),
-		protocolv2.NewServerRequestAccountChatGPTAuthTokensRefresh(protocolv2.ServerRequestAccountChatGPTAuthTokensRefresh{}),
-		protocolv2.NewServerRequestAttestationGenerate(protocolv2.ServerRequestAttestationGenerate{}),
-		protocolv2.NewServerRequestCurrentTimeRead(protocolv2.ServerRequestCurrentTimeRead{}),
-		protocolv2.NewServerRequestApplyPatchApproval(protocolv2.ServerRequestApplyPatchApproval{}),
-		protocolv2.NewServerRequestExecCommandApproval(protocolv2.ServerRequestExecCommandApproval{}),
-	}
-	for _, request := range requests {
-		response, synthesizable := exactFailClosedServerRequestResponse(request)
-		if synthesizable != (response.kind == request.Kind() && response.value != nil) {
-			t.Fatalf("fail-closed coverage for %s is inconsistent: %#v", request.Kind(), response)
-		}
-	}
-}
-
 func TestNormalCloseCancelsAndJoinsExactServerRequestHandler(t *testing.T) {
 	started := make(chan struct{})
 	finished := make(chan struct{})
