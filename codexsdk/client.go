@@ -886,7 +886,7 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 	}
 	c.turnMu.Unlock()
 	for _, stream := range targets {
-		if err := stream.accept(typed); err != nil {
+		if err := stream.acceptOrdered(typed); err != nil {
 			failure := fmt.Errorf("%w: turn_id=%s: %v", ErrNotificationBackpressure, stream.turnID, err)
 			c.failClient(failure)
 			return true
@@ -1067,6 +1067,7 @@ func (c *client) unregisterStream(turnID string, stream *threadStreamState) {
 
 func (c *client) attachExactStream(stream *exactRunState) {
 	c.turnMu.Lock()
+	stream.notificationOrderMu.Lock()
 	delete(c.exactAttaching[stream.threadID], stream)
 	if len(c.exactAttaching[stream.threadID]) == 0 {
 		delete(c.exactAttaching, stream.threadID)
@@ -1088,6 +1089,7 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	globalErr := c.pendingGlobal
 	c.pendingGlobal = nil
 	c.turnMu.Unlock()
+	defer stream.notificationOrderMu.Unlock()
 	for _, notification := range pending {
 		typed, err := exactNotification(notification)
 		if err != nil {
