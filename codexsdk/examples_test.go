@@ -10,6 +10,34 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
+func ExampleThreadRunner_start() {
+	ctx := context.Background()
+	workspace, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	root, err := codexsdk.New(codexsdk.ClientOptions{
+		CWD:     workspace,
+		Command: []string{"codex", "app-server", "--listen", "stdio://"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer root.Close()
+
+	result, err := root.ThreadRunner().Start(ctx, codexsdk.StartThreadRunRequest{
+		Thread: protocolv2.ThreadStartParams{Model: protocolv2.Value("gpt-5")},
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{
+			protocolv2.NewUserInputText(protocolv2.UserInputText{Text: "Reply briefly."}),
+		}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	_ = result.Run.FinalResponse
+	_ = result.Run.Notifications
+}
+
 func ExampleThreadClient_textAndFileInputEphemeralStart() {
 	ctx := context.Background()
 	workspace, err := os.Getwd()
@@ -160,16 +188,16 @@ func ExampleClient_approvalHandling() {
 	root, err := codexsdk.New(codexsdk.ClientOptions{
 		CWD:     workspace,
 		Command: []string{"codex", "app-server", "--listen", "stdio://"},
-		ServerRequestHandler: func(ctx context.Context, req codexsdk.ServerRequest) (codexsdk.ServerRequestResponse, error) {
+		LegacyServerRequestHandler: func(ctx context.Context, req codexsdk.ServerRequest) (codexsdk.LegacyServerRequestResponse, error) {
 			switch req.Kind {
 			case codexsdk.ServerRequestApplyPatchApproval,
 				codexsdk.ServerRequestExecCommandApproval,
 				codexsdk.ServerRequestCommandApproval,
 				codexsdk.ServerRequestFileChangeApproval,
 				codexsdk.ServerRequestPermissionsApproval:
-				return codexsdk.ServerRequestResponse{ApprovalDecision: codexsdk.ApprovalDecline}, nil
+				return codexsdk.LegacyServerRequestResponse{ApprovalDecision: codexsdk.ApprovalDecline}, nil
 			default:
-				return codexsdk.ServerRequestResponse{}, fmt.Errorf("unsupported server request: %s", req.Method)
+				return codexsdk.LegacyServerRequestResponse{}, fmt.Errorf("unsupported server request: %s", req.Method)
 			}
 		},
 	})

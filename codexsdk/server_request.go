@@ -11,6 +11,10 @@ import (
 )
 
 func (c *client) handleServerRequest(message map[string]any) {
+	if c.options.ServerRequestHandler != nil {
+		c.handleExactServerRequest(message)
+		return
+	}
 	id := message["id"]
 	method, _ := message["method"].(string)
 	params, _ := message["params"].(map[string]any)
@@ -121,7 +125,7 @@ func (c *client) respondToServerRequestWithContext(id any, method string, params
 		return
 	}
 
-	nilHandler := c.options.ServerRequestHandler == nil
+	nilHandler := c.options.LegacyServerRequestHandler == nil
 	handlerResponse, handlerErr := c.invokeServerRequestHandler(req, parent)
 	if handlerErr != nil {
 		c.routeServerRequestError(req, handlerErr)
@@ -229,9 +233,9 @@ func isSupportedServerRequest(req ServerRequest) bool {
 	}
 }
 
-func (c *client) invokeServerRequestHandler(req ServerRequest, parent context.Context) (response ServerRequestResponse, err error) {
-	if c.options.ServerRequestHandler == nil {
-		return ServerRequestResponse{}, nil
+func (c *client) invokeServerRequestHandler(req ServerRequest, parent context.Context) (response LegacyServerRequestResponse, err error) {
+	if c.options.LegacyServerRequestHandler == nil {
+		return LegacyServerRequestResponse{}, nil
 	}
 	if parent == nil {
 		parent = c.serverRequestContext(req)
@@ -243,7 +247,7 @@ func (c *client) invokeServerRequestHandler(req ServerRequest, parent context.Co
 			err = fmt.Errorf("codexsdk: server request handler panic: %v", recovered)
 		}
 	}()
-	return c.options.ServerRequestHandler(ctx, req)
+	return c.options.LegacyServerRequestHandler(ctx, req)
 }
 
 func (c *client) routeServerRequestError(req ServerRequest, err error) {
@@ -476,7 +480,7 @@ func decodeServerRequestParams(method string, params map[string]any, target any)
 	return nil
 }
 
-func serverRequestResponseResult(req ServerRequest, response ServerRequestResponse, handlerErr error) (any, error) {
+func serverRequestResponseResult(req ServerRequest, response LegacyServerRequestResponse, handlerErr error) (any, error) {
 	if handlerErr != nil {
 		if result, ok := failClosedServerRequestResponse(req); ok {
 			return result, nil

@@ -155,6 +155,10 @@ func TestInternalJSONRPCProtocolErrorIsPropagated(t *testing.T) {
 			!strings.Contains(err.Error(), "invalid params") {
 			t.Fatalf("protocol error was not propagated with native facts: %v", err)
 		}
+		var protocolErr *ProtocolError
+		if !errors.As(err, &protocolErr) || protocolErr.Method != "failing/method" || protocolErr.Code != -32602 {
+			t.Fatalf("protocol error detail = %#v", protocolErr)
+		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for protocol error")
 	}
@@ -373,9 +377,9 @@ func TestInternalJSONRPCReadLoopServerRequestTypedValidation(t *testing.T) {
 		c := newTransportHarness()
 		writer := c.stdin.(*recordingWriteCloser)
 		handlerSeen := make(chan ServerRequest, 1)
-		c.options.ServerRequestHandler = func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+		c.options.LegacyServerRequestHandler = func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 			handlerSeen <- req
-			return ServerRequestResponse{ApprovalDecision: ApprovalDecline}, nil
+			return LegacyServerRequestResponse{ApprovalDecision: ApprovalDecline}, nil
 		}
 
 		c.readLoop(strings.NewReader(`{"id":"server-1","method":"applyPatchApproval","params":{"callId":"call-1","conversationId":"thread-1","fileChanges":{"/repo/file.txt":{"content":"old","type":"delete"}}}}` + "\n"))
@@ -399,9 +403,9 @@ func TestInternalJSONRPCReadLoopServerRequestTypedValidation(t *testing.T) {
 		c := newTransportHarness()
 		writer := c.stdin.(*recordingWriteCloser)
 		handlerCalled := make(chan struct{}, 1)
-		c.options.ServerRequestHandler = func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+		c.options.LegacyServerRequestHandler = func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 			handlerCalled <- struct{}{}
-			return ServerRequestResponse{}, errors.New("handler should not be called")
+			return LegacyServerRequestResponse{}, errors.New("handler should not be called")
 		}
 
 		c.readLoop(strings.NewReader(`{"id":"server-1","method":"item/commandExecution/requestApproval","params":{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}}` + "\n"))
@@ -429,9 +433,9 @@ func TestInternalJSONRPCReadLoopServerRequestTypedValidation(t *testing.T) {
 		c := newTransportHarness()
 		writer := c.stdin.(*recordingWriteCloser)
 		handlerCalled := make(chan struct{}, 1)
-		c.options.ServerRequestHandler = func(ctx context.Context, req ServerRequest) (ServerRequestResponse, error) {
+		c.options.LegacyServerRequestHandler = func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 			handlerCalled <- struct{}{}
-			return ServerRequestResponse{}, errors.New("handler should not be called")
+			return LegacyServerRequestResponse{}, errors.New("handler should not be called")
 		}
 
 		c.readLoop(strings.NewReader(`{"id":"server-1","method":"server/unknown","params":{"threadId":"thread-1","turnId":"turn-1"}}` + "\n"))

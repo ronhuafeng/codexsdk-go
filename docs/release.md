@@ -13,6 +13,11 @@ Use this checklist before tagging or publishing a release.
   methods, request structs, response structs, or thread helper behavior is a
   major change after v1.0 unless preserving compatibility would be unsafe.
 
+The handwritten public API is mechanically recorded in
+`codexsdk/testdata/handwritten-api.txt`. Generated `protocolv2` declarations and
+generated facades are intentionally excluded because their inventory is a
+protocol fact guarded by generator reproducibility tests.
+
 ## Baseline Update Flow
 
 1. Pick an upstream OpenAI Codex commit.

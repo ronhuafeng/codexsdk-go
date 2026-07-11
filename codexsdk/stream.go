@@ -5,6 +5,9 @@ import (
 	"sync"
 )
 
+// ThreadStream is the v0.1 projected event stream.
+//
+// Deprecated: use Stream with ThreadRunner.
 type ThreadStream struct {
 	mu      sync.Mutex
 	state   *threadStreamState
@@ -24,7 +27,7 @@ type threadStreamState struct {
 	// around stream attach. It is not a scheduler or event store.
 	notificationOrderMu sync.Mutex
 	mu                  sync.Mutex
-	result              ThreadRunResult
+	result              LegacyThreadRunResult
 	hasRes              bool
 	err                 error
 	closed              bool
@@ -93,9 +96,9 @@ func (s *ThreadStream) Event() ThreadEvent {
 	return s.current
 }
 
-func (s *ThreadStream) Result() (ThreadRunResult, bool) {
+func (s *ThreadStream) Result() (LegacyThreadRunResult, bool) {
 	if s == nil || s.state == nil {
-		return ThreadRunResult{}, false
+		return LegacyThreadRunResult{}, false
 	}
 	s.state.mu.Lock()
 	defer s.state.mu.Unlock()
@@ -155,7 +158,7 @@ func (s *threadStreamState) cancelContext() {
 	}
 }
 
-func (s *threadStreamState) finishResult(result ThreadRunResult) {
+func (s *threadStreamState) finishResult(result LegacyThreadRunResult) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
