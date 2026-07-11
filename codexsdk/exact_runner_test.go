@@ -569,3 +569,112 @@ func TestExactRunnerProducesSanitizedDiagnosticForMalformedNotification(t *testi
 		t.Fatalf("diagnostic = %#v", diagnostic)
 	}
 }
+
+func TestExactRunPendingNotificationPrecedesLiveNotificationAtAttachBoundary(t *testing.T) {
+	state := newExactRunState(nil, "thread-1", StartedThreadRun{})
+	state.turnID = "turn-1"
+	pending := exactTestNotification(t, protocolv2.MethodModelRerouted, map[string]any{
+		"threadId": "thread-1", "turnId": "turn-1", "fromModel": "initial", "toModel": "pending",
+		"reason": "highRiskCyberActivity",
+	})
+	live := exactTestNotification(t, protocolv2.MethodModelRerouted, map[string]any{
+		"threadId": "thread-1", "turnId": "turn-1", "fromModel": "pending", "toModel": "live",
+		"reason": "highRiskCyberActivity",
+	})
+
+	state.notificationOrderMu.Lock()
+	liveAccepted := make(chan error, 1)
+	go func() { liveAccepted <- state.acceptOrdered(live) }()
+	select {
+	case err := <-liveAccepted:
+		t.Fatalf("live notification crossed attach gate: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+	if err := state.accept(pending); err != nil {
+		t.Fatal(err)
+	}
+	state.notificationOrderMu.Unlock()
+	if err := <-liveAccepted; err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok := state.result.(StartedThreadRun)
+	if !ok || len(result.Run.Notifications) != 2 {
+		t.Fatalf("partial result = %#v", state.result)
+	}
+	first, _ := result.Run.Notifications[0].AsModelRerouted()
+	second, _ := result.Run.Notifications[1].AsModelRerouted()
+	if first.Params.ToModel != "pending" || second.Params.ToModel != "live" {
+		t.Fatalf("notification order = %q, %q", first.Params.ToModel, second.Params.ToModel)
+	}
+}
+
+func TestExactRunOrderGateIsPerRun(t *testing.T) {
+	blocked := newExactRunState(nil, "thread-blocked", StartedThreadRun{})
+	independent := newExactRunState(nil, "thread-independent", StartedThreadRun{})
+	notification := exactTestNotification(t, protocolv2.MethodModelRerouted, map[string]any{
+		"threadId": "thread-independent", "turnId": "turn-independent", "fromModel": "a", "toModel": "b",
+		"reason": "highRiskCyberActivity",
+	})
+
+	blocked.notificationOrderMu.Lock()
+	defer blocked.notificationOrderMu.Unlock()
+	accepted := make(chan error, 1)
+	go func() { accepted <- independent.acceptOrdered(notification) }()
+	select {
+	case err := <-accepted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("unrelated exact run was serialized behind another run's attach gate")
+	}
+}
+
+func TestExactRunAttachGatePreservesUsageBeforeTerminalEvidence(t *testing.T) {
+	state := newExactRunState(nil, "thread-1", StartedThreadRun{})
+	state.turnID = "turn-1"
+	usage := exactTestNotification(t, protocolv2.MethodThreadTokenUsageUpdated, map[string]any{
+		"threadId": "thread-1", "turnId": "turn-1",
+		"tokenUsage": map[string]any{
+			"last":               map[string]any{"cachedInputTokens": 0, "inputTokens": 3, "outputTokens": 2, "reasoningOutputTokens": 1, "totalTokens": 5},
+			"modelContextWindow": 100,
+			"total":              map[string]any{"cachedInputTokens": 0, "inputTokens": 30, "outputTokens": 20, "reasoningOutputTokens": 10, "totalTokens": 50},
+		},
+	})
+	terminal := exactTestNotification(t, protocolv2.MethodTurnCompleted, map[string]any{
+		"threadId": "thread-1",
+		"turn": map[string]any{
+			"id": "turn-1", "status": "completed",
+			"items": []map[string]any{{"id": "answer", "type": "agentMessage", "text": "done", "phase": "final_answer"}},
+		},
+	})
+
+	state.notificationOrderMu.Lock()
+	terminalAccepted := make(chan error, 1)
+	go func() { terminalAccepted <- state.acceptOrdered(terminal) }()
+	if err := state.accept(usage); err != nil {
+		t.Fatal(err)
+	}
+	state.notificationOrderMu.Unlock()
+	if err := <-terminalAccepted; err != nil {
+		t.Fatal(err)
+	}
+
+	result := state.result.(StartedThreadRun).Run
+	if len(result.Notifications) != 2 || result.Notifications[0].Kind() != protocolv2.ServerNotificationKindThreadTokenUsageUpdated || result.Notifications[1].Kind() != protocolv2.ServerNotificationKindTurnCompleted {
+		t.Fatalf("notification evidence = %#v", result.Notifications)
+	}
+	if result.Usage == nil || result.Usage.Total.InputTokens != 30 || result.FinalResponse != "done" {
+		t.Fatalf("derived facts = usage %#v final %q", result.Usage, result.FinalResponse)
+	}
+}
+
+func exactTestNotification(t *testing.T, method string, params map[string]any) protocolv2.ServerNotification {
+	t.Helper()
+	notification, err := exactNotification(rpcNotification{method: method, params: params})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return notification
+}

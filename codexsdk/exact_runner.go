@@ -29,11 +29,15 @@ type exactRunState struct {
 	events   chan protocolv2.ServerNotification
 	done     chan struct{}
 
-	mu        sync.Mutex
-	result    any
-	hasResult bool
-	err       error
-	terminal  bool
+	// notificationOrderMu preserves the ingestion order of pending and live
+	// notifications across attachment. It is per run so unrelated turns do not
+	// serialize behind one another.
+	notificationOrderMu sync.Mutex
+	mu                  sync.Mutex
+	result              any
+	hasResult           bool
+	err                 error
+	terminal            bool
 }
 
 type TurnError struct {
@@ -367,6 +371,12 @@ func (s *exactRunState) accept(notification protocolv2.ServerNotification) error
 		s.finish(terminalErr)
 	}
 	return nil
+}
+
+func (s *exactRunState) acceptOrdered(notification protocolv2.ServerNotification) error {
+	s.notificationOrderMu.Lock()
+	defer s.notificationOrderMu.Unlock()
+	return s.accept(notification)
 }
 
 func (s *exactRunState) applyTerminalLocked(notification protocolv2.ServerNotification) (bool, error) {
