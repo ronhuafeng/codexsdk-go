@@ -610,6 +610,8 @@ func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 		close(attached)
 	}()
 	<-published
+	liveAtGate := make(chan struct{})
+	state.testAtNotificationOrderGate = func() { close(liveAtGate) }
 	liveRouted := make(chan bool, 1)
 	go func() {
 		typed, err := exactNotification(terminal)
@@ -620,13 +622,8 @@ func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 		}
 		liveRouted <- c.routeExactNotification(terminal, typed)
 	}()
-	select {
-	case <-liveRouted:
-		close(releaseReplay)
-		t.Fatal("live terminal overtook pending usage while attachment was paused")
-	case <-time.After(25 * time.Millisecond):
-		close(releaseReplay)
-	}
+	<-liveAtGate
+	close(releaseReplay)
 	<-attached
 	if !<-liveRouted {
 		t.Fatal("live terminal was not routed to the exact run")
@@ -709,5 +706,81 @@ func TestExactRunAttachDoesNotSerializeUnrelatedRuns(t *testing.T) {
 	defer cancel()
 	if !stream.Next(ctx) || stream.Notification().Kind() != protocolv2.ServerNotificationKindModelRerouted {
 		t.Fatal("independent stream did not expose its routed notification")
+	}
+}
+
+func TestExactRunAttachKeepsLatestRerouteFactLive(t *testing.T) {
+	c := &client{
+		exactStreams:        map[string]map[*exactRunState]struct{}{},
+		exactAttaching:      map[string]map[*exactRunState]struct{}{},
+		pendingEvents:       map[string][]rpcNotification{},
+		pendingErrors:       map[string]error{},
+		pendingDiagnostics:  map[string][]DiagnosticRef{},
+		pendingThreadEvents: map[string][]rpcNotification{},
+	}
+	state := newExactRunState(nil, "thread-1", StartedThreadRun{Start: facadeThreadStartResponse("thread-1", "model-a")})
+	state.turnID = "turn-1"
+	c.exactAttaching[state.threadID] = map[*exactRunState]struct{}{state: {}}
+	c.pendingEvents[state.turnID] = []rpcNotification{{method: protocolv2.MethodModelRerouted, params: map[string]any{
+		"threadId": state.threadID, "turnId": state.turnID, "fromModel": "model-a", "toModel": "model-b", "reason": "highRiskCyberActivity",
+	}}}
+	live := rpcNotification{method: protocolv2.MethodModelRerouted, params: map[string]any{
+		"threadId": state.threadID, "turnId": state.turnID, "fromModel": "model-b", "toModel": "model-c", "reason": "highRiskCyberActivity",
+	}}
+	published := make(chan struct{})
+	releaseReplay := make(chan struct{})
+	c.testAfterExactStreamPublished = func() {
+		close(published)
+		<-releaseReplay
+	}
+	attached := make(chan struct{})
+	go func() {
+		c.attachExactStream(state)
+		close(attached)
+	}()
+	<-published
+	liveAtGate := make(chan struct{})
+	state.testAtNotificationOrderGate = func() { close(liveAtGate) }
+	routed := make(chan bool, 1)
+	go func() {
+		typed, err := exactNotification(live)
+		if err != nil {
+			t.Error(err)
+			routed <- false
+			return
+		}
+		routed <- c.routeExactNotification(live, typed)
+	}()
+	<-liveAtGate
+	close(releaseReplay)
+	<-attached
+	if !<-routed {
+		t.Fatal("live reroute was not routed")
+	}
+
+	stream := &Stream[StartedThreadRun]{state: state}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	var toModels []string
+	for range 2 {
+		if !stream.Next(ctx) {
+			t.Fatalf("stream ended after %d reroutes: %v", len(toModels), stream.Err())
+		}
+		rerouted, ok := stream.Notification().AsModelRerouted()
+		if !ok {
+			t.Fatalf("notification = %s", stream.Notification().Kind())
+		}
+		toModels = append(toModels, rerouted.Params.ToModel)
+	}
+	if !reflect.DeepEqual(toModels, []string{"model-b", "model-c"}) {
+		t.Fatalf("reroute history = %#v", toModels)
+	}
+	result, ok := stream.Result()
+	if !ok || len(result.Run.Notifications) != 2 {
+		t.Fatalf("result = %#v ok=%v", result.Run, ok)
+	}
+	last, ok := result.Run.Notifications[1].AsModelRerouted()
+	if !ok || last.Params.ToModel != "model-c" {
+		t.Fatalf("effective model fact = %#v", result.Run.Notifications)
 	}
 }
