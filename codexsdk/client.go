@@ -872,28 +872,41 @@ func exactNotification(notification rpcNotification) (protocolv2.ServerNotificat
 }
 
 func (c *client) routeExactNotification(notification rpcNotification, typed protocolv2.ServerNotification) bool {
-	turnID := turnIDFromNotification(notification.method, notification.params)
-	threadID := threadIDFromNotification(notification.params)
+	class, identity := attributionFor(typed)
+	if class == notificationAttributionGlobal || class == notificationAttributionUnsupported {
+		return false
+	}
 	c.turnMu.Lock()
 	var targets []*exactRunState
-	if turnID != "" {
-		for stream := range c.exactStreams[turnID] {
+	switch class {
+	case notificationAttributionTurn:
+		if identity.turnID == "" {
+			c.turnMu.Unlock()
+			return false
+		}
+		for stream := range c.exactStreams[identity.turnID] {
 			targets = append(targets, stream)
 		}
-		for stream := range c.exactAttaching[threadID] {
-			targets = append(targets, stream)
+		for stream := range c.exactAttaching[identity.threadID] {
+			if stream.turnID == identity.turnID {
+				targets = append(targets, stream)
+			}
 		}
-	} else {
+	case notificationAttributionThread:
+		if identity.threadID == "" {
+			c.turnMu.Unlock()
+			return false
+		}
 		for _, streams := range c.exactStreams {
 			for stream := range streams {
-				if threadID == "" || stream.threadID == threadID {
+				if stream.threadID == identity.threadID {
 					targets = append(targets, stream)
 				}
 			}
 		}
 		for candidateThreadID, streams := range c.exactAttaching {
 			for stream := range streams {
-				if threadID == "" || candidateThreadID == threadID {
+				if candidateThreadID == identity.threadID {
 					targets = append(targets, stream)
 				}
 			}

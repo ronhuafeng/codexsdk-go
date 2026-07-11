@@ -9,6 +9,12 @@
 // returns that same cause. This per-run capacity is independent of the
 // configurable global notification-handler queue capacity. Per-run overflow
 // errors include turn_id context; global-handler overflow has no run context.
+// Exact run history follows generated-schema identity: turn-scoped facts attach
+// only to the matching turn; thread-scoped facts attach to every run currently
+// active or attaching for that thread and are not retained for a later run;
+// client/global facts never enter per-run evidence. Every validated generated
+// notification is still enqueued for the global handler, in ingestion order,
+// after its justified per-run append completes.
 // Client shutdown atomically closes callback admission and joins callbacks
 // accepted before that boundary before releasing transport resources.
 //
