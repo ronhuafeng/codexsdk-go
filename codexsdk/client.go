@@ -598,12 +598,12 @@ func (c *client) startTurnStream(ctx context.Context, threadID string, input []I
 	stream.state.notificationOrderMu.Unlock()
 	if terminal {
 		for _, request := range serverRequests {
-			go c.respondToServerRequestFailClosed(request.id, request.method, request.params)
+			c.handleLegacyServerRequest(request.id, request.method, request.params, nil, true)
 		}
 		return stream, nil
 	}
 	for _, request := range serverRequests {
-		go c.respondToServerRequestWithContext(request.id, request.method, request.params, stream.state.ctx)
+		c.handleLegacyServerRequest(request.id, request.method, request.params, stream.state.ctx, false)
 	}
 	return stream, nil
 }

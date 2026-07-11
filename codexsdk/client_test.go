@@ -5592,10 +5592,14 @@ func TestTypedNonApprovalServerRequestBeforeAttachUsesStreamContextOnClose(t *te
 
 func TestServerRequestHandlerContextCancelsOnClientClose(t *testing.T) {
 	handlerSeen := make(chan struct{})
+	handlerCanceled := make(chan struct{})
+	releaseHandler := make(chan struct{})
 	handlerDone := make(chan error, 1)
 	client := newFakeClient(t, "blocking-approval-concurrent", func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 		close(handlerSeen)
 		<-ctx.Done()
+		close(handlerCanceled)
+		<-releaseHandler
 		handlerDone <- ctx.Err()
 		return LegacyServerRequestResponse{}, ctx.Err()
 	})
@@ -5612,7 +5616,16 @@ func TestServerRequestHandlerContextCancelsOnClientClose(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("server request handler was not invoked")
 	}
-	if err := client.Close(); err != nil {
+	closed := make(chan error, 1)
+	go func() { closed <- client.Close() }()
+	<-handlerCanceled
+	select {
+	case err := <-closed:
+		t.Fatalf("Close returned before admitted legacy handler completed: %v", err)
+	default:
+	}
+	close(releaseHandler)
+	if err := <-closed; err != nil {
 		t.Fatal(err)
 	}
 	select {

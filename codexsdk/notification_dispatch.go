@@ -41,27 +41,15 @@ func (c *client) notificationDispatcher() {
 				c.discardAcceptedNotifications()
 				return
 			}
-			if handler != nil {
-				if err := invokeNotificationHandler(c.ctx, handler, notification); err != nil {
-					c.endNotificationHandler()
-					c.discardAcceptedNotifications()
-					c.failClient(err)
-					return
-				}
-				c.endNotificationHandler()
+			if handler != nil && !c.dispatchAcceptedNotification(handler, notification) {
+				return
 			}
 		case <-c.dispatchStop:
 			for {
 				select {
 				case notification := <-c.notifications:
-					if handler != nil {
-						if err := invokeNotificationHandler(c.ctx, handler, notification); err != nil {
-							c.endNotificationHandler()
-							c.discardAcceptedNotifications()
-							c.failClient(err)
-							return
-						}
-						c.endNotificationHandler()
+					if handler != nil && !c.dispatchAcceptedNotification(handler, notification) {
+						return
 					}
 				default:
 					return
@@ -74,6 +62,17 @@ func (c *client) notificationDispatcher() {
 	}
 }
 
+func (c *client) dispatchAcceptedNotification(handler ServerNotificationHandler, notification protocolv2.ServerNotification) bool {
+	err := invokeNotificationHandler(c.ctx, handler, notification)
+	c.endNotificationHandler()
+	if err == nil {
+		return true
+	}
+	c.discardAcceptedNotifications()
+	c.failClient(err)
+	return false
+}
+
 func (c *client) beginHandler() (context.Context, bool) {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
@@ -81,7 +80,13 @@ func (c *client) beginHandler() (context.Context, bool) {
 		return nil, false
 	}
 	c.handlerWG.Add(1)
-	return c.handlerCtx, true
+	if c.handlerCtx != nil {
+		return c.handlerCtx, true
+	}
+	if c.ctx != nil {
+		return c.ctx, true
+	}
+	return context.Background(), true
 }
 
 func (c *client) endHandler() {
