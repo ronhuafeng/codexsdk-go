@@ -22,7 +22,9 @@ stability metadata. Its `surface` classifies every exported generated Go
 declaration and compatibility-relevant member by comparing package generation
 without and with experimental schema visibility. A type is `mixed` when its
 members span stable and experimental classifications; each member retains its
-own classification. Do not maintain a second handwritten stability inventory.
+own classification. Canonical signatures let release comparison detect changed
+types and members as well as added or removed identities. Do not maintain a
+second handwritten stability inventory.
 
 The handwritten public API is mechanically recorded in
 `codexsdk/testdata/handwritten-api.txt`. Generated `protocolv2` declarations and
@@ -51,8 +53,8 @@ protocol fact guarded by generator reproducibility tests.
 7. Update `manifest.json`, `coverage_matrix.json`, `drift_report.json`, and
    `matrix_update_skeleton.json`.
    The sync path derives `manifest.json.surface` and embeds its classified
-   compatibility impact in both reports. Any removed generated identity is
-   incompatible regardless of classification.
+   compatibility impact in both reports. Any removed identity or changed
+   signature is incompatible regardless of classification.
 8. Regenerate Go code:
 
    ```sh

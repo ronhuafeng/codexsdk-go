@@ -1,8 +1,10 @@
 package protocolgen
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"sort"
@@ -52,7 +54,7 @@ func ClassifyExportedPackage(stableSources, completeSources [][]byte) ([]Surface
 		if stableItem, ok := stable[key]; ok && stableItem.Kind == item.Kind {
 			stability = StabilityStable
 		}
-		entries = append(entries, SurfaceEntry{Name: item.Name, Kind: item.Kind, Owner: item.Owner, Stability: stability})
+		entries = append(entries, SurfaceEntry{Name: item.Name, Kind: item.Kind, Owner: item.Owner, Signature: item.Signature, Stability: stability})
 	}
 	markMixedOwners(entries)
 	sortSurface(entries)
@@ -69,8 +71,8 @@ func ValidateSurface(entries []SurfaceEntry) error {
 	seen := map[string]bool{}
 	for _, entry := range entries {
 		key := string(entry.Kind) + "\x00" + entry.Name
-		if entry.Name == "" {
-			return fmt.Errorf("surface entry has no name")
+		if entry.Name == "" || entry.Signature == "" {
+			return fmt.Errorf("surface entry is missing name or signature: %#v", entry)
 		}
 		switch entry.Kind {
 		case SurfaceConst, SurfaceField, SurfaceFunc, SurfaceInterface, SurfaceMethod, SurfaceType, SurfaceValue, SurfaceVar:
@@ -103,13 +105,17 @@ func VerifyExportedPackage(completeSources [][]byte, entries []SurfaceEntry) err
 	if err != nil {
 		return err
 	}
-	classified := map[string]bool{}
+	classified := map[string]SurfaceEntry{}
 	for _, entry := range entries {
-		classified[string(entry.Kind)+"\x00"+entry.Name] = true
+		classified[string(entry.Kind)+"\x00"+entry.Name] = entry
 	}
 	for key, item := range exported {
-		if !classified[key] {
+		entry, ok := classified[key]
+		if !ok {
 			return fmt.Errorf("exported generated %s %q is unclassified", item.Kind, item.Name)
+		}
+		if entry.Signature != item.Signature {
+			return fmt.Errorf("exported generated %s %q signature is %q, classified as %q", item.Kind, item.Name, item.Signature, entry.Signature)
 		}
 	}
 	for key := range classified {
@@ -161,9 +167,10 @@ func memberOwner(entry SurfaceEntry) string {
 }
 
 type exportedIdentity struct {
-	Kind  SurfaceKind
-	Name  string
-	Owner string
+	Kind      SurfaceKind
+	Name      string
+	Owner     string
+	Signature string
 }
 
 func exportedPackageSurface(sources [][]byte) (map[string]exportedIdentity, error) {
@@ -184,13 +191,14 @@ func exportedPackageSurface(sources [][]byte) (map[string]exportedIdentity, erro
 }
 
 func exportedFileSurface(source []byte, filename string) (map[string]exportedIdentity, error) {
-	file, err := parser.ParseFile(token.NewFileSet(), filename, source, 0)
+	fileSet := token.NewFileSet()
+	file, err := parser.ParseFile(fileSet, filename, source, 0)
 	if err != nil {
 		return nil, err
 	}
 	result := map[string]exportedIdentity{}
-	add := func(kind SurfaceKind, name, owner string) {
-		item := exportedIdentity{Kind: kind, Name: name, Owner: owner}
+	add := func(kind SurfaceKind, name, owner, signature string) {
+		item := exportedIdentity{Kind: kind, Name: name, Owner: owner, Signature: signature}
 		result[string(kind)+"\x00"+name] = item
 	}
 	for _, decl := range file.Decls {
@@ -202,8 +210,8 @@ func exportedFileSurface(source []byte, filename string) (map[string]exportedIde
 					if !item.Name.IsExported() {
 						continue
 					}
-					add(SurfaceType, item.Name.Name, "")
-					collectTypeMembers(add, item.Name.Name, item.Type)
+					add(SurfaceType, item.Name.Name, "", formatNode(fileSet, item.Type))
+					collectTypeMembers(fileSet, add, item.Name.Name, item.Type)
 				case *ast.ValueSpec:
 					kind := SurfaceVar
 					if node.Tok == token.CONST {
@@ -213,9 +221,17 @@ func exportedFileSurface(source []byte, filename string) (map[string]exportedIde
 					if node.Tok == token.CONST && owner != "" {
 						kind = SurfaceValue
 					}
-					for _, name := range item.Names {
+					for index, name := range item.Names {
 						if name.IsExported() {
-							add(kind, name.Name, owner)
+							signature := formatNode(fileSet, item.Type)
+							if len(item.Values) > 0 {
+								valueIndex := index
+								if valueIndex >= len(item.Values) {
+									valueIndex = len(item.Values) - 1
+								}
+								signature += " = " + formatNode(fileSet, item.Values[valueIndex])
+							}
+							add(kind, name.Name, owner, signature)
 						}
 					}
 				}
@@ -225,24 +241,28 @@ func exportedFileSurface(source []byte, filename string) (map[string]exportedIde
 				continue
 			}
 			if node.Recv == nil {
-				add(SurfaceFunc, node.Name.Name, "")
+				add(SurfaceFunc, node.Name.Name, "", formatNode(fileSet, node.Type))
 				continue
 			}
 			if owner := receiverName(node.Recv.List[0].Type); owner != "" && ast.IsExported(owner) {
-				add(SurfaceMethod, owner+"."+node.Name.Name, owner)
+				add(SurfaceMethod, owner+"."+node.Name.Name, owner, formatNode(fileSet, node.Type))
 			}
 		}
 	}
 	return result, nil
 }
 
-func collectTypeMembers(add func(SurfaceKind, string, string), owner string, expression ast.Expr) {
+func collectTypeMembers(fileSet *token.FileSet, add func(SurfaceKind, string, string, string), owner string, expression ast.Expr) {
 	switch node := expression.(type) {
 	case *ast.StructType:
 		for _, field := range node.Fields.List {
 			for _, name := range field.Names {
 				if name.IsExported() {
-					add(SurfaceField, owner+"."+name.Name, owner)
+					signature := formatNode(fileSet, field.Type)
+					if field.Tag != nil {
+						signature += " " + field.Tag.Value
+					}
+					add(SurfaceField, owner+"."+name.Name, owner, signature)
 				}
 			}
 		}
@@ -250,11 +270,22 @@ func collectTypeMembers(add func(SurfaceKind, string, string), owner string, exp
 		for _, field := range node.Methods.List {
 			for _, name := range field.Names {
 				if name.IsExported() {
-					add(SurfaceInterface, owner+"."+name.Name, owner)
+					add(SurfaceInterface, owner+"."+name.Name, owner, formatNode(fileSet, field.Type))
 				}
 			}
 		}
 	}
+}
+
+func formatNode(fileSet *token.FileSet, node any) string {
+	if node == nil {
+		return "implicit"
+	}
+	var out bytes.Buffer
+	if err := format.Node(&out, fileSet, node); err != nil {
+		panic(fmt.Sprintf("format parsed generated node: %v", err))
+	}
+	return out.String()
 }
 
 func expressionName(expression ast.Expr) string {

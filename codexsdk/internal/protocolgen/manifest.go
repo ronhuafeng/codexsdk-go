@@ -19,6 +19,7 @@ type SurfaceEntry struct {
 	Kind      SurfaceKind `json:"kind"`
 	Name      string      `json:"name"`
 	Owner     string      `json:"owner,omitempty"`
+	Signature string      `json:"signature"`
 	Stability Stability   `json:"stability"`
 }
 

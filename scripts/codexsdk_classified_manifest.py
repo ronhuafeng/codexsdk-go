@@ -54,17 +54,28 @@ def prepare_generation_root(source: Path, complete: Path, destination: Path) -> 
 
     complete_manifest = load_json(complete / "manifest.json")
     stable_methods = {
-        method.get("method")
-        for method in coverage.get("methods", [])
-        if method.get("stability") == "stable"
+        entry.get("method")
+        for entry in complete_manifest.get("entries", [])
+        if entry.get("stability") == "stable"
     }
     complete_manifest["entries"] = [
         entry for entry in complete_manifest.get("entries", []) if entry.get("method") in stable_methods
     ]
     # The method registry does not consume surface metadata. This valid seed is
     # replaced by the derived surface before anything is checked in.
-    complete_manifest["surface"] = [{"kind": "type", "name": "SurfaceSeed", "stability": "stable"}]
+    complete_manifest["surface"] = [
+        {"kind": "type", "name": "SurfaceSeed", "signature": "struct{}", "stability": "stable"}
+    ]
     write_json(destination / "manifest.json", complete_manifest)
+
+
+def prepare_complete_generation_root(source: Path, destination: Path) -> None:
+    shutil.copytree(source, destination)
+    manifest = load_json(destination / "manifest.json")
+    manifest["surface"] = [
+        {"kind": "type", "name": "SurfaceSeed", "signature": "struct{}", "stability": "stable"}
+    ]
+    write_json(destination / "manifest.json", manifest)
 
 
 def generate_package(schema_root: Path, output: Path) -> Path:
@@ -108,9 +119,11 @@ def derive_surface(stable_schema: Path, complete_schema: Path) -> list[dict[str,
     with tempfile.TemporaryDirectory() as raw_tmp:
         tmp = Path(raw_tmp)
         stable_root = tmp / "stable-schema"
+        complete_root = tmp / "complete-schema"
         prepare_generation_root(stable_schema, complete_schema, stable_root)
+        prepare_complete_generation_root(complete_schema, complete_root)
         stable_source = generate_package(stable_root, tmp / "stable-go")
-        complete_source = generate_package(complete_schema, tmp / "complete-go")
+        complete_source = generate_package(complete_root, tmp / "complete-go")
         return classify_surface(stable_source, complete_source)
 
 
