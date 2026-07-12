@@ -67,6 +67,9 @@ class TrackUpstreamTest(unittest.TestCase):
                         "if sys.argv[1:4] == ['app-server', 'generate-json-schema', '--experimental'] and sys.argv[4] == '--out':",
                         "    shutil.copytree(source, Path(sys.argv[5]), dirs_exist_ok=True)",
                         "    raise SystemExit(0)",
+                        "if sys.argv[1:3] == ['app-server', 'generate-json-schema'] and sys.argv[3] == '--out':",
+                        "    shutil.copytree(source, Path(sys.argv[4]), dirs_exist_ok=True)",
+                        "    raise SystemExit(0)",
                         "raise SystemExit(f'unexpected args: {sys.argv[1:]}')",
                         "",
                     ]
@@ -108,6 +111,8 @@ class TrackUpstreamTest(unittest.TestCase):
             self.assertEqual(completed.stdout, "")
             self.assertEqual(completed.stderr, "")
             self.assertTrue((reports / "SUMMARY.md").exists())
+            self.assertTrue((out / "schema" / "ClientRequest.json").exists())
+            self.assertTrue((out / "stable-schema" / "ClientRequest.json").exists())
             self.assertEqual(drift["status"], "clean")
             self.assertEqual(sorted(drift.keys()), ["comparison_mode", "file_diff", "matrix_update_skeleton", "method_diff", "status", "target"])
             self.assertEqual(matrix["status"], "empty")
