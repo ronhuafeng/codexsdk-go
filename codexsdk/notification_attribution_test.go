@@ -40,7 +40,7 @@ func TestUnknownFutureNotificationKindFailsClosed(t *testing.T) {
 
 func TestIdentifierFreeGlobalFamiliesOnlyReachGlobalQueue(t *testing.T) {
 	c := &client{
-		ctx: context.Background(), notifications: make(chan protocolv2.ServerNotification, 3),
+		ctx: context.Background(), notifications: make(chan acceptedNotification, 3),
 		exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{},
 	}
 	first := newExactRunState(c, "thread-a", StartedThreadRun{})
@@ -62,7 +62,7 @@ func TestIdentifierFreeGlobalFamiliesOnlyReachGlobalQueue(t *testing.T) {
 	for index, input := range inputs {
 		c.routeNotification(input)
 		got := <-c.notifications
-		gotJSON, gotErr := got.MarshalJSON()
+		gotJSON, gotErr := got.notification.MarshalJSON()
 		wantJSON, wantErr := wants[index].MarshalJSON()
 		if gotErr != nil || wantErr != nil || string(gotJSON) != string(wantJSON) {
 			t.Fatalf("global queue value = %s (%v), want independently constructed %s (%v)", gotJSON, gotErr, wantJSON, wantErr)
@@ -196,7 +196,7 @@ func TestAttributionClassesFollowGeneratedSchemaIdentityFacts(t *testing.T) {
 func TestExactAttributionSeparatesTurnThreadAndGlobalFacts(t *testing.T) {
 	c := &client{
 		ctx:            context.Background(),
-		notifications:  make(chan protocolv2.ServerNotification, 8),
+		notifications:  make(chan acceptedNotification, 8),
 		exactStreams:   map[string]map[*exactRunState]struct{}{},
 		exactAttaching: map[string]map[*exactRunState]struct{}{},
 	}
@@ -234,7 +234,7 @@ func TestExactAttributionSeparatesTurnThreadAndGlobalFacts(t *testing.T) {
 	}
 	var globalKinds []protocolv2.ServerNotificationKind
 	for len(c.notifications) > 0 {
-		globalKinds = append(globalKinds, (<-c.notifications).Kind())
+		globalKinds = append(globalKinds, (<-c.notifications).notification.Kind())
 	}
 	wantGlobal := []protocolv2.ServerNotificationKind{
 		protocolv2.ServerNotificationKindModelRerouted,
@@ -275,7 +275,7 @@ func TestThreadAttributionReachesEveryCurrentRunOnSameThread(t *testing.T) {
 func TestRunEvidenceAppendPrecedesGlobalHandlerEnqueue(t *testing.T) {
 	c := &client{
 		ctx:            context.Background(),
-		notifications:  make(chan protocolv2.ServerNotification, 1),
+		notifications:  make(chan acceptedNotification, 1),
 		exactStreams:   map[string]map[*exactRunState]struct{}{},
 		exactAttaching: map[string]map[*exactRunState]struct{}{},
 	}
@@ -299,7 +299,7 @@ func TestRunEvidenceAppendPrecedesGlobalHandlerEnqueue(t *testing.T) {
 	}
 	select {
 	case got := <-c.notifications:
-		t.Fatalf("global handler queue received %s before run append", got.Kind())
+		t.Fatalf("global handler queue received %s before run append", got.notification.Kind())
 	default:
 	}
 	close(release)
@@ -311,8 +311,8 @@ func TestRunEvidenceAppendPrecedesGlobalHandlerEnqueue(t *testing.T) {
 	if len(exactNotificationKinds(state)) != 1 {
 		t.Fatal("run evidence was not appended")
 	}
-	if got := <-c.notifications; got.Kind() != protocolv2.ServerNotificationKindModelRerouted {
-		t.Fatalf("global handler queue received %s", got.Kind())
+	if got := <-c.notifications; got.notification.Kind() != protocolv2.ServerNotificationKindModelRerouted {
+		t.Fatalf("global handler queue received %s", got.notification.Kind())
 	}
 }
 

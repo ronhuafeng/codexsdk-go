@@ -14,7 +14,10 @@
 // active or attaching for that thread and are not retained for a later run;
 // client/global facts never enter per-run evidence. Every validated generated
 // notification is still enqueued for the global handler, in ingestion order,
-// after its justified per-run append completes.
+// after its justified per-run append completes. A terminal exact notification
+// cannot complete its affected stream until that notification's global handler
+// invocation has returned and any handler failure is published as the client
+// first cause.
 // Client shutdown atomically closes callback admission and joins callbacks
 // accepted before that boundary before releasing transport resources.
 //

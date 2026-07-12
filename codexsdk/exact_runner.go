@@ -362,22 +362,22 @@ func (s *exactRunState) turnIDSnapshot() string {
 }
 
 func (s *exactRunState) accept(notification protocolv2.ServerNotification) error {
-	finished, err := s.acceptState(notification)
+	finished, _, err := s.acceptState(notification, false)
 	if finished {
 		s.unregister()
 	}
 	return err
 }
 
-func (s *exactRunState) acceptState(notification protocolv2.ServerNotification) (bool, error) {
+func (s *exactRunState) acceptState(notification protocolv2.ServerNotification, deferTerminal bool) (bool, func(), error) {
 	cloned, err := cloneJSON(notification)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	s.mu.Lock()
 	if s.terminal {
 		s.mu.Unlock()
-		return false, nil
+		return false, nil, nil
 	}
 	s.updateRunLocked(func(run *ThreadRunResult) {
 		run.Notifications = append(run.Notifications, cloned)
@@ -392,17 +392,32 @@ func (s *exactRunState) acceptState(notification protocolv2.ServerNotification) 
 	select {
 	case s.events <- cloned:
 	case <-s.done:
-		return false, nil
+		return false, nil, nil
 	default:
-		return false, ErrNotificationBackpressure
+		return false, nil, ErrNotificationBackpressure
 	}
 	if terminal {
-		return s.finishState(terminalErr), nil
+		if deferTerminal {
+			return false, func() {
+				if s.finishState(terminalErr) {
+					s.unregister()
+				}
+			}, nil
+		}
+		return s.finishState(terminalErr), nil, nil
 	}
-	return false, nil
+	return false, nil, nil
 }
 
 func (s *exactRunState) acceptOrdered(notification protocolv2.ServerNotification) error {
+	completion, err := s.acceptOrderedBeforeTerminalCompletion(notification)
+	if completion != nil {
+		completion()
+	}
+	return err
+}
+
+func (s *exactRunState) acceptOrderedBeforeTerminalCompletion(notification protocolv2.ServerNotification) (func(), error) {
 	if s.testAtNotificationOrderGate != nil {
 		s.testAtNotificationOrderGate()
 	}
@@ -410,12 +425,9 @@ func (s *exactRunState) acceptOrdered(notification protocolv2.ServerNotification
 	if s.testAfterNotificationOrderLocked != nil {
 		s.testAfterNotificationOrderLocked()
 	}
-	finished, err := s.acceptState(notification)
+	_, completion, err := s.acceptState(notification, true)
 	s.notificationOrderMu.Unlock()
-	if finished {
-		s.unregister()
-	}
-	return err
+	return completion, err
 }
 
 func (s *exactRunState) applyTerminalLocked(notification protocolv2.ServerNotification) (bool, error) {

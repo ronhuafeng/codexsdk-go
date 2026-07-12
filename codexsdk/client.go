@@ -42,7 +42,7 @@ type client struct {
 	shutdownOnce   sync.Once
 	dispatchStop   chan struct{}
 	dispatcherDone chan struct{}
-	notifications  chan protocolv2.ServerNotification
+	notifications  chan acceptedNotification
 
 	writeMu sync.Mutex
 	stdin   io.WriteCloser
@@ -94,6 +94,11 @@ type rpcNotification struct {
 	params map[string]any
 }
 
+type acceptedNotification struct {
+	notification protocolv2.ServerNotification
+	dispatched   chan struct{}
+}
+
 type rpcServerRequest struct {
 	id       any
 	method   string
@@ -130,7 +135,7 @@ func New(options ClientOptions) (Client, error) {
 	if queueCapacity == 0 {
 		queueCapacity = 64
 	}
-	c.notifications = make(chan protocolv2.ServerNotification, queueCapacity)
+	c.notifications = make(chan acceptedNotification, queueCapacity)
 	go c.notificationDispatcher()
 	if err := c.start(); err != nil {
 		cancel()
@@ -829,12 +834,23 @@ func (c *client) routeNotification(notification rpcNotification) {
 		c.routeNotificationError(notification, err)
 		return
 	}
+	var terminalCompletions []func()
 	defer func() {
-		if err := c.enqueueNotification(typed); err != nil {
+		dispatched, err := c.enqueueNotification(typed, len(terminalCompletions) > 0)
+		if err != nil {
 			c.failClient(err)
+			return
+		}
+		if dispatched != nil {
+			<-dispatched
+		}
+		for _, complete := range terminalCompletions {
+			complete()
 		}
 	}()
-	if c.routeExactNotification(notification, typed) {
+	var routed bool
+	routed, terminalCompletions = c.routeExactNotificationBeforeTerminalCompletion(notification, typed)
+	if routed {
 		return
 	}
 	turnID := turnIDFromNotification(notification.method, notification.params)
@@ -872,9 +888,17 @@ func exactNotification(notification rpcNotification) (protocolv2.ServerNotificat
 }
 
 func (c *client) routeExactNotification(notification rpcNotification, typed protocolv2.ServerNotification) bool {
+	routed, completions := c.routeExactNotificationBeforeTerminalCompletion(notification, typed)
+	for _, complete := range completions {
+		complete()
+	}
+	return routed
+}
+
+func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpcNotification, typed protocolv2.ServerNotification) (bool, []func()) {
 	class, identity := attributionFor(typed)
 	if class == notificationAttributionGlobal || class == notificationAttributionUnsupported {
-		return false
+		return false, nil
 	}
 	c.turnMu.Lock()
 	var targets []*exactRunState
@@ -882,7 +906,7 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 	case notificationAttributionTurn:
 		if identity.turnID == "" {
 			c.turnMu.Unlock()
-			return false
+			return false, nil
 		}
 		for stream := range c.exactStreams[identity.turnID] {
 			targets = append(targets, stream)
@@ -895,7 +919,7 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 	case notificationAttributionThread:
 		if identity.threadID == "" {
 			c.turnMu.Unlock()
-			return false
+			return false, nil
 		}
 		for _, streams := range c.exactStreams {
 			for stream := range streams {
@@ -915,8 +939,13 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 	c.turnMu.Unlock()
 	var deliveryErr error
 	var failedStream *exactRunState
+	var terminalCompletions []func()
 	for _, stream := range targets {
-		if err := stream.acceptOrdered(typed); err != nil {
+		completion, err := stream.acceptOrderedBeforeTerminalCompletion(typed)
+		if completion != nil {
+			terminalCompletions = append(terminalCompletions, completion)
+		}
+		if err != nil {
 			if deliveryErr == nil {
 				deliveryErr = err
 				failedStream = stream
@@ -926,7 +955,7 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 	if deliveryErr != nil {
 		c.failExactNotificationDelivery(failedStream, deliveryErr)
 	}
-	return len(targets) > 0
+	return len(targets) > 0, terminalCompletions
 }
 
 func (c *client) failExactNotificationDelivery(stream *exactRunState, err error) {

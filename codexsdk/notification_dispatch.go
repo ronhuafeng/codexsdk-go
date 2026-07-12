@@ -9,24 +9,29 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-func (c *client) enqueueNotification(notification protocolv2.ServerNotification) error {
+func (c *client) enqueueNotification(notification protocolv2.ServerNotification, waitForDispatch bool) (<-chan struct{}, error) {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	if c.closed {
-		return nil
+		return nil, nil
 	}
 	hasHandler := c.options.ServerNotificationHandler != nil
+	var dispatched chan struct{}
+	if hasHandler && waitForDispatch {
+		dispatched = make(chan struct{})
+	}
+	accepted := acceptedNotification{notification: notification, dispatched: dispatched}
 	if hasHandler {
 		c.handlerWG.Add(1)
 	}
 	select {
-	case c.notifications <- notification:
-		return nil
+	case c.notifications <- accepted:
+		return dispatched, nil
 	default:
 		if hasHandler {
 			c.handlerWG.Done()
 		}
-		return ErrNotificationBackpressure
+		return nil, ErrNotificationBackpressure
 	}
 }
 
@@ -35,20 +40,23 @@ func (c *client) notificationDispatcher() {
 	handler := c.options.ServerNotificationHandler
 	for {
 		select {
-		case notification := <-c.notifications:
+		case accepted := <-c.notifications:
 			if c.ctx.Err() != nil {
 				c.endNotificationHandler()
+				if accepted.dispatched != nil {
+					close(accepted.dispatched)
+				}
 				c.discardAcceptedNotifications()
 				return
 			}
-			if handler != nil && !c.dispatchAcceptedNotification(handler, notification) {
+			if handler != nil && !c.dispatchAcceptedNotification(handler, accepted) {
 				return
 			}
 		case <-c.dispatchStop:
 			for {
 				select {
-				case notification := <-c.notifications:
-					if handler != nil && !c.dispatchAcceptedNotification(handler, notification) {
+				case accepted := <-c.notifications:
+					if handler != nil && !c.dispatchAcceptedNotification(handler, accepted) {
 						return
 					}
 				default:
@@ -62,14 +70,20 @@ func (c *client) notificationDispatcher() {
 	}
 }
 
-func (c *client) dispatchAcceptedNotification(handler ServerNotificationHandler, notification protocolv2.ServerNotification) bool {
-	err := invokeNotificationHandler(c.ctx, handler, notification)
+func (c *client) dispatchAcceptedNotification(handler ServerNotificationHandler, accepted acceptedNotification) bool {
+	err := invokeNotificationHandler(c.ctx, handler, accepted.notification)
 	c.endNotificationHandler()
 	if err == nil {
+		if accepted.dispatched != nil {
+			close(accepted.dispatched)
+		}
 		return true
 	}
-	c.discardAcceptedNotifications()
 	c.failClient(err)
+	c.discardAcceptedNotifications()
+	if accepted.dispatched != nil {
+		close(accepted.dispatched)
+	}
 	return false
 }
 
@@ -111,8 +125,11 @@ func (c *client) discardAcceptedNotifications() {
 	}
 	for {
 		select {
-		case <-c.notifications:
+		case accepted := <-c.notifications:
 			c.handlerWG.Done()
+			if accepted.dispatched != nil {
+				close(accepted.dispatched)
+			}
 		default:
 			return
 		}
