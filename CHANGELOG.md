@@ -13,6 +13,10 @@ All notable changes to this project are documented here.
 - The zero-value `Client` is safe and inert: `Close` succeeds and operations
   return `ErrClientClosed`. Consumers should define narrow interfaces at their
   own test and adapter seams.
+- Removed the deprecated v0.1 `ThreadClient`, projected streams, copied
+  protocol models and enums, conversion helpers, compatibility initialization
+  fields, and legacy server-request callback path. Use `ThreadRunner`, exact
+  `protocolv2` values, generated facades, and `ServerRequestHandler`.
 
 ### Added
 

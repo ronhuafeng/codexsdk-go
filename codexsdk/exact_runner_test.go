@@ -533,11 +533,7 @@ func TestExactRunWithoutHandlerFailsClosedInsteadOfUsingLegacyPendingQueue(t *te
 	}
 	client := root
 	client.turnMu.Lock()
-	pending := len(client.pendingServer)
 	client.turnMu.Unlock()
-	if pending != 0 {
-		t.Fatalf("exact request entered legacy pending queue: %#v", client.pendingServer)
-	}
 	if err := root.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -558,11 +554,7 @@ func TestExactRunNilHandlerFailClosedResponsesAreDeterministic(t *testing.T) {
 			}
 			client := root
 			client.turnMu.Lock()
-			pending := len(client.pendingServer)
 			client.turnMu.Unlock()
-			if pending != 0 {
-				t.Fatalf("exact request entered legacy pending queue: %#v", client.pendingServer)
-			}
 			if err := root.Close(); err != nil {
 				t.Fatal(err)
 			}
@@ -1301,12 +1293,10 @@ func TestExactRunnerProducesSanitizedDiagnosticForMalformedNotification(t *testi
 
 func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 	c := &Client{
-		exactStreams:        map[string]map[*exactRunState]struct{}{},
-		exactAttaching:      map[string]map[*exactRunState]struct{}{},
-		pendingEvents:       map[string][]rpcNotification{},
-		pendingErrors:       map[string]error{},
-		pendingDiagnostics:  map[string][]DiagnosticRef{},
-		pendingThreadEvents: map[string][]rpcNotification{},
+		exactStreams:       map[string]map[*exactRunState]struct{}{},
+		exactAttaching:     map[string]map[*exactRunState]struct{}{},
+		pendingEvents:      map[string][]rpcNotification{},
+		pendingDiagnostics: map[string][]DiagnosticRef{},
 	}
 	state := newExactRunState(nil, "thread-1", StartedThreadRun{Start: facadeThreadStartResponse("thread-1", "model")})
 	state.turnID = "turn-1"
@@ -1384,12 +1374,10 @@ func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 
 func TestExactTerminalDeliveryDoesNotDeadlockWithAttachment(t *testing.T) {
 	c := &Client{
-		exactStreams:        map[string]map[*exactRunState]struct{}{},
-		exactAttaching:      map[string]map[*exactRunState]struct{}{},
-		pendingEvents:       map[string][]rpcNotification{},
-		pendingErrors:       map[string]error{},
-		pendingDiagnostics:  map[string][]DiagnosticRef{},
-		pendingThreadEvents: map[string][]rpcNotification{},
+		exactStreams:       map[string]map[*exactRunState]struct{}{},
+		exactAttaching:     map[string]map[*exactRunState]struct{}{},
+		pendingEvents:      map[string][]rpcNotification{},
+		pendingDiagnostics: map[string][]DiagnosticRef{},
 	}
 	state := newExactRunState(c, "thread-deadlock", StartedThreadRun{Start: facadeThreadStartResponse("thread-deadlock", "model")})
 	state.turnID = "turn-deadlock"
@@ -1443,12 +1431,10 @@ func TestExactTerminalDeliveryDoesNotDeadlockWithAttachment(t *testing.T) {
 
 func TestExactTerminalBeforeAttachmentIsNotPublishedAsLive(t *testing.T) {
 	c := &Client{
-		exactStreams:        map[string]map[*exactRunState]struct{}{},
-		exactAttaching:      map[string]map[*exactRunState]struct{}{},
-		pendingEvents:       map[string][]rpcNotification{},
-		pendingErrors:       map[string]error{},
-		pendingDiagnostics:  map[string][]DiagnosticRef{},
-		pendingThreadEvents: map[string][]rpcNotification{},
+		exactStreams:       map[string]map[*exactRunState]struct{}{},
+		exactAttaching:     map[string]map[*exactRunState]struct{}{},
+		pendingEvents:      map[string][]rpcNotification{},
+		pendingDiagnostics: map[string][]DiagnosticRef{},
 	}
 	state := newExactRunState(c, "thread-terminal-first", StartedThreadRun{Start: facadeThreadStartResponse("thread-terminal-first", "model")})
 	state.turnID = "turn-terminal-first"
@@ -1481,12 +1467,10 @@ func TestExactRunTurnIDAccessIsRaceFreeAcrossAttributionAndLifecycle(t *testing.
 	const repetitions = 100
 	for index := 0; index < repetitions; index++ {
 		c := &Client{
-			exactStreams:        map[string]map[*exactRunState]struct{}{},
-			exactAttaching:      map[string]map[*exactRunState]struct{}{},
-			pendingEvents:       map[string][]rpcNotification{},
-			pendingErrors:       map[string]error{},
-			pendingDiagnostics:  map[string][]DiagnosticRef{},
-			pendingThreadEvents: map[string][]rpcNotification{},
+			exactStreams:       map[string]map[*exactRunState]struct{}{},
+			exactAttaching:     map[string]map[*exactRunState]struct{}{},
+			pendingEvents:      map[string][]rpcNotification{},
+			pendingDiagnostics: map[string][]DiagnosticRef{},
 		}
 		threadID := "thread-race-" + itoa(index)
 		turnID := "turn-race-" + itoa(index)
@@ -1617,12 +1601,10 @@ func assertExactOverflowClientContract(t *testing.T, mode string, terminal bool)
 
 func TestExactRunAttachDoesNotSerializeUnrelatedRuns(t *testing.T) {
 	c := &Client{
-		exactStreams:        map[string]map[*exactRunState]struct{}{},
-		exactAttaching:      map[string]map[*exactRunState]struct{}{},
-		pendingEvents:       map[string][]rpcNotification{},
-		pendingErrors:       map[string]error{},
-		pendingDiagnostics:  map[string][]DiagnosticRef{},
-		pendingThreadEvents: map[string][]rpcNotification{},
+		exactStreams:       map[string]map[*exactRunState]struct{}{},
+		exactAttaching:     map[string]map[*exactRunState]struct{}{},
+		pendingEvents:      map[string][]rpcNotification{},
+		pendingDiagnostics: map[string][]DiagnosticRef{},
 	}
 	attaching := newExactRunState(nil, "thread-attaching", StartedThreadRun{Start: facadeThreadStartResponse("thread-attaching", "model")})
 	attaching.turnID = "turn-attaching"
@@ -1673,12 +1655,10 @@ func TestExactRunAttachDoesNotSerializeUnrelatedRuns(t *testing.T) {
 
 func TestExactRunAttachKeepsLatestRerouteFactLive(t *testing.T) {
 	c := &Client{
-		exactStreams:        map[string]map[*exactRunState]struct{}{},
-		exactAttaching:      map[string]map[*exactRunState]struct{}{},
-		pendingEvents:       map[string][]rpcNotification{},
-		pendingErrors:       map[string]error{},
-		pendingDiagnostics:  map[string][]DiagnosticRef{},
-		pendingThreadEvents: map[string][]rpcNotification{},
+		exactStreams:       map[string]map[*exactRunState]struct{}{},
+		exactAttaching:     map[string]map[*exactRunState]struct{}{},
+		pendingEvents:      map[string][]rpcNotification{},
+		pendingDiagnostics: map[string][]DiagnosticRef{},
 	}
 	state := newExactRunState(nil, "thread-1", StartedThreadRun{Start: facadeThreadStartResponse("thread-1", "model-a")})
 	state.turnID = "turn-1"

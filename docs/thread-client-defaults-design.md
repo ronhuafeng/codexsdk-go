@@ -1,6 +1,10 @@
 # Thread Client Defaults Design
 
-Status: implemented
+Status: historical; API removed in v0.3
+
+This document records the former v0.1 compatibility design. Its declarations
+were removed in favor of exact generated params and `ThreadRunner`; see
+[the migration mapping](v0.2-migration.md#removed-v01-mapping).
 
 ## Summary
 

@@ -43,6 +43,11 @@ func listModels(ctx context.Context, models ModelLister) error {
 The repository compile-checks these patterns without an SDK-owned root
 interface.
 
+The deprecated v0.1 projected lifecycle and copied protocol compatibility
+types are not part of this boundary. `ThreadRunner` is the only handwritten
+thread/turn lifecycle API; generated facades and `protocolv2` are the factual
+operation and model source.
+
 ## Construction and ownership
 
 `New` requires `ClientOptions` and starts and initializes one app-server
