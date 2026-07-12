@@ -233,12 +233,16 @@ func TestNormalCloseWaitsForAcceptedNotificationHandler(t *testing.T) {
 
 func TestNotificationQueueOverflowPreservesFirstFailure(t *testing.T) {
 	started := make(chan struct{})
+	notificationAccepted := filepath.Join(t.TempDir(), "notification-accepted")
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
 		CWD:                       t.TempDir(),
-		Command:                   fakeCommand("happy"),
+		Command:                   fakeNotificationOverflowCommand(notificationAccepted),
 		NotificationQueueCapacity: 1,
 		ServerNotificationHandler: func(ctx context.Context, _ protocolv2.ServerNotification) error {
+			if err := os.WriteFile(notificationAccepted, []byte("accepted"), 0o600); err != nil {
+				return err
+			}
 			select {
 			case <-started:
 			default:
@@ -252,7 +256,11 @@ func TestNotificationQueueOverflowPreservesFirstFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _ = root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
-	<-started
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("notification handler did not accept the first notification")
+	}
 	if closeErr := root.Close(); !errors.Is(closeErr, ErrNotificationBackpressure) {
 		t.Fatalf("Close error = %v, want ErrNotificationBackpressure", closeErr)
 	}
