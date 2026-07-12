@@ -136,4 +136,6 @@ jobs:
           cache: true
 
       - name: Compile isolated consumer
+        env:
+          CODEXSDK_CONSUMER_REF: ${{ github.event.pull_request.head.sha || github.sha }}
         run: scripts/codexsdk_test_clean_consumer.sh

@@ -303,11 +303,17 @@ func TestZeroValueClientIsSafeAndInert(t *testing.T) {
 	if _, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{}); !errors.Is(err, ErrClientClosed) {
 		t.Fatalf("zero-value ThreadRunner.Start error = %v, want ErrClientClosed", err)
 	}
+	if _, err := root.ThreadRunner().Resume(context.Background(), ResumeThreadRunRequest{}); !errors.Is(err, ErrClientClosed) {
+		t.Fatalf("zero-value ThreadRunner.Resume error = %v, want ErrClientClosed", err)
+	}
 	if _, err := root.ThreadClient(ThreadClientOptions{}).StartThread(context.Background(), StartThreadRequest{}); !errors.Is(err, ErrClientClosed) {
 		t.Fatalf("zero-value ThreadClient.StartThread error = %v, want ErrClientClosed", err)
 	}
 	if _, err := root.Models().List(context.Background(), protocolv2.ModelListParams{}); !errors.Is(err, ErrClientClosed) {
 		t.Fatalf("zero-value Models.List error = %v, want ErrClientClosed", err)
+	}
+	if _, err := root.Accounts().Logout(context.Background()); !errors.Is(err, ErrClientClosed) {
+		t.Fatalf("zero-value Accounts.Logout error = %v, want ErrClientClosed", err)
 	}
 }
 
