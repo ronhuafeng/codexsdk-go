@@ -15,7 +15,7 @@ type ThreadStream struct {
 }
 
 type threadStreamState struct {
-	client   *client
+	client   *Client
 	threadID string
 	turnID   string
 	events   chan ThreadEvent
@@ -38,7 +38,7 @@ type threadStreamState struct {
 	usage      Usage
 }
 
-func newThreadStream(c *client, threadID string) *ThreadStream {
+func newThreadStream(c *Client, threadID string) *ThreadStream {
 	parent := context.Background()
 	if c != nil && c.ctx != nil {
 		parent = c.ctx

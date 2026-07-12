@@ -487,9 +487,9 @@ func TestInternalJSONRPCReadLoopEOFFailsPendingWaits(t *testing.T) {
 	}
 }
 
-func newTransportHarness() *client {
+func newTransportHarness() *Client {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &client{
+	return &Client{
 		ctx:                 ctx,
 		cancel:              cancel,
 		stdin:               &recordingWriteCloser{},
@@ -520,7 +520,7 @@ func (w *overlapDetectingWriteCloser) Close() error {
 	return nil
 }
 
-func waitForPendingCount(t *testing.T, c *client, want int) {
+func waitForPendingCount(t *testing.T, c *Client, want int) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
@@ -532,7 +532,7 @@ func waitForPendingCount(t *testing.T, c *client, want int) {
 	t.Fatalf("pending count = %d, want %d", pendingCount(c), want)
 }
 
-func pendingCount(c *client) int {
+func pendingCount(c *Client) int {
 	count := 0
 	c.pending.Range(func(_, _ any) bool {
 		count++

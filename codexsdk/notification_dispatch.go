@@ -9,7 +9,7 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-func (c *client) enqueueNotification(notification protocolv2.ServerNotification, evidence *notificationEvidence, waitForDispatch bool) (<-chan struct{}, error) {
+func (c *Client) enqueueNotification(notification protocolv2.ServerNotification, evidence *notificationEvidence, waitForDispatch bool) (<-chan struct{}, error) {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	if c.closed {
@@ -37,7 +37,7 @@ func (c *client) enqueueNotification(notification protocolv2.ServerNotification,
 	}
 }
 
-func (c *client) notificationDispatcher() {
+func (c *Client) notificationDispatcher() {
 	defer close(c.dispatcherDone)
 	handler := c.options.ServerNotificationHandler
 	for {
@@ -80,7 +80,7 @@ func (c *client) notificationDispatcher() {
 	}
 }
 
-func (c *client) discardCurrentAndQueuedNotifications(accepted acceptedNotification) {
+func (c *Client) discardCurrentAndQueuedNotifications(accepted acceptedNotification) {
 	c.endNotificationHandler()
 	if accepted.dispatched != nil {
 		close(accepted.dispatched)
@@ -88,7 +88,7 @@ func (c *client) discardCurrentAndQueuedNotifications(accepted acceptedNotificat
 	c.discardAcceptedNotifications()
 }
 
-func (c *client) dispatchAcceptedNotification(handler ServerNotificationHandler, accepted acceptedNotification) bool {
+func (c *Client) dispatchAcceptedNotification(handler ServerNotificationHandler, accepted acceptedNotification) bool {
 	err := invokeNotificationHandler(c.ctx, handler, accepted.notification)
 	c.endNotificationHandler()
 	if err == nil {
@@ -105,7 +105,7 @@ func (c *client) dispatchAcceptedNotification(handler ServerNotificationHandler,
 	return false
 }
 
-func (c *client) beginHandler() (context.Context, bool) {
+func (c *Client) beginHandler() (context.Context, bool) {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	if c.closed {
@@ -117,7 +117,7 @@ func (c *client) beginHandler() (context.Context, bool) {
 
 // callbackContext returns the immutable client-scoped callback context.
 // Callers that admit new work must still hold closeMu while adding its WG count.
-func (c *client) callbackContext() context.Context {
+func (c *Client) callbackContext() context.Context {
 	if c.handlerCtx != nil {
 		return c.handlerCtx
 	}
@@ -127,17 +127,17 @@ func (c *client) callbackContext() context.Context {
 	return context.Background()
 }
 
-func (c *client) endHandler() {
+func (c *Client) endHandler() {
 	c.handlerWG.Done()
 }
 
-func (c *client) endNotificationHandler() {
+func (c *Client) endNotificationHandler() {
 	if c.options.ServerNotificationHandler != nil {
 		c.handlerWG.Done()
 	}
 }
 
-func (c *client) discardAcceptedNotifications() {
+func (c *Client) discardAcceptedNotifications() {
 	if c.options.ServerNotificationHandler == nil {
 		return
 	}
@@ -166,7 +166,7 @@ func invokeNotificationHandler(ctx context.Context, handler ServerNotificationHa
 	return nil
 }
 
-func (c *client) failClient(err error) {
+func (c *Client) failClient(err error) {
 	if err == nil {
 		return
 	}
@@ -186,7 +186,7 @@ func (c *client) failClient(err error) {
 	go func() { _ = c.Close() }()
 }
 
-func (c *client) shutdown() {
+func (c *Client) shutdown() {
 	c.closeMu.Lock()
 	failure := c.failure
 	c.closed = true

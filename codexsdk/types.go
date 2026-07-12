@@ -86,13 +86,6 @@ type ThreadClient interface {
 	ForkThread(ctx context.Context, req ForkThreadRequest) (ThreadForkResult, error)
 }
 
-type Client interface {
-	SDKSurface
-	ThreadRunner() ThreadRunner
-	ThreadClient(options ThreadClientOptions) ThreadClient
-	Close() error
-}
-
 type ClientOptions struct {
 	CWD                       string
 	Command                   []string

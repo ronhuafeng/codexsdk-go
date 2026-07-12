@@ -8,8 +8,8 @@ import (
 )
 
 // These consumer-owned interfaces are compile-only examples for the public
-// boundary selected in issue #44. They deliberately describe only the methods
-// each consumer needs and do not embed codexsdk.SDKSurface.
+// concrete boundary implemented in issue #62. They deliberately describe only
+// the methods each consumer needs.
 type runStarter interface {
 	Start(context.Context, codexsdk.StartThreadRunRequest) (codexsdk.StartedThreadRun, error)
 }
@@ -29,6 +29,15 @@ func compileModelConsumer(ctx context.Context, models modelLister) error {
 }
 
 var (
-	_ runStarter  = (codexsdk.ThreadRunner)(nil)
-	_ modelLister = (codexsdk.Models)(nil)
+	_ *codexsdk.Client = (*codexsdk.Client)(nil)
+	_ runStarter       = (codexsdk.ThreadRunner)(nil)
+	_ modelLister      = (codexsdk.Models)(nil)
 )
+
+func compileConcreteRootLifecycle(root *codexsdk.Client) error {
+	return root.Close()
+}
+
+func compileConcreteRootFacade(ctx context.Context, root *codexsdk.Client) error {
+	return compileModelConsumer(ctx, root.Models())
+}

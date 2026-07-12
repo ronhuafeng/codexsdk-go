@@ -9,7 +9,7 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-func (c *client) handleExactServerRequest(id any, request protocolv2.ServerRequest) {
+func (c *Client) handleExactServerRequest(id any, request protocolv2.ServerRequest) {
 	ctx, ok := c.beginHandler()
 	if !ok {
 		c.rejectExactServerRequestAfterAdmissionClosed(id, request)
@@ -21,7 +21,7 @@ func (c *client) handleExactServerRequest(id any, request protocolv2.ServerReque
 	}()
 }
 
-func (c *client) respondToExactServerRequest(ctx context.Context, id any, request protocolv2.ServerRequest) {
+func (c *Client) respondToExactServerRequest(ctx context.Context, id any, request protocolv2.ServerRequest) {
 	if c.options.ServerRequestHandler == nil {
 		response, ok := exactFailClosedServerRequestResponse(request)
 		if !ok {
@@ -55,7 +55,7 @@ func (c *client) respondToExactServerRequest(ctx context.Context, id any, reques
 	}
 }
 
-func (c *client) rejectExactServerRequestAfterAdmissionClosed(id any, request protocolv2.ServerRequest) {
+func (c *Client) rejectExactServerRequestAfterAdmissionClosed(id any, request protocolv2.ServerRequest) {
 	if response, ok := exactFailClosedServerRequestResponse(request); ok {
 		_ = c.writeExactServerRequestResponse(id, request, response)
 		return
@@ -66,7 +66,7 @@ func (c *client) rejectExactServerRequestAfterAdmissionClosed(id any, request pr
 	})
 }
 
-func (c *client) writeExactServerRequestResponse(id any, request protocolv2.ServerRequest, response ServerRequestResponse) error {
+func (c *Client) writeExactServerRequestResponse(id any, request protocolv2.ServerRequest, response ServerRequestResponse) error {
 	raw, err := json.Marshal(response.value)
 	if err != nil {
 		failure := fmt.Errorf("codexsdk: encode %s response: %w", request.Kind(), err)
@@ -109,7 +109,7 @@ func exactFailClosedServerRequestResponse(request protocolv2.ServerRequest) (Ser
 	}
 }
 
-func (c *client) closingNormally() bool {
+func (c *Client) closingNormally() bool {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	return c.normalClosing && c.failure == nil

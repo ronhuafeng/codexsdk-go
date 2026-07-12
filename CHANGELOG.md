@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the SDK-owned `Client`/`SDKSurface` umbrella interfaces with an
+  exported concrete `Client`; `New(ClientOptions)` now returns `*Client` while
+  retaining lifecycle methods, `ThreadRunner`, typed callbacks, partial
+  evidence, and every exact generated facade.
+- The zero-value `Client` is safe and inert: `Close` succeeds and operations
+  return `ErrClientClosed`. Consumers should define narrow interfaces at their
+  own test and adapter seams.
+
 ### Added
 
 - Non-destructive exact `Stream.Wait` observation for independent concurrent

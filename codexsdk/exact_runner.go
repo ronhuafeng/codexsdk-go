@@ -14,7 +14,7 @@ import (
 
 const exactStreamQueueCapacity = 128
 
-type exactRunner struct{ client *client }
+type exactRunner struct{ client *Client }
 
 type Stream[R any] struct {
 	mu      sync.Mutex
@@ -23,7 +23,7 @@ type Stream[R any] struct {
 }
 
 type exactRunState struct {
-	client   *client
+	client   *Client
 	threadID string
 	// turnID is guarded by mu, including reads performed while routing the run.
 	turnID string
@@ -63,7 +63,7 @@ func (e *TurnError) Unwrap() error {
 	return e.Err
 }
 
-func (c *client) ThreadRunner() ThreadRunner { return &exactRunner{client: c} }
+func (c *Client) ThreadRunner() ThreadRunner { return &exactRunner{client: c} }
 
 func (r *exactRunner) Start(ctx context.Context, request StartThreadRunRequest) (StartedThreadRun, error) {
 	stream, err := r.StartStream(ctx, request)
@@ -84,6 +84,9 @@ func (r *exactRunner) Resume(ctx context.Context, request ResumeThreadRunRequest
 func (r *exactRunner) StartStream(ctx context.Context, request StartThreadRunRequest) (*Stream[StartedThreadRun], error) {
 	if r == nil || r.client == nil {
 		return nil, ErrClientClosed
+	}
+	if err := r.client.checkOpen(); err != nil {
+		return nil, err
 	}
 	if request.Turn.ThreadID != "" {
 		return nil, errors.New("codexsdk: StartThreadRunRequest.Turn.ThreadID is composition-owned")
@@ -130,6 +133,9 @@ func (r *exactRunner) StartStream(ctx context.Context, request StartThreadRunReq
 func (r *exactRunner) ResumeStream(ctx context.Context, request ResumeThreadRunRequest) (*Stream[ResumedThreadRun], error) {
 	if r == nil || r.client == nil {
 		return nil, ErrClientClosed
+	}
+	if err := r.client.checkOpen(); err != nil {
+		return nil, err
 	}
 	if request.Turn.ThreadID != "" {
 		return nil, errors.New("codexsdk: ResumeThreadRunRequest.Turn.ThreadID is composition-owned")
@@ -372,11 +378,11 @@ func (s *Stream[R]) Close() error {
 	return nil
 }
 
-func newExactRunState(client *client, threadID string, result any) *exactRunState {
+func newExactRunState(client *Client, threadID string, result any) *exactRunState {
 	return newExactRunStateWithQueueCapacity(client, threadID, result, exactStreamQueueCapacity)
 }
 
-func (c *client) newExactRunState(threadID string, result any) *exactRunState {
+func (c *Client) newExactRunState(threadID string, result any) *exactRunState {
 	queueCapacity := exactStreamQueueCapacity
 	if c.testExactStreamQueueCapacity > 0 {
 		queueCapacity = c.testExactStreamQueueCapacity
@@ -384,7 +390,7 @@ func (c *client) newExactRunState(threadID string, result any) *exactRunState {
 	return newExactRunStateWithQueueCapacity(c, threadID, result, queueCapacity)
 }
 
-func newExactRunStateWithQueueCapacity(client *client, threadID string, result any, queueCapacity int) *exactRunState {
+func newExactRunStateWithQueueCapacity(client *Client, threadID string, result any, queueCapacity int) *exactRunState {
 	return &exactRunState{
 		client:    client,
 		threadID:  threadID,

@@ -211,7 +211,7 @@ func TestRootClientCloseWaitsForAppServerProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := root.(*client)
+	c := root
 	if c.cmd == nil || c.cmd.Process == nil {
 		t.Fatal("root client did not retain SDK-owned app-server process")
 	}
@@ -233,8 +233,8 @@ func TestRootClientCloseWaitsForAppServerProcess(t *testing.T) {
 	}
 }
 
-func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) {
-	root := reflect.TypeOf((*Client)(nil)).Elem()
+func TestConcreteRootClientDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) {
+	root := reflect.TypeOf((*Client)(nil))
 	for _, name := range []string{
 		"Call",
 		"ForkThread",
@@ -275,16 +275,12 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 	}
 
 	expected := expectedSDKSurfaceMethods(t)
-	surface := reflect.TypeOf((*SDKSurface)(nil)).Elem()
 	for accessor, methods := range expected {
-		if _, ok := root.MethodByName(accessor); !ok {
+		accessorMethod, ok := root.MethodByName(accessor)
+		if !ok {
 			t.Fatalf("root Client missing %s facade accessor", accessor)
 		}
-		surfaceMethod, ok := surface.MethodByName(accessor)
-		if !ok {
-			t.Fatalf("SDKSurface missing %s accessor", accessor)
-		}
-		facadeType := surfaceMethod.Type.Out(0)
+		facadeType := accessorMethod.Type.Out(0)
 		if facadeType.NumMethod() != len(methods) {
 			t.Fatalf("%s method count = %d, want %d", accessor, facadeType.NumMethod(), len(methods))
 		}
@@ -296,6 +292,22 @@ func TestRootClientInterfaceDoesNotExposeThreadLifecycleOrRawCall(t *testing.T) 
 		if _, ok := facadeType.MethodByName("Call"); ok {
 			t.Fatalf("%s exposes raw Call", accessor)
 		}
+	}
+}
+
+func TestZeroValueClientIsSafeAndInert(t *testing.T) {
+	var root Client
+	if err := root.Close(); err != nil {
+		t.Fatalf("zero-value Close error = %v, want nil", err)
+	}
+	if _, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{}); !errors.Is(err, ErrClientClosed) {
+		t.Fatalf("zero-value ThreadRunner.Start error = %v, want ErrClientClosed", err)
+	}
+	if _, err := root.ThreadClient(ThreadClientOptions{}).StartThread(context.Background(), StartThreadRequest{}); !errors.Is(err, ErrClientClosed) {
+		t.Fatalf("zero-value ThreadClient.StartThread error = %v, want ErrClientClosed", err)
+	}
+	if _, err := root.Models().List(context.Background(), protocolv2.ModelListParams{}); !errors.Is(err, ErrClientClosed) {
+		t.Fatalf("zero-value Models.List error = %v, want ErrClientClosed", err)
 	}
 }
 
@@ -4614,7 +4626,7 @@ func TestNativeNotificationsAndLongLines(t *testing.T) {
 func TestAttachStreamDrainsPendingStateTogether(t *testing.T) {
 	turnErr := errors.New("turn pending")
 	globalErr := errors.New("global pending")
-	c := &client{
+	c := &Client{
 		streams: map[string]map[*threadStreamState]struct{}{},
 		pendingEvents: map[string][]rpcNotification{"turn-1": {
 			{method: "item/agentMessage/delta", params: map[string]any{"threadId": "thread-1", "turnId": "turn-1", "delta": "turn"}},
@@ -4655,7 +4667,7 @@ func TestAttachStreamDrainsPendingStateTogether(t *testing.T) {
 func TestFailClosedServerRequestDoesNotInvokeHandler(t *testing.T) {
 	handlerCalled := make(chan struct{}, 1)
 	writer := &recordingWriteCloser{}
-	c := &client{
+	c := &Client{
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
@@ -4771,7 +4783,7 @@ func TestServerRequestApprovalFailClosedResponsesUseProtocolShapes(t *testing.T)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			writer := &recordingWriteCloser{}
-			c := &client{stdin: writer}
+			c := &Client{stdin: writer}
 			c.respondToServerRequestFailClosed("server-1", tc.method, tc.params)
 			var response map[string]any
 			if err := json.Unmarshal(bytes.TrimSpace(writer.Bytes()), &response); err != nil {
@@ -4856,7 +4868,7 @@ func TestServerRequestNonApprovalFailClosedResponsesUseProtocolShapes(t *testing
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			writer := &recordingWriteCloser{}
-			c := &client{stdin: writer}
+			c := &Client{stdin: writer}
 			c.respondToServerRequestFailClosed("server-1", tc.method, tc.params)
 			var response map[string]any
 			if err := json.Unmarshal(bytes.TrimSpace(writer.Bytes()), &response); err != nil {
@@ -4873,7 +4885,7 @@ func TestServerRequestNonApprovalFailClosedResponsesUseProtocolShapes(t *testing
 func TestServerRequestRejectsMalformedTypedApprovalBeforeHandler(t *testing.T) {
 	handlerCalled := make(chan struct{}, 1)
 	writer := &recordingWriteCloser{}
-	c := &client{
+	c := &Client{
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
@@ -5025,7 +5037,7 @@ func TestServerRequestHandlerTypedApprovalResponses(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			writer := &recordingWriteCloser{}
 			var seen ServerRequest
-			c := &client{
+			c := &Client{
 				stdin: writer,
 				options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 					seen = req
@@ -5149,7 +5161,7 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			writer := &recordingWriteCloser{}
 			var seen ServerRequest
-			c := &client{
+			c := &Client{
 				stdin: writer,
 				options: ClientOptions{LegacyServerRequestHandler: func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
 					seen = req
@@ -5175,7 +5187,7 @@ func TestServerRequestHandlerTypedNonApprovalResponses(t *testing.T) {
 
 func TestServerRequestPermissionsCancelShortcutFailsClosed(t *testing.T) {
 	writer := &recordingWriteCloser{}
-	c := &client{
+	c := &Client{
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
@@ -5212,7 +5224,7 @@ func TestServerRequestPermissionsCancelShortcutFailsClosed(t *testing.T) {
 
 func TestServerRequestHandlerInvalidApprovalDecisionFailsClosed(t *testing.T) {
 	writer := &recordingWriteCloser{}
-	c := &client{
+	c := &Client{
 		stdin:         writer,
 		streams:       map[string]map[*threadStreamState]struct{}{},
 		pendingErrors: map[string]error{},
@@ -5276,7 +5288,7 @@ func TestTypedServerRequestsRejectMalformedBeforeHandler(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			handlerCalled := make(chan struct{}, 1)
 			writer := &recordingWriteCloser{}
-			c := &client{
+			c := &Client{
 				stdin:         writer,
 				streams:       map[string]map[*threadStreamState]struct{}{},
 				pendingErrors: map[string]error{},

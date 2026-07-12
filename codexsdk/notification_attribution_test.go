@@ -39,7 +39,7 @@ func TestUnknownFutureNotificationKindFailsClosed(t *testing.T) {
 }
 
 func TestIdentifierFreeGlobalFamiliesOnlyReachGlobalQueue(t *testing.T) {
-	c := &client{
+	c := &Client{
 		ctx: context.Background(), notifications: make(chan acceptedNotification, 3),
 		exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{},
 	}
@@ -74,7 +74,7 @@ func TestIdentifierFreeGlobalFamiliesOnlyReachGlobalQueue(t *testing.T) {
 }
 
 func TestConcurrentAttributionDoesNotDuplicateOrCrossRuns(t *testing.T) {
-	c := &client{exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{}}
+	c := &Client{exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{}}
 	first := newExactRunState(c, "thread-shared", StartedThreadRun{})
 	first.turnID = "turn-1"
 	second := newExactRunState(c, "thread-shared", StartedThreadRun{})
@@ -194,7 +194,7 @@ func TestAttributionClassesFollowGeneratedSchemaIdentityFacts(t *testing.T) {
 }
 
 func TestExactAttributionSeparatesTurnThreadAndGlobalFacts(t *testing.T) {
-	c := &client{
+	c := &Client{
 		ctx:            context.Background(),
 		notifications:  make(chan acceptedNotification, 8),
 		exactStreams:   map[string]map[*exactRunState]struct{}{},
@@ -252,7 +252,7 @@ func TestExactAttributionSeparatesTurnThreadAndGlobalFacts(t *testing.T) {
 }
 
 func TestThreadAttributionReachesEveryCurrentRunOnSameThread(t *testing.T) {
-	c := &client{exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{}}
+	c := &Client{exactStreams: map[string]map[*exactRunState]struct{}{}, exactAttaching: map[string]map[*exactRunState]struct{}{}}
 	first := newExactRunState(c, "thread-shared", StartedThreadRun{})
 	first.turnID = "turn-1"
 	second := newExactRunState(c, "thread-shared", StartedThreadRun{})
@@ -273,7 +273,7 @@ func TestThreadAttributionReachesEveryCurrentRunOnSameThread(t *testing.T) {
 }
 
 func TestRunEvidenceAppendPrecedesGlobalHandlerEnqueue(t *testing.T) {
-	c := &client{
+	c := &Client{
 		ctx:            context.Background(),
 		notifications:  make(chan acceptedNotification, 1),
 		exactStreams:   map[string]map[*exactRunState]struct{}{},

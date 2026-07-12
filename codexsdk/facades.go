@@ -9,7 +9,7 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-func (c *client) callProtocol(ctx context.Context, method string, params any, response any) error {
+func (c *Client) callProtocol(ctx context.Context, method string, params any, response any) error {
 	if c == nil {
 		return ErrClientClosed
 	}
@@ -34,7 +34,7 @@ func (c *client) callProtocol(ctx context.Context, method string, params any, re
 	return nil
 }
 
-func (c *client) callProtocolNoParams(ctx context.Context, method string, response any) error {
+func (c *Client) callProtocolNoParams(ctx context.Context, method string, response any) error {
 	if c == nil {
 		return ErrClientClosed
 	}
@@ -52,7 +52,7 @@ func (c *client) callProtocolNoParams(ctx context.Context, method string, respon
 	return nil
 }
 
-func (c *client) checkProtocolMethodAllowed(method string) error {
+func (c *Client) checkProtocolMethodAllowed(method string) error {
 	info, ok := protocolv2.LookupMethod(method)
 	if !ok {
 		return fmt.Errorf("codexsdk: unknown app-server method %q", method)
@@ -63,7 +63,7 @@ func (c *client) checkProtocolMethodAllowed(method string) error {
 	return nil
 }
 
-func (c *client) checkProtocolParamsAllowed(method string, params any) error {
+func (c *Client) checkProtocolParamsAllowed(method string, params any) error {
 	if c.experimentalAPIEnabled() {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (c *client) checkProtocolParamsAllowed(method string, params any) error {
 	}
 }
 
-func (c *client) experimentalAPIEnabled() bool {
+func (c *Client) experimentalAPIEnabled() bool {
 	if c == nil {
 		return false
 	}

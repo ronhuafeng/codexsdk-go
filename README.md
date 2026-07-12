@@ -19,9 +19,9 @@ launched Codex app-server over stdio.
 - Runtime requirement: the SDK launches an external `codex app-server` command.
   Unit tests and CI do not require a local Codex binary.
 
-The accepted pre-v1 API direction is a concrete root client, consumer-owned
+The pre-v1 API uses a concrete root client, consumer-owned
 narrow interfaces, and manifest-classified stable versus experimental
-generated compatibility. This is a documented target, not the current API.
+generated compatibility.
 See [Pre-v1 Public API Boundary](docs/public-api-boundary.md).
 
 ## Packages
