@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.3.0-rc.1] - 2026-07-12
 
 ### Changed
 
@@ -23,6 +23,12 @@ All notable changes to this project are documented here.
 - Non-destructive exact `Stream.Wait` observation for independent concurrent
   consumers, with immutable complete or partial result snapshots and
   caller-local context cancellation.
+
+### Fixed
+
+- Transport failure during exact-stream attachment now retains notifications
+  and run evidence accepted before terminalization, preserving the first cause
+  together with the immutable partial result.
 
 ## [0.2.1] - 2026-07-12
 
