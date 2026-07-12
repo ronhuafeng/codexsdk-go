@@ -8,10 +8,21 @@ Use this checklist before tagging or publishing a release.
   remain compatible unless a security fix requires otherwise.
 - v1.0 and later: follow SemVer for the public API in `codexsdk` and
   `codexsdk/protocolv2`.
+- At v1.0, every exported generated Go name in this module receives normal
+  source-compatibility protection. Experimental classification is not a SemVer
+  exemption; incompatible generated drift requires an additive compatibility
+  path or the next major version.
 - Generated additions to `protocolv2` are usually minor changes.
 - Removing or changing public generated types, method constants, facade
   methods, request structs, response structs, or thread helper behavior is a
   major change after v1.0 unless preserving compatibility would be unsafe.
+
+The classified `manifest.json` is the accepted single source for generated
+stability metadata. It currently classifies methods from stable-versus-
+experimental schema visibility. Extending it to classify exported generated
+types and members, and enforcing that coverage in release tooling, requires a
+new bounded implementation issue after #44. Until then, do not maintain a
+second handwritten stability inventory.
 
 The handwritten public API is mechanically recorded in
 `codexsdk/testdata/handwritten-api.txt`. Generated `protocolv2` declarations and
