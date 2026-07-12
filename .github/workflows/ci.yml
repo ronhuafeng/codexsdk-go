@@ -105,3 +105,35 @@ jobs:
           go test ./codexsdk
           -run 'Test(ExactStreamWait|ExactRunAttach|ExactNotificationOverflow|ExactTerminalOverflow|ExactAttribution|ConcurrentAttribution|ThreadAttributionReachesEveryCurrentRunOnSameThread|RunEvidenceAppendPrecedesGlobalHandlerEnqueue|NotificationHandlerFailureCancelsStreamWithPartialEvidence|HandlerFailureDiscardsQueuedTerminalWithoutBlockingRun|ExactRunNilHandlerUnsafeRequestPreservesPartialEvidence|RequestArrivingDuringClose|CloseIdempotencyAndConcurrentRouting|CloseJoinsNotificationAndServerRequestHandlers|NormalCloseCancelsAndJoinsExactServerRequestHandler|FailureShutdown|ProtocolFailureFinishesActiveStreams)'
           -count=50
+
+  public-api:
+    name: Public API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up current stable Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Check handwritten API and generated facades
+        run: go test ./codexsdk -run 'Test(HandwrittenPublicAPI|ConcreteRootClientDoesNotExposeThreadLifecycleOrRawCall)$'
+
+  clean-consumer:
+    name: Clean consumer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up current stable Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Compile isolated consumer
+        run: scripts/codexsdk_test_clean_consumer.sh

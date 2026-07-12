@@ -1,5 +1,9 @@
-// Package codexsdk provides Go interfaces for interacting with a Codex
-// app-server. It owns process transport, client lifecycle, generated protocol
+// Package codexsdk provides a concrete Client for interacting with a Codex
+// app-server. New returns the only connected form, *Client. The safe, inert
+// zero value closes successfully and returns ErrClientClosed from operations.
+// Consumers should define narrow interfaces around the operations they use.
+//
+// Client owns process transport, client lifecycle, generated protocol
 // facades, exact thread/turn composition, and typed callback delivery. Exact
 // run notifications retain ingestion order across stream attachment: pending
 // notifications are accepted before later live notifications for the same run.

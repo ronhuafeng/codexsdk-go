@@ -26,7 +26,10 @@ const (
 	defaultClientTitle = "Codex Go SDK"
 )
 
-type client struct {
+// Client owns one Codex app-server process and its transport, callbacks, and
+// exact generated protocol facades. Construct connected clients with New.
+// The zero value is safe but inert.
+type Client struct {
 	options       ClientOptions
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -77,7 +80,7 @@ type client struct {
 }
 
 type threadClient struct {
-	client  *client
+	client  *Client
 	options ThreadClientOptions
 }
 
@@ -120,14 +123,14 @@ type rpcServerRequest struct {
 	admitted bool
 }
 
-func New(options ClientOptions) (Client, error) {
+func New(options ClientOptions) (*Client, error) {
 	normalized, err := validateOptions(options)
 	if err != nil {
 		return nil, err
 	}
 	clientCtx, cancel := context.WithCancel(context.Background())
 	handlerCtx, handlerCancel := context.WithCancel(clientCtx)
-	c := &client{
+	c := &Client{
 		options:             normalized,
 		ctx:                 clientCtx,
 		cancel:              cancel,
@@ -238,7 +241,7 @@ func validateOptions(options ClientOptions) (ClientOptions, error) {
 	return options, nil
 }
 
-func (c *client) ThreadClient(options ThreadClientOptions) ThreadClient {
+func (c *Client) ThreadClient(options ThreadClientOptions) ThreadClient {
 	return &threadClient{client: c, options: options}
 }
 
@@ -588,7 +591,7 @@ func nullableProtocolReasoningEffort(value *protocolv2.Nullable[protocolv2.Reaso
 	return string(*value.Value)
 }
 
-func (c *client) startTurnStream(ctx context.Context, threadID string, input []InputItem, outputSchema protocolv2.OutputSchema, effort ReasoningEffort, cwd string) (*ThreadStream, error) {
+func (c *Client) startTurnStream(ctx context.Context, threadID string, input []InputItem, outputSchema protocolv2.OutputSchema, effort ReasoningEffort, cwd string) (*ThreadStream, error) {
 	stream := newThreadStream(c, threadID)
 	stream.state.inputStats = inputStats(input)
 	params, err := turnStartProtocolParams(threadID, input, outputSchema, effort, cwd)
@@ -631,8 +634,8 @@ func (c *client) startTurnStream(ctx context.Context, threadID string, input []I
 	return stream, nil
 }
 
-func (c *client) Close() error {
-	if c == nil {
+func (c *Client) Close() error {
+	if c == nil || c.ctx == nil {
 		return nil
 	}
 	c.shutdownOnce.Do(c.shutdown)
@@ -641,7 +644,10 @@ func (c *client) Close() error {
 	return c.failure
 }
 
-func (c *client) checkOpen() error {
+func (c *Client) checkOpen() error {
+	if c == nil || c.ctx == nil {
+		return ErrClientClosed
+	}
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	if c.closed {
@@ -650,7 +656,7 @@ func (c *client) checkOpen() error {
 	return nil
 }
 
-func (c *client) start() error {
+func (c *Client) start() error {
 	command := c.options.Command
 	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Dir = c.options.CWD
@@ -677,11 +683,11 @@ func (c *client) start() error {
 	return nil
 }
 
-func (c *client) call(ctx context.Context, method string, params map[string]any) (map[string]any, error) {
+func (c *Client) call(ctx context.Context, method string, params map[string]any) (map[string]any, error) {
 	return c.callValidated(ctx, method, params, nil)
 }
 
-func (c *client) callValidated(ctx context.Context, method string, params map[string]any, validate func(map[string]any) error) (map[string]any, error) {
+func (c *Client) callValidated(ctx context.Context, method string, params map[string]any, validate func(map[string]any) error) (map[string]any, error) {
 	if err := c.checkOpen(); err != nil {
 		return nil, err
 	}
@@ -705,14 +711,14 @@ func (c *client) callValidated(ctx context.Context, method string, params map[st
 	}
 }
 
-func (c *client) notify(payload any) error {
+func (c *Client) notify(payload any) error {
 	if err := c.checkOpen(); err != nil {
 		return err
 	}
 	return c.write(payload)
 }
 
-func (c *client) write(payload any) error {
+func (c *Client) write(payload any) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	raw, err := json.Marshal(payload)
@@ -726,7 +732,7 @@ func (c *client) write(payload any) error {
 	return err
 }
 
-func (c *client) readLoop(stdout io.Reader) {
+func (c *Client) readLoop(stdout io.Reader) {
 	defer close(c.readerDone)
 	reader := bufio.NewReader(stdout)
 	for {
@@ -773,7 +779,7 @@ func (c *client) readLoop(stdout io.Reader) {
 	c.failClient(errors.New("codexsdk: app-server closed stdout"))
 }
 
-func (c *client) handleMessage(message map[string]any) {
+func (c *Client) handleMessage(message map[string]any) {
 	_, hasID := message["id"]
 	method, hasMethod := message["method"].(string)
 	if hasID && hasMethod {
@@ -790,7 +796,7 @@ func (c *client) handleMessage(message map[string]any) {
 	}
 }
 
-func (c *client) routeResponse(message map[string]any) {
+func (c *Client) routeResponse(message map[string]any) {
 	id := fmt.Sprint(message["id"])
 	raw, ok := c.pending.LoadAndDelete(id)
 	if !ok {
@@ -840,7 +846,7 @@ func protocolError(id any, method string, rawError any) error {
 	}
 }
 
-func (c *client) routeNotification(notification rpcNotification) {
+func (c *Client) routeNotification(notification rpcNotification) {
 	if c.isClosed() {
 		return
 	}
@@ -903,7 +909,7 @@ func exactNotification(notification rpcNotification) (protocolv2.ServerNotificat
 	return typed, nil
 }
 
-func (c *client) routeExactNotification(notification rpcNotification, typed protocolv2.ServerNotification) bool {
+func (c *Client) routeExactNotification(notification rpcNotification, typed protocolv2.ServerNotification) bool {
 	routed, completions, _ := c.routeExactNotificationBeforeTerminalCompletion(notification, typed)
 	for _, complete := range completions {
 		complete()
@@ -911,7 +917,7 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 	return routed
 }
 
-func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpcNotification, typed protocolv2.ServerNotification) (bool, []func(), *notificationEvidence) {
+func (c *Client) routeExactNotificationBeforeTerminalCompletion(notification rpcNotification, typed protocolv2.ServerNotification) (bool, []func(), *notificationEvidence) {
 	class, identity := attributionFor(typed)
 	if class == notificationAttributionGlobal || class == notificationAttributionUnsupported {
 		return false, nil, nil
@@ -991,14 +997,14 @@ func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpc
 	return len(targets) > 0, terminalCompletions, nil
 }
 
-func (c *client) failExactNotificationDelivery(stream *exactRunState, err error) {
+func (c *Client) failExactNotificationDelivery(stream *exactRunState, err error) {
 	if errors.Is(err, ErrNotificationBackpressure) {
 		err = fmt.Errorf("%w: turn_id=%s", ErrNotificationBackpressure, stream.turnIDSnapshot())
 	}
 	c.failClient(err)
 }
 
-func (c *client) routeNoTurnNotification(notification rpcNotification) {
+func (c *Client) routeNoTurnNotification(notification rpcNotification) {
 	if !supportedNoTurnNotification(notification.method) {
 		// validateStreamNotification already proved this is a known app-server
 		// notification. ThreadClient only projects a narrow no-turn event set;
@@ -1028,7 +1034,7 @@ func (c *client) routeNoTurnNotification(notification rpcNotification) {
 	}
 }
 
-func (c *client) routeNotificationError(notification rpcNotification, err error) {
+func (c *Client) routeNotificationError(notification rpcNotification, err error) {
 	raw, _ := json.Marshal(notification.params)
 	sum := sha256.Sum256(raw)
 	ref := DiagnosticRef{
@@ -1136,7 +1142,7 @@ func decodeNotificationParams(method string, params map[string]any, target any) 
 	return nil
 }
 
-func (c *client) attachStreamAndDrainPending(turnID string, stream *threadStreamState) ([]rpcNotification, []rpcServerRequest, error) {
+func (c *Client) attachStreamAndDrainPending(turnID string, stream *threadStreamState) ([]rpcNotification, []rpcServerRequest, error) {
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	if c.streams[turnID] == nil {
@@ -1163,7 +1169,7 @@ func (c *client) attachStreamAndDrainPending(turnID string, stream *threadStream
 	return pending, serverRequests, pendingErr
 }
 
-func (c *client) unregisterStream(turnID string, stream *threadStreamState) {
+func (c *Client) unregisterStream(turnID string, stream *threadStreamState) {
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	if c.streams[turnID] == nil {
@@ -1175,7 +1181,7 @@ func (c *client) unregisterStream(turnID string, stream *threadStreamState) {
 	}
 }
 
-func (c *client) attachExactStream(stream *exactRunState) {
+func (c *Client) attachExactStream(stream *exactRunState) {
 	c.turnMu.Lock()
 	if c.testBeforeExactStreamOrderGate != nil {
 		c.testBeforeExactStreamOrderGate()
@@ -1289,7 +1295,7 @@ func (n rpcNotification) completeEvidenceTerminal() {
 	}
 }
 
-func (c *client) registerAttachingExactStream(stream *exactRunState) {
+func (c *Client) registerAttachingExactStream(stream *exactRunState) {
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	if c.exactAttaching[stream.threadID] == nil {
@@ -1298,7 +1304,7 @@ func (c *client) registerAttachingExactStream(stream *exactRunState) {
 	c.exactAttaching[stream.threadID][stream] = struct{}{}
 }
 
-func (c *client) unregisterAttachingExactStream(stream *exactRunState) {
+func (c *Client) unregisterAttachingExactStream(stream *exactRunState) {
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	delete(c.exactAttaching[stream.threadID], stream)
@@ -1307,7 +1313,7 @@ func (c *client) unregisterAttachingExactStream(stream *exactRunState) {
 	}
 }
 
-func (c *client) hasExactRun(threadID, turnID string) bool {
+func (c *Client) hasExactRun(threadID, turnID string) bool {
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	if turnID != "" && len(c.exactStreams[turnID]) != 0 {
@@ -1322,7 +1328,7 @@ func (c *client) hasExactRun(threadID, turnID string) bool {
 	return false
 }
 
-func (c *client) unregisterExactRun(stream *exactRunState) {
+func (c *Client) unregisterExactRun(stream *exactRunState) {
 	c.turnMu.Lock()
 	defer c.turnMu.Unlock()
 	delete(c.exactAttaching[stream.threadID], stream)
@@ -1336,7 +1342,7 @@ func (c *client) unregisterExactRun(stream *exactRunState) {
 	}
 }
 
-func (c *client) streamContext(turnID string) context.Context {
+func (c *Client) streamContext(turnID string) context.Context {
 	if turnID == "" {
 		return nil
 	}
@@ -1350,7 +1356,7 @@ func (c *client) streamContext(turnID string) context.Context {
 	return nil
 }
 
-func (c *client) failAll(err error) {
+func (c *Client) failAll(err error) {
 	var pendingCalls []pendingCall
 	c.pending.Range(func(key, value any) bool {
 		c.pending.Delete(key)
@@ -1406,7 +1412,7 @@ func (c *client) failAll(err error) {
 	}
 }
 
-func (c *client) bestEffortInterrupt(threadID, turnID string) {
+func (c *Client) bestEffortInterrupt(threadID, turnID string) {
 	go func() {
 		parent := c.ctx
 		if parent == nil {
@@ -1422,13 +1428,13 @@ func (c *client) bestEffortInterrupt(threadID, turnID string) {
 	}()
 }
 
-func (c *client) isClosed() bool {
+func (c *Client) isClosed() bool {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	return c.closed
 }
 
-func (c *client) drainStderr(stderr io.Reader) {
+func (c *Client) drainStderr(stderr io.Reader) {
 	_, _ = io.Copy(io.Discard, stderr)
 }
 

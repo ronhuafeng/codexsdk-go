@@ -108,18 +108,15 @@ def render(methods: list[SurfaceMethod]) -> str:
         '\t"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"',
         ")",
         "",
-        "type SDKSurface interface {",
+        "",
     ]
-    for accessor in accessors:
-        lines.append(f"\t{accessor}() {accessor}")
-    lines.extend(["}", ""])
 
     for accessor in accessors:
         struct_name = facade_struct_name(accessor)
         lines.extend(
             [
                 f"type {struct_name} struct {{",
-                "\tclient *client",
+                "\tclient *Client",
                 "}",
                 "",
                 f"type {accessor} interface {{",
@@ -136,7 +133,7 @@ def render(methods: list[SurfaceMethod]) -> str:
             [
                 "}",
                 "",
-                f"func (c *client) {accessor}() {accessor} {{",
+                f"func (c *Client) {accessor}() {accessor} {{",
                 f"\treturn {struct_name}{{client: c}}",
                 "}",
                 "",

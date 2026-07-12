@@ -8,39 +8,8 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-type SDKSurface interface {
-	Accounts() Accounts
-	Apps() Apps
-	CollaborationModes() CollaborationModes
-	Commands() Commands
-	Config() Config
-	ConfigRequirements() ConfigRequirements
-	Environments() Environments
-	ExperimentalFeatures() ExperimentalFeatures
-	ExternalAgentConfigs() ExternalAgentConfigs
-	FS() FS
-	Feedback() Feedback
-	FuzzyFileSearch() FuzzyFileSearch
-	Hooks() Hooks
-	MCPServerStatus() MCPServerStatus
-	MCPServers() MCPServers
-	Marketplace() Marketplace
-	Memory() Memory
-	Mock() Mock
-	ModelProviders() ModelProviders
-	Models() Models
-	Plugins() Plugins
-	Processes() Processes
-	RemoteControl() RemoteControl
-	Reviews() Reviews
-	Skills() Skills
-	Threads() Threads
-	Turns() Turns
-	WindowsSandbox() WindowsSandbox
-}
-
 type accountsFacade struct {
-	client *client
+	client *Client
 }
 
 type Accounts interface {
@@ -54,36 +23,36 @@ type Accounts interface {
 	WorkspaceMessagesRead(ctx context.Context) (protocolv2.GetWorkspaceMessagesResponse, error)
 }
 
-func (c *client) Accounts() Accounts {
+func (c *Client) Accounts() Accounts {
 	return accountsFacade{client: c}
 }
 
 type appsFacade struct {
-	client *client
+	client *Client
 }
 
 type Apps interface {
 	List(ctx context.Context, params protocolv2.AppsListParams) (protocolv2.AppsListResponse, error)
 }
 
-func (c *client) Apps() Apps {
+func (c *Client) Apps() Apps {
 	return appsFacade{client: c}
 }
 
 type collaborationModesFacade struct {
-	client *client
+	client *Client
 }
 
 type CollaborationModes interface {
 	List(ctx context.Context, params protocolv2.CollaborationModeListParams) (protocolv2.CollaborationModeListResponse, error)
 }
 
-func (c *client) CollaborationModes() CollaborationModes {
+func (c *Client) CollaborationModes() CollaborationModes {
 	return collaborationModesFacade{client: c}
 }
 
 type commandsFacade struct {
-	client *client
+	client *Client
 }
 
 type Commands interface {
@@ -93,12 +62,12 @@ type Commands interface {
 	ExecWrite(ctx context.Context, params protocolv2.CommandExecWriteParams) (protocolv2.CommandExecWriteResponse, error)
 }
 
-func (c *client) Commands() Commands {
+func (c *Client) Commands() Commands {
 	return commandsFacade{client: c}
 }
 
 type configFacade struct {
-	client *client
+	client *Client
 }
 
 type Config interface {
@@ -108,36 +77,36 @@ type Config interface {
 	ValueWrite(ctx context.Context, params protocolv2.ConfigValueWriteParams) (protocolv2.ConfigWriteResponse, error)
 }
 
-func (c *client) Config() Config {
+func (c *Client) Config() Config {
 	return configFacade{client: c}
 }
 
 type configRequirementsFacade struct {
-	client *client
+	client *Client
 }
 
 type ConfigRequirements interface {
 	Read(ctx context.Context) (protocolv2.ConfigRequirementsReadResponse, error)
 }
 
-func (c *client) ConfigRequirements() ConfigRequirements {
+func (c *Client) ConfigRequirements() ConfigRequirements {
 	return configRequirementsFacade{client: c}
 }
 
 type environmentsFacade struct {
-	client *client
+	client *Client
 }
 
 type Environments interface {
 	Add(ctx context.Context, params protocolv2.EnvironmentAddParams) (protocolv2.EnvironmentAddResponse, error)
 }
 
-func (c *client) Environments() Environments {
+func (c *Client) Environments() Environments {
 	return environmentsFacade{client: c}
 }
 
 type experimentalFeaturesFacade struct {
-	client *client
+	client *Client
 }
 
 type ExperimentalFeatures interface {
@@ -145,12 +114,12 @@ type ExperimentalFeatures interface {
 	List(ctx context.Context, params protocolv2.ExperimentalFeatureListParams) (protocolv2.ExperimentalFeatureListResponse, error)
 }
 
-func (c *client) ExperimentalFeatures() ExperimentalFeatures {
+func (c *Client) ExperimentalFeatures() ExperimentalFeatures {
 	return experimentalFeaturesFacade{client: c}
 }
 
 type externalAgentConfigsFacade struct {
-	client *client
+	client *Client
 }
 
 type ExternalAgentConfigs interface {
@@ -159,12 +128,12 @@ type ExternalAgentConfigs interface {
 	ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error)
 }
 
-func (c *client) ExternalAgentConfigs() ExternalAgentConfigs {
+func (c *Client) ExternalAgentConfigs() ExternalAgentConfigs {
 	return externalAgentConfigsFacade{client: c}
 }
 
 type fsFacade struct {
-	client *client
+	client *Client
 }
 
 type FS interface {
@@ -179,24 +148,24 @@ type FS interface {
 	WriteFile(ctx context.Context, params protocolv2.FsWriteFileParams) (protocolv2.FsWriteFileResponse, error)
 }
 
-func (c *client) FS() FS {
+func (c *Client) FS() FS {
 	return fsFacade{client: c}
 }
 
 type feedbackFacade struct {
-	client *client
+	client *Client
 }
 
 type Feedback interface {
 	Upload(ctx context.Context, params protocolv2.FeedbackUploadParams) (protocolv2.FeedbackUploadResponse, error)
 }
 
-func (c *client) Feedback() Feedback {
+func (c *Client) Feedback() Feedback {
 	return feedbackFacade{client: c}
 }
 
 type fuzzyFileSearchFacade struct {
-	client *client
+	client *Client
 }
 
 type FuzzyFileSearch interface {
@@ -206,36 +175,36 @@ type FuzzyFileSearch interface {
 	SessionUpdate(ctx context.Context, params protocolv2.FuzzyFileSearchSessionUpdateParams) (protocolv2.FuzzyFileSearchSessionUpdateResponse, error)
 }
 
-func (c *client) FuzzyFileSearch() FuzzyFileSearch {
+func (c *Client) FuzzyFileSearch() FuzzyFileSearch {
 	return fuzzyFileSearchFacade{client: c}
 }
 
 type hooksFacade struct {
-	client *client
+	client *Client
 }
 
 type Hooks interface {
 	List(ctx context.Context, params protocolv2.HooksListParams) (protocolv2.HooksListResponse, error)
 }
 
-func (c *client) Hooks() Hooks {
+func (c *Client) Hooks() Hooks {
 	return hooksFacade{client: c}
 }
 
 type mcpServerStatusFacade struct {
-	client *client
+	client *Client
 }
 
 type MCPServerStatus interface {
 	List(ctx context.Context, params protocolv2.ListMcpServerStatusParams) (protocolv2.ListMcpServerStatusResponse, error)
 }
 
-func (c *client) MCPServerStatus() MCPServerStatus {
+func (c *Client) MCPServerStatus() MCPServerStatus {
 	return mcpServerStatusFacade{client: c}
 }
 
 type mcpServersFacade struct {
-	client *client
+	client *Client
 }
 
 type MCPServers interface {
@@ -244,12 +213,12 @@ type MCPServers interface {
 	ToolCall(ctx context.Context, params protocolv2.McpServerToolCallParams) (protocolv2.McpServerToolCallResponse, error)
 }
 
-func (c *client) MCPServers() MCPServers {
+func (c *Client) MCPServers() MCPServers {
 	return mcpServersFacade{client: c}
 }
 
 type marketplaceFacade struct {
-	client *client
+	client *Client
 }
 
 type Marketplace interface {
@@ -258,60 +227,60 @@ type Marketplace interface {
 	Upgrade(ctx context.Context, params protocolv2.MarketplaceUpgradeParams) (protocolv2.MarketplaceUpgradeResponse, error)
 }
 
-func (c *client) Marketplace() Marketplace {
+func (c *Client) Marketplace() Marketplace {
 	return marketplaceFacade{client: c}
 }
 
 type memoryFacade struct {
-	client *client
+	client *Client
 }
 
 type Memory interface {
 	Reset(ctx context.Context) (protocolv2.MemoryResetResponse, error)
 }
 
-func (c *client) Memory() Memory {
+func (c *Client) Memory() Memory {
 	return memoryFacade{client: c}
 }
 
 type mockFacade struct {
-	client *client
+	client *Client
 }
 
 type Mock interface {
 	ExperimentalMethod(ctx context.Context, params protocolv2.MockExperimentalMethodParams) (protocolv2.MockExperimentalMethodResponse, error)
 }
 
-func (c *client) Mock() Mock {
+func (c *Client) Mock() Mock {
 	return mockFacade{client: c}
 }
 
 type modelProvidersFacade struct {
-	client *client
+	client *Client
 }
 
 type ModelProviders interface {
 	CapabilitiesRead(ctx context.Context, params protocolv2.ModelProviderCapabilitiesReadParams) (protocolv2.ModelProviderCapabilitiesReadResponse, error)
 }
 
-func (c *client) ModelProviders() ModelProviders {
+func (c *Client) ModelProviders() ModelProviders {
 	return modelProvidersFacade{client: c}
 }
 
 type modelsFacade struct {
-	client *client
+	client *Client
 }
 
 type Models interface {
 	List(ctx context.Context, params protocolv2.ModelListParams) (protocolv2.ModelListResponse, error)
 }
 
-func (c *client) Models() Models {
+func (c *Client) Models() Models {
 	return modelsFacade{client: c}
 }
 
 type pluginsFacade struct {
-	client *client
+	client *Client
 }
 
 type Plugins interface {
@@ -328,12 +297,12 @@ type Plugins interface {
 	Uninstall(ctx context.Context, params protocolv2.PluginUninstallParams) (protocolv2.PluginUninstallResponse, error)
 }
 
-func (c *client) Plugins() Plugins {
+func (c *Client) Plugins() Plugins {
 	return pluginsFacade{client: c}
 }
 
 type processesFacade struct {
-	client *client
+	client *Client
 }
 
 type Processes interface {
@@ -343,12 +312,12 @@ type Processes interface {
 	WriteStdin(ctx context.Context, params protocolv2.ProcessWriteStdinParams) (protocolv2.ProcessWriteStdinResponse, error)
 }
 
-func (c *client) Processes() Processes {
+func (c *Client) Processes() Processes {
 	return processesFacade{client: c}
 }
 
 type remoteControlFacade struct {
-	client *client
+	client *Client
 }
 
 type RemoteControl interface {
@@ -360,24 +329,24 @@ type RemoteControl interface {
 	StatusRead(ctx context.Context) (protocolv2.RemoteControlStatusReadResponse, error)
 }
 
-func (c *client) RemoteControl() RemoteControl {
+func (c *Client) RemoteControl() RemoteControl {
 	return remoteControlFacade{client: c}
 }
 
 type reviewsFacade struct {
-	client *client
+	client *Client
 }
 
 type Reviews interface {
 	Start(ctx context.Context, params protocolv2.ReviewStartParams) (protocolv2.ReviewStartResponse, error)
 }
 
-func (c *client) Reviews() Reviews {
+func (c *Client) Reviews() Reviews {
 	return reviewsFacade{client: c}
 }
 
 type skillsFacade struct {
-	client *client
+	client *Client
 }
 
 type Skills interface {
@@ -386,12 +355,12 @@ type Skills interface {
 	List(ctx context.Context, params protocolv2.SkillsListParams) (protocolv2.SkillsListResponse, error)
 }
 
-func (c *client) Skills() Skills {
+func (c *Client) Skills() Skills {
 	return skillsFacade{client: c}
 }
 
 type threadsFacade struct {
-	client *client
+	client *Client
 }
 
 type Threads interface {
@@ -431,12 +400,12 @@ type Threads interface {
 	Unsubscribe(ctx context.Context, params protocolv2.ThreadUnsubscribeParams) (protocolv2.ThreadUnsubscribeResponse, error)
 }
 
-func (c *client) Threads() Threads {
+func (c *Client) Threads() Threads {
 	return threadsFacade{client: c}
 }
 
 type turnsFacade struct {
-	client *client
+	client *Client
 }
 
 type Turns interface {
@@ -445,12 +414,12 @@ type Turns interface {
 	Steer(ctx context.Context, params protocolv2.TurnSteerParams) (protocolv2.TurnSteerResponse, error)
 }
 
-func (c *client) Turns() Turns {
+func (c *Client) Turns() Turns {
 	return turnsFacade{client: c}
 }
 
 type windowsSandboxFacade struct {
-	client *client
+	client *Client
 }
 
 type WindowsSandbox interface {
@@ -458,7 +427,7 @@ type WindowsSandbox interface {
 	SetupStart(ctx context.Context, params protocolv2.WindowsSandboxSetupStartParams) (protocolv2.WindowsSandboxSetupStartResponse, error)
 }
 
-func (c *client) WindowsSandbox() WindowsSandbox {
+func (c *Client) WindowsSandbox() WindowsSandbox {
 	return windowsSandboxFacade{client: c}
 }
 

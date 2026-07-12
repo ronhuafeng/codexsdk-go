@@ -170,7 +170,7 @@ func TestNotificationHandlerFailureCancelsStreamWithPartialEvidence(t *testing.T
 	}
 	pendingSeen := make(chan struct{})
 	releaseAttach := make(chan struct{})
-	client := root.(*client)
+	client := root
 	client.testBeforeExactTurnAttach = func() { <-releaseAttach }
 	client.testPendingExactNotification = func(notification rpcNotification) {
 		if notification.method == protocolv2.MethodTurnCompleted {
@@ -237,7 +237,7 @@ func TestHandlerFailureDiscardsQueuedTerminalWithoutBlockingRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := root.(*client)
+	client := root
 	client.testBeforeExactTurnAttach = func() { <-releaseAttach }
 	client.testPendingExactNotification = func(notification rpcNotification) {
 		if notification.method == protocolv2.MethodTurnCompleted {
@@ -327,7 +327,7 @@ func TestNormalCloseDrainsPendingExactHandlerAfterEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root.(*client).testPendingExactNotification = func(notification rpcNotification) {
+	root.testPendingExactNotification = func(notification rpcNotification) {
 		if notification.method == protocolv2.MethodTurnCompleted {
 			close(pendingSeen)
 		}
@@ -531,7 +531,7 @@ func TestExactRunWithoutHandlerFailsClosedInsteadOfUsingLegacyPendingQueue(t *te
 	if runErr != nil {
 		t.Fatalf("nil-handler command approval should decline and complete: %v (result %#v)", runErr, result)
 	}
-	client := root.(*client)
+	client := root
 	client.turnMu.Lock()
 	pending := len(client.pendingServer)
 	client.turnMu.Unlock()
@@ -556,7 +556,7 @@ func TestExactRunNilHandlerFailClosedResponsesAreDeterministic(t *testing.T) {
 			if _, err := root.ThreadRunner().Start(ctx, StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}}); err != nil {
 				t.Fatalf("exact nil-handler %s did not fail closed: %v", mode, err)
 			}
-			client := root.(*client)
+			client := root
 			client.turnMu.Lock()
 			pending := len(client.pendingServer)
 			client.turnMu.Unlock()
@@ -1229,7 +1229,7 @@ func TestExactStreamWaitNilAndClosedSemantics(t *testing.T) {
 }
 
 func TestExactRunnerRejectsOwnedThreadIDBeforeTransport(t *testing.T) {
-	runner := &exactRunner{client: &client{}}
+	runner := &exactRunner{client: &Client{}}
 	_, err := runner.StartStream(context.Background(), StartThreadRunRequest{
 		Turn: protocolv2.TurnStartParams{ThreadID: "caller-owned", Input: []protocolv2.UserInput{}},
 	})
@@ -1300,7 +1300,7 @@ func TestExactRunnerProducesSanitizedDiagnosticForMalformedNotification(t *testi
 }
 
 func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
-	c := &client{
+	c := &Client{
 		exactStreams:        map[string]map[*exactRunState]struct{}{},
 		exactAttaching:      map[string]map[*exactRunState]struct{}{},
 		pendingEvents:       map[string][]rpcNotification{},
@@ -1383,7 +1383,7 @@ func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 }
 
 func TestExactTerminalDeliveryDoesNotDeadlockWithAttachment(t *testing.T) {
-	c := &client{
+	c := &Client{
 		exactStreams:        map[string]map[*exactRunState]struct{}{},
 		exactAttaching:      map[string]map[*exactRunState]struct{}{},
 		pendingEvents:       map[string][]rpcNotification{},
@@ -1442,7 +1442,7 @@ func TestExactTerminalDeliveryDoesNotDeadlockWithAttachment(t *testing.T) {
 }
 
 func TestExactTerminalBeforeAttachmentIsNotPublishedAsLive(t *testing.T) {
-	c := &client{
+	c := &Client{
 		exactStreams:        map[string]map[*exactRunState]struct{}{},
 		exactAttaching:      map[string]map[*exactRunState]struct{}{},
 		pendingEvents:       map[string][]rpcNotification{},
@@ -1480,7 +1480,7 @@ func TestExactTerminalBeforeAttachmentIsNotPublishedAsLive(t *testing.T) {
 func TestExactRunTurnIDAccessIsRaceFreeAcrossAttributionAndLifecycle(t *testing.T) {
 	const repetitions = 100
 	for index := 0; index < repetitions; index++ {
-		c := &client{
+		c := &Client{
 			exactStreams:        map[string]map[*exactRunState]struct{}{},
 			exactAttaching:      map[string]map[*exactRunState]struct{}{},
 			pendingEvents:       map[string][]rpcNotification{},
@@ -1549,7 +1549,7 @@ func assertExactOverflowClientContract(t *testing.T, mode string, terminal bool)
 	if err != nil {
 		t.Fatal(err)
 	}
-	concrete := root.(*client)
+	concrete := root
 	concrete.testExactStreamQueueCapacity = 1
 
 	other, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
@@ -1616,7 +1616,7 @@ func assertExactOverflowClientContract(t *testing.T, mode string, terminal bool)
 }
 
 func TestExactRunAttachDoesNotSerializeUnrelatedRuns(t *testing.T) {
-	c := &client{
+	c := &Client{
 		exactStreams:        map[string]map[*exactRunState]struct{}{},
 		exactAttaching:      map[string]map[*exactRunState]struct{}{},
 		pendingEvents:       map[string][]rpcNotification{},
@@ -1672,7 +1672,7 @@ func TestExactRunAttachDoesNotSerializeUnrelatedRuns(t *testing.T) {
 }
 
 func TestExactRunAttachKeepsLatestRerouteFactLive(t *testing.T) {
-	c := &client{
+	c := &Client{
 		exactStreams:        map[string]map[*exactRunState]struct{}{},
 		exactAttaching:      map[string]map[*exactRunState]struct{}{},
 		pendingEvents:       map[string][]rpcNotification{},

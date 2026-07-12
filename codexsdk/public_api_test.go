@@ -114,7 +114,7 @@ func handwrittenDeclarations(fset *token.FileSet, pkg *types.Package) []string {
 		if !object.Exported() || generatedPosition(fset, object.Pos()) {
 			continue
 		}
-		declarations = append(declarations, types.ObjectString(object, qualifier))
+		declarations = append(declarations, publicObjectString(object, qualifier))
 		typeName, ok := object.(*types.TypeName)
 		if !ok {
 			continue
@@ -132,6 +132,27 @@ func handwrittenDeclarations(fset *token.FileSet, pkg *types.Package) []string {
 		}
 	}
 	return declarations
+}
+
+func publicObjectString(object types.Object, qualifier types.Qualifier) string {
+	typeName, ok := object.(*types.TypeName)
+	if !ok {
+		return types.ObjectString(object, qualifier)
+	}
+	named, ok := typeName.Type().(*types.Named)
+	if !ok {
+		return types.ObjectString(object, qualifier)
+	}
+	structure, ok := named.Underlying().(*types.Struct)
+	if !ok {
+		return types.ObjectString(object, qualifier)
+	}
+	for index := 0; index < structure.NumFields(); index++ {
+		if structure.Field(index).Exported() {
+			return types.ObjectString(object, qualifier)
+		}
+	}
+	return fmt.Sprintf("type %s.%s struct{ /* unexported fields */ }", object.Pkg().Path(), object.Name())
 }
 
 func generatedPosition(fset *token.FileSet, position token.Pos) bool {

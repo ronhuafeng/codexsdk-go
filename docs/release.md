@@ -77,6 +77,10 @@ release:
 - `Go race` runs the full suite with the race detector.
 - `Runtime repeat` repeats only synchronization-driven runtime concurrency
   contracts; it supplements rather than replaces their deterministic runs.
+- `Public API` verifies the canonical handwritten inventory and manifest-derived
+  access to every generated facade on the concrete root.
+- `Clean consumer` compiles lifecycle, generated-facade, and consumer-owned
+  narrow-interface usage from an isolated module.
 - `Tag clean module` runs only after a `v*` tag is pushed. It resolves that tag
   from `proxy.golang.org` in a new consumer module and compiles an import of the
   SDK. Because this is a post-tag verification gate, it cannot prevent the tag

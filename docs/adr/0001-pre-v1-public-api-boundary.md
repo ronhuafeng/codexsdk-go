@@ -10,8 +10,8 @@ the current SDK-owned `Client` interface embedding the growing generated
 
 ## Status
 
-Accepted design; production implementation is deferred to bounded follow-up
-work.
+Accepted; the concrete-root portion is implemented by issue #62 after v0.2.1.
+Generated stability manifest extension remains separate bounded work.
 
 ## Decision
 

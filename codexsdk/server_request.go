@@ -10,7 +10,7 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-func (c *client) handleServerRequest(message map[string]any) {
+func (c *Client) handleServerRequest(message map[string]any) {
 	id := message["id"]
 	method, _ := message["method"].(string)
 	params, _ := message["params"].(map[string]any)
@@ -53,7 +53,7 @@ func (c *client) handleServerRequest(message map[string]any) {
 	c.handleLegacyServerRequest(id, method, params, nil, false)
 }
 
-func (c *client) handleLegacyServerRequest(id any, method string, params map[string]any, parent context.Context, failClosed bool) {
+func (c *Client) handleLegacyServerRequest(id any, method string, params map[string]any, parent context.Context, failClosed bool) {
 	handlerCtx, ok := c.beginHandler()
 	if !ok {
 		c.respondToServerRequestFailClosed(id, method, params)
@@ -62,7 +62,7 @@ func (c *client) handleLegacyServerRequest(id any, method string, params map[str
 	c.handleAdmittedLegacyServerRequest(handlerCtx, id, method, params, parent, failClosed)
 }
 
-func (c *client) handleAdmittedLegacyServerRequest(handlerCtx context.Context, id any, method string, params map[string]any, parent context.Context, failClosed bool) {
+func (c *Client) handleAdmittedLegacyServerRequest(handlerCtx context.Context, id any, method string, params map[string]any, parent context.Context, failClosed bool) {
 	if parent == nil {
 		parent = handlerCtx
 	}
@@ -80,7 +80,7 @@ func (c *client) handleAdmittedLegacyServerRequest(handlerCtx context.Context, i
 	}()
 }
 
-func (c *client) dispatchBufferedLegacyServerRequest(request rpcServerRequest, parent context.Context, failClosed bool) {
+func (c *Client) dispatchBufferedLegacyServerRequest(request rpcServerRequest, parent context.Context, failClosed bool) {
 	if request.admitted {
 		c.handleAdmittedLegacyServerRequest(c.callbackContext(), request.id, request.method, request.params, parent, failClosed)
 		return
@@ -143,7 +143,7 @@ func requestIDString(id any) string {
 	return fmt.Sprint(id)
 }
 
-func (c *client) admitOrBufferLegacyServerRequest(turnID string, request rpcServerRequest) (context.Context, context.Context, bool, bool) {
+func (c *Client) admitOrBufferLegacyServerRequest(turnID string, request rpcServerRequest) (context.Context, context.Context, bool, bool) {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	if c.closed {
@@ -165,11 +165,11 @@ func (c *client) admitOrBufferLegacyServerRequest(turnID string, request rpcServ
 	return handlerCtx, nil, true, true
 }
 
-func (c *client) respondToServerRequest(id any, method string, params map[string]any) {
+func (c *Client) respondToServerRequest(id any, method string, params map[string]any) {
 	c.respondToServerRequestWithContext(id, method, params, nil)
 }
 
-func (c *client) respondToServerRequestWithContext(id any, method string, params map[string]any, parent context.Context) {
+func (c *Client) respondToServerRequestWithContext(id any, method string, params map[string]any, parent context.Context) {
 	req, err := serverRequestFromMethod(method, params)
 	if err != nil {
 		c.writeServerRequestError(id, -32602, err)
@@ -205,7 +205,7 @@ func (c *client) respondToServerRequestWithContext(id any, method string, params
 	}
 }
 
-func (c *client) respondToServerRequestFailClosed(id any, method string, params map[string]any) {
+func (c *Client) respondToServerRequestFailClosed(id any, method string, params map[string]any) {
 	req, err := serverRequestFromMethod(method, params)
 	if err != nil {
 		c.writeServerRequestError(id, -32602, err)
@@ -219,11 +219,11 @@ func (c *client) respondToServerRequestFailClosed(id any, method string, params 
 	c.writeFailClosedServerRequestResultOrError(id, req, fmt.Errorf("codexsdk: %s failed closed", req.Method))
 }
 
-func (c *client) writeServerRequestError(id any, code int, err error) {
+func (c *Client) writeServerRequestError(id any, code int, err error) {
 	_ = c.write(map[string]any{"id": id, "error": map[string]any{"code": code, "message": err.Error()}})
 }
 
-func (c *client) writeServerRequestResult(id any, req ServerRequest, result any) error {
+func (c *Client) writeServerRequestResult(id any, req ServerRequest, result any) error {
 	raw, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("codexsdk: encode %s response: %w", req.Method, err)
@@ -235,7 +235,7 @@ func (c *client) writeServerRequestResult(id any, req ServerRequest, result any)
 	return c.write(map[string]any{"id": id, "result": decoded})
 }
 
-func (c *client) writeFailClosedServerRequestResultOrError(id any, req ServerRequest, fallbackErr error) {
+func (c *Client) writeFailClosedServerRequestResultOrError(id any, req ServerRequest, fallbackErr error) {
 	result, ok := failClosedServerRequestResponse(req)
 	if !ok {
 		c.writeServerRequestError(id, -32000, failClosedServerRequestError(req, fallbackErr))
@@ -253,7 +253,7 @@ func failClosedServerRequestError(req ServerRequest, fallbackErr error) error {
 	return fallbackErr
 }
 
-func (c *client) serverRequestContext(req ServerRequest) context.Context {
+func (c *Client) serverRequestContext(req ServerRequest) context.Context {
 	if streamCtx := c.streamContext(req.TurnID); streamCtx != nil {
 		return streamCtx
 	}
@@ -263,7 +263,7 @@ func (c *client) serverRequestContext(req ServerRequest) context.Context {
 	return context.Background()
 }
 
-func (c *client) unsupportedServerRequest(req ServerRequest) *unsupportedServerRequestError {
+func (c *Client) unsupportedServerRequest(req ServerRequest) *unsupportedServerRequestError {
 	err := &unsupportedServerRequestError{
 		Method:   req.Method,
 		Kind:     req.Kind,
@@ -291,7 +291,7 @@ func isSupportedServerRequest(req ServerRequest) bool {
 	}
 }
 
-func (c *client) invokeServerRequestHandler(req ServerRequest, parent context.Context) (response LegacyServerRequestResponse, err error) {
+func (c *Client) invokeServerRequestHandler(req ServerRequest, parent context.Context) (response LegacyServerRequestResponse, err error) {
 	if c.options.LegacyServerRequestHandler == nil {
 		return LegacyServerRequestResponse{}, nil
 	}
@@ -308,7 +308,7 @@ func (c *client) invokeServerRequestHandler(req ServerRequest, parent context.Co
 	return c.options.LegacyServerRequestHandler(ctx, req)
 }
 
-func (c *client) routeServerRequestError(req ServerRequest, err error) {
+func (c *Client) routeServerRequestError(req ServerRequest, err error) {
 	if req.TurnID == "" {
 		c.turnMu.Lock()
 		c.pendingGlobal = err
@@ -334,7 +334,7 @@ func (c *client) routeServerRequestError(req ServerRequest, err error) {
 	}
 }
 
-func (c *client) routeServerRequestDiagnostic(id any, req ServerRequest, kind string) {
+func (c *Client) routeServerRequestDiagnostic(id any, req ServerRequest, kind string) {
 	if req.TurnID == "" {
 		return
 	}

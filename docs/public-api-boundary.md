@@ -2,14 +2,13 @@
 
 The accepted target for issue #44 is recorded in
 [ADR 0001](adr/0001-pre-v1-public-api-boundary.md). This page translates the
-decision into consumer guidance and migration consequences. It describes a
-future pre-v1 change; the current release still returns the existing
-`codexsdk.Client` interface.
+decision into consumer guidance and migration consequences. The concrete-root
+boundary is implemented after v0.2.1.
 
 ## Target shape
 
-The root client will be a concrete `*codexsdk.Client` created only by
-`codexsdk.New`. It will continue to own `Close`, exact thread/turn lifecycle,
+The root client is a concrete `*codexsdk.Client` created only by
+`codexsdk.New`. It owns `Close`, exact thread/turn lifecycle,
 typed callbacks, and access to all generated facades. Generated additions then
 add methods to a concrete type instead of enlarging an interface every SDK
 consumer may have implemented.
@@ -41,8 +40,8 @@ func listModels(ctx context.Context, models ModelLister) error {
 }
 ```
 
-The repository compile-checks these patterns without requiring a consumer to
-mock `SDKSurface`.
+The repository compile-checks these patterns without an SDK-owned root
+interface.
 
 ## Construction and ownership
 
@@ -82,10 +81,9 @@ remains closed because its design was folded into #44.
 
 ## Migration window
 
-The concrete-root change is scheduled for a bounded release no earlier than
-v0.3 and before v1. It will be delivered atomically with migration,
-compatibility inventory, changelog, package documentation, and clean-consumer
-evidence.
+The concrete-root change is implemented after v0.2.1 as a pre-v1 breaking
+change. Its code, migration guidance, compatibility inventory, changelog,
+package documentation, and clean-consumer evidence move together.
 
 Typical construction using type inference is unchanged in shape:
 
