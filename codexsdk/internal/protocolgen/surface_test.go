@@ -116,16 +116,35 @@ func TestClassifyExportedSurfaceCountsStableOwnerAsMixedEvidence(t *testing.T) {
 	t.Fatalf("surface = %#v, want mixed Event", got)
 }
 
+func TestClassifyExportedSurfaceSignaturesIncludeTagsAndTypedValues(t *testing.T) {
+	source := []byte("package protocolv2\ntype Event struct { ID string `json:\"id,omitempty\"` }\ntype EventKind string\nconst EventKindReady EventKind = \"ready\"\n")
+
+	got, err := ClassifyExportedSurface(source, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]SurfaceEntry{}
+	for _, entry := range got {
+		byName[entry.Name] = entry
+	}
+	if byName["Event.ID"].Signature != "string `json:\"id,omitempty\"`" {
+		t.Fatalf("Event.ID signature = %q", byName["Event.ID"].Signature)
+	}
+	if byName["EventKindReady"].Signature != `EventKind = "ready"` {
+		t.Fatalf("EventKindReady signature = %q", byName["EventKindReady"].Signature)
+	}
+}
+
 func TestVerifyExportedSurfaceRejectsUnclassifiedExport(t *testing.T) {
 	source := []byte("package protocolv2\ntype Event struct { ID string }\n")
-	err := VerifyExportedSurface(source, []SurfaceEntry{{Kind: SurfaceType, Name: "Event", Stability: StabilityStable}})
+	err := VerifyExportedSurface(source, []SurfaceEntry{{Kind: SurfaceType, Name: "Event", Signature: "struct{ ID string }", Stability: StabilityStable}})
 	if err == nil || !strings.Contains(err.Error(), `field "Event.ID" is unclassified`) {
 		t.Fatalf("error = %v, want unclassified field", err)
 	}
 }
 
 func TestValidateSurfaceRejectsMixedMember(t *testing.T) {
-	err := ValidateSurface([]SurfaceEntry{{Kind: SurfaceField, Name: "Event.ID", Stability: StabilityMixed}})
+	err := ValidateSurface([]SurfaceEntry{{Kind: SurfaceField, Name: "Event.ID", Signature: "string", Stability: StabilityMixed}})
 	if err == nil || !strings.Contains(err.Error(), "cannot be mixed") {
 		t.Fatalf("error = %v, want mixed member rejection", err)
 	}

@@ -195,8 +195,9 @@ def validate_manifest(root: Path) -> list[Finding]:
             kind = entry.get("kind", "")
             name = entry.get("name", "")
             stability = entry.get("stability", "")
+            signature = entry.get("signature", "")
             identity = (kind, name)
-            if not kind or not name or stability not in valid_stability:
+            if not kind or not name or not signature or stability not in valid_stability:
                 findings.append(finding("manifest_unclassified_surface", str(manifest_path), f"invalid surface entry: {entry!r}"))
                 continue
             if kind not in valid_kinds or (stability == "mixed" and kind != "type"):

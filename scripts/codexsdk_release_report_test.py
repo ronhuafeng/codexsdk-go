@@ -14,7 +14,7 @@ import codexsdk_release_report as release_report
 def manifest(*entries: tuple[str, str, str]) -> dict[str, object]:
     return {
         "surface": [
-            {"kind": kind, "name": name, "stability": stability}
+            {"kind": kind, "name": name, "signature": f"{kind}:{name}", "stability": stability}
             for kind, name, stability in entries
         ]
     }
@@ -51,6 +51,17 @@ class ReleaseReportTest(unittest.TestCase):
 
         self.assertEqual(report["compatibility_impact"], "additive_or_metadata_only")
         self.assertEqual(report["counts_by_classification"]["experimental"]["added"], 1)
+
+    def test_signature_change_is_incompatible_and_classified(self) -> None:
+        base = manifest(("field", "Event.ID", "experimental"))
+        target = manifest(("field", "Event.ID", "experimental"))
+        target["surface"][0]["signature"] = "int64"
+
+        report = release_report.compatibility_report(base, target)
+
+        self.assertEqual(report["compatibility_impact"], "incompatible")
+        self.assertEqual(report["changed"][0]["name"], "Event.ID")
+        self.assertEqual(report["changed"][0]["classification"], "experimental")
 
 
 if __name__ == "__main__":

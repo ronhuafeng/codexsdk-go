@@ -201,9 +201,9 @@ class SyncStateTest(unittest.TestCase):
             manifest = schema_utils.load_json(manifest_path)
             manifest["schema_version"] = 2
             manifest["surface"] = [
-                {"kind": "field", "name": "Event.ID", "stability": ""},
-                {"kind": "field", "name": "Event.ID", "stability": "mixed"},
-                {"kind": "field", "name": "Event.ID", "stability": "stable"},
+                {"kind": "field", "name": "Event.ID", "signature": "string", "stability": ""},
+                {"kind": "field", "name": "Event.ID", "signature": "string", "stability": "mixed"},
+                {"kind": "field", "name": "Event.ID", "signature": "string", "stability": "stable"},
             ]
             write_json(manifest_path, manifest)
 

@@ -31,8 +31,8 @@ class ClassifiedManifestTest(unittest.TestCase):
                 complete / "coverage_matrix.json",
                 {
                     "methods": [
-                        {"method": "stable/read", "stability": "stable"},
-                        {"method": "preview/read", "stability": "experimental"},
+                        {"method": "stable/read", "stability": "experimental"},
+                        {"method": "preview/read", "stability": "stable"},
                     ],
                     "types": [{"schema": "Stable.json"}, {"schema": "Preview.json"}],
                     "fields": [
@@ -44,7 +44,10 @@ class ClassifiedManifestTest(unittest.TestCase):
             write_json(
                 complete / "manifest.json",
                 {
-                    "entries": [{"method": "stable/read"}, {"method": "preview/read"}],
+                    "entries": [
+                        {"method": "stable/read", "stability": "stable"},
+                        {"method": "preview/read", "stability": "experimental"},
+                    ],
                     "classification_sources": {},
                 },
             )
@@ -61,7 +64,7 @@ class ClassifiedManifestTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             path = Path(raw_tmp) / "manifest.json"
             write_json(path, {"schema_version": 1, "classification_sources": {}, "surface": []})
-            surface = [{"kind": "type", "name": "Event", "stability": "stable"}]
+            surface = [{"kind": "type", "name": "Event", "signature": "struct{}", "stability": "stable"}]
 
             classified_manifest.update_manifest(path, surface)
 

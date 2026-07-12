@@ -16,20 +16,21 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return value
 
 
-def surface_index(manifest: dict[str, Any]) -> dict[tuple[str, str], str]:
-    result: dict[tuple[str, str], str] = {}
+def surface_index(manifest: dict[str, Any]) -> dict[tuple[str, str], dict[str, str]]:
+    result: dict[tuple[str, str], dict[str, str]] = {}
     for raw in manifest.get("surface", []):
         if not isinstance(raw, dict):
             raise ValueError("manifest surface entry is not an object")
         kind = raw.get("kind")
         name = raw.get("name")
         stability = raw.get("stability")
-        if not all(isinstance(value, str) and value for value in (kind, name, stability)):
+        signature = raw.get("signature")
+        if not all(isinstance(value, str) and value for value in (kind, name, stability, signature)):
             raise ValueError(f"manifest surface entry is unclassified: {raw!r}")
         key = (kind, name)
         if key in result:
             raise ValueError(f"duplicate manifest surface identity: {kind} {name}")
-        result[key] = stability
+        result[key] = {"classification": stability, "signature": signature}
     if not result:
         raise ValueError("manifest has no classified generated surface")
     return result
@@ -41,30 +42,43 @@ def compatibility_report(base: dict[str, Any], target: dict[str, Any]) -> dict[s
     added = []
     removed = []
     reclassified = []
+    changed = []
     for kind, name in sorted(after.keys() - before.keys()):
-        added.append({"kind": kind, "name": name, "classification": after[(kind, name)]})
+        added.append({"kind": kind, "name": name, **after[(kind, name)]})
     for kind, name in sorted(before.keys() - after.keys()):
-        removed.append({"kind": kind, "name": name, "classification": before[(kind, name)]})
+        removed.append({"kind": kind, "name": name, **before[(kind, name)]})
     for kind, name in sorted(before.keys() & after.keys()):
-        if before[(kind, name)] != after[(kind, name)]:
+        if before[(kind, name)]["classification"] != after[(kind, name)]["classification"]:
             reclassified.append(
                 {
                     "kind": kind,
                     "name": name,
-                    "from": before[(kind, name)],
-                    "to": after[(kind, name)],
+                    "from": before[(kind, name)]["classification"],
+                    "to": after[(kind, name)]["classification"],
+                }
+            )
+        if before[(kind, name)]["signature"] != after[(kind, name)]["signature"]:
+            changed.append(
+                {
+                    "kind": kind,
+                    "name": name,
+                    "classification": before[(kind, name)]["classification"],
+                    "from_signature": before[(kind, name)]["signature"],
+                    "to_signature": after[(kind, name)]["signature"],
                 }
             )
     return {
         "policy": "classification_is_metadata_not_a_semver_exemption",
-        "compatibility_impact": "incompatible" if removed else "additive_or_metadata_only",
+        "compatibility_impact": "incompatible" if removed or changed else "additive_or_metadata_only",
         "added": added,
         "removed": removed,
         "reclassified": reclassified,
+        "changed": changed,
         "counts_by_classification": {
             stability: {
                 "added": sum(item["classification"] == stability for item in added),
                 "removed": sum(item["classification"] == stability for item in removed),
+                "changed": sum(item["classification"] == stability for item in changed),
                 "reclassified_from": sum(item["from"] == stability for item in reclassified),
                 "reclassified_to": sum(item["to"] == stability for item in reclassified),
             }

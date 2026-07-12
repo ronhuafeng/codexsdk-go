@@ -578,6 +578,7 @@ def write_clean_reports(
         "added": generated_compatibility["added"],
         "removed": generated_compatibility["removed"],
         "reclassified": generated_compatibility["reclassified"],
+        "changed": generated_compatibility["changed"],
     }
     write_json(root / "drift_report.json", drift)
     write_json(root / "matrix_update_skeleton.json", matrix)
