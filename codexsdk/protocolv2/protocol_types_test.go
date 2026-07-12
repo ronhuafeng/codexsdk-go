@@ -406,13 +406,13 @@ func TestGeneratedTurnResponseCoreAdjacentPayloadsProtocolMarshalAndUnmarshal(t 
 		t.Fatalf("decoded thread turns list response = %#v", decodedTurnsList)
 	}
 
-	itemsListRaw, err := json.Marshal(ThreadTurnsItemsListResponse{
+	itemsListRaw, err := json.Marshal(ThreadItemsListResponse{
 		Data: []ThreadItem{item},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var decodedItemsList ThreadTurnsItemsListResponse
+	var decodedItemsList ThreadItemsListResponse
 	if err := json.Unmarshal(itemsListRaw, &decodedItemsList); err != nil {
 		t.Fatal(err)
 	}
@@ -4473,7 +4473,6 @@ func TestGeneratedAskForApprovalUnionMarshalAndAccessors(t *testing.T) {
 		want  string
 	}{
 		{name: "untrusted", value: NewAskForApprovalUntrusted(), kind: AskForApprovalKindUntrusted, want: `"untrusted"`},
-		{name: "on failure", value: NewAskForApprovalOnFailure(), kind: AskForApprovalKindOnFailure, want: `"on-failure"`},
 		{name: "on request", value: NewAskForApprovalOnRequest(), kind: AskForApprovalKindOnRequest, want: `"on-request"`},
 		{name: "never", value: NewAskForApprovalNever(), kind: AskForApprovalKindNever, want: `"never"`},
 		{
@@ -8078,14 +8077,14 @@ func TestGeneratedConstrainedInt32RejectsOverflow(t *testing.T) {
 	}
 }
 
-func TestGeneratedConstrainedUint64RejectsNegative(t *testing.T) {
+func TestGeneratedInt64ElicitationCountAcceptsNegativeSchemaValue(t *testing.T) {
 	var response ThreadDecrementElicitationResponse
 	err := json.Unmarshal([]byte(`{"count":-1,"paused":false}`), &response)
-	if err == nil {
-		t.Fatal("expected negative uint64 to fail")
+	if err != nil {
+		t.Fatalf("negative int64 elicitation count rejected: %v", err)
 	}
-	if !strings.Contains(err.Error(), "decode ThreadDecrementElicitationResponse.count") {
-		t.Fatalf("unexpected negative uint64 error: %v", err)
+	if response.Count != -1 {
+		t.Fatalf("decoded elicitation count = %d, want -1", response.Count)
 	}
 }
 

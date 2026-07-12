@@ -3,6 +3,10 @@
   "title": "ThreadStartParams",
   "type": "object",
   "properties": {
+    "allowProviderModelFallback": {
+      "description": "Allow a provider with an authoritative static model catalog to replace an unavailable requested model with its default.",
+      "type": "boolean"
+    },
     "approvalPolicy": {
       "anyOf": [
         {
@@ -78,6 +82,17 @@
     "experimentalRawEvents": {
       "description": "If true, opt into emitting raw Responses API items on the event stream. This is for internal use only (e.g. Codex Cloud).",
       "type": "boolean"
+    },
+    "historyMode": {
+      "description": "Persisted thread history contract to use for this new thread.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ThreadHistoryMode"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "mockExperimentalField": {
       "description": "Test-only experimental field used to validate experimental gating and schema filtering behavior in a stable way.",
@@ -210,7 +225,6 @@
           "type": "string",
           "enum": [
             "untrusted",
-            "on-failure",
             "on-request",
             "never"
           ]
@@ -270,6 +284,7 @@
               "type": "string"
             },
             "path": {
+              "description": "Absolute path for the root in the selected environment.",
               "type": "string"
             },
             "type": {
@@ -385,12 +400,28 @@
       "type": "string"
     },
     "MultiAgentMode": {
-      "description": "Controls whether the model receives multi-agent delegation instructions and, when it does, whether it should only spawn sub-agents after an explicit user request or may delegate proactively when doing so would help. `none` leaves the multi-agent tools available without injecting delegation instructions.",
-      "type": "string",
-      "enum": [
-        "none",
-        "explicitRequestOnly",
-        "proactive"
+      "description": "Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "explicitRequestOnly",
+            "proactive"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "custom"
+          ],
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "title": "CustomMultiAgentMode"
+        }
       ]
     },
     "Personality": {
@@ -430,6 +461,13 @@
           ]
         }
       }
+    },
+    "ThreadHistoryMode": {
+      "type": "string",
+      "enum": [
+        "legacy",
+        "paginated"
+      ]
     },
     "ThreadSource": {
       "type": "string"

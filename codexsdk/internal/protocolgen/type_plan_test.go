@@ -189,7 +189,7 @@ func TestBuildProtocolTypePlanSupportsConstrainedIntegerScalars(t *testing.T) {
 		{
 			path:   "v2/ThreadIncrementElicitationResponse.json#/properties/count",
 			kind:   FieldPlanScalar,
-			goType: "uint64",
+			goType: "int64",
 		},
 		{
 			path:   "FileChangeRequestApprovalParams.json#/properties/startedAtMs",
