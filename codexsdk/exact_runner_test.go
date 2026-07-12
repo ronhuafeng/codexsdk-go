@@ -1366,6 +1366,73 @@ func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 	}
 }
 
+func TestExactRunAttachTurnPublicationPreservesPendingBeforeLiveOrder(t *testing.T) {
+	c := &Client{
+		exactStreams:       map[string]map[*exactRunState]struct{}{},
+		exactAttaching:     map[string]map[*exactRunState]struct{}{},
+		pendingEvents:      map[string][]rpcNotification{},
+		pendingDiagnostics: map[string][]DiagnosticRef{},
+	}
+	state := newExactRunState(nil, "thread-1", StartedThreadRun{Start: facadeThreadStartResponse("thread-1", "model")})
+	c.exactAttaching[state.threadID] = map[*exactRunState]struct{}{state: {}}
+	pending := rpcNotification{method: protocolv2.MethodModelRerouted, params: map[string]any{
+		"threadId": "thread-1", "turnId": "turn-1", "fromModel": "model-a", "toModel": "model-b", "reason": "highRiskCyberActivity",
+	}}
+	c.pendingEvents["turn-1"] = []rpcNotification{pending}
+	live := rpcNotification{method: protocolv2.MethodModelRerouted, params: map[string]any{
+		"threadId": "thread-1", "turnId": "turn-1", "fromModel": "model-b", "toModel": "model-c", "reason": "highRiskCyberActivity",
+	}}
+
+	published := make(chan struct{})
+	releaseAttach := make(chan struct{})
+	c.testAfterExactTurnPublished = func() {
+		close(published)
+		<-releaseAttach
+	}
+	liveAtGate := make(chan struct{})
+	state.testAtNotificationOrderGate = func() { close(liveAtGate) }
+	attached := make(chan struct{})
+	go func() {
+		c.attachExactStreamForTurn(state, protocolv2.Turn{ID: "turn-1", Status: protocolv2.TurnStatusInProgress})
+		close(attached)
+	}()
+	<-published
+	liveRouted := make(chan bool, 1)
+	go func() {
+		typed, err := exactNotification(live)
+		if err != nil {
+			t.Error(err)
+			liveRouted <- false
+			return
+		}
+		liveRouted <- c.routeExactNotification(live, typed)
+	}()
+	<-liveAtGate
+	close(releaseAttach)
+	<-attached
+	if !<-liveRouted {
+		t.Fatal("live notification was not routed to the exact run")
+	}
+
+	state.mu.Lock()
+	result := state.result.(StartedThreadRun)
+	state.mu.Unlock()
+	if len(result.Run.Notifications) != 2 {
+		t.Fatalf("notification evidence = %#v", result.Run.Notifications)
+	}
+	var models []string
+	for _, notification := range result.Run.Notifications {
+		rerouted, ok := notification.AsModelRerouted()
+		if !ok {
+			t.Fatalf("notification = %#v, want model/rerouted", notification)
+		}
+		models = append(models, rerouted.Params.ToModel)
+	}
+	if want := []string{"model-b", "model-c"}; !reflect.DeepEqual(models, want) {
+		t.Fatalf("notification order = %#v, want %#v", models, want)
+	}
+}
+
 func TestExactRunAttachPreservesAcceptedPendingEvidenceBeforeTransportFailure(t *testing.T) {
 	c := &Client{
 		exactStreams:       map[string]map[*exactRunState]struct{}{},

@@ -125,8 +125,7 @@ func (r *exactRunner) StartStream(ctx context.Context, request StartThreadRunReq
 	if r.client.testBeforeExactTurnAttach != nil {
 		r.client.testBeforeExactTurnAttach()
 	}
-	state.setTurn(turnStarted.Turn)
-	r.client.attachExactStream(state)
+	r.client.attachExactStreamForTurn(state, turnStarted.Turn)
 	return stream, nil
 }
 
@@ -175,8 +174,7 @@ func (r *exactRunner) ResumeStream(ctx context.Context, request ResumeThreadRunR
 		state.finish(errors.New("codexsdk: turn/start response missing turn id"))
 		return stream, nil
 	}
-	state.setTurn(turnStarted.Turn)
-	r.client.attachExactStream(state)
+	r.client.attachExactStreamForTurn(state, turnStarted.Turn)
 	return stream, nil
 }
 
@@ -406,6 +404,16 @@ func (s *exactRunState) setTurn(turn protocolv2.Turn) {
 	s.turnID = turn.ID
 	s.updateRunLocked(func(run *ThreadRunResult) { run.Turn = turn })
 	s.mu.Unlock()
+}
+
+func (c *Client) attachExactStreamForTurn(stream *exactRunState, turn protocolv2.Turn) {
+	stream.notificationOrderMu.Lock()
+	stream.setTurn(turn)
+	if c.testAfterExactTurnPublished != nil {
+		c.testAfterExactTurnPublished()
+	}
+	c.turnMu.Lock()
+	c.attachExactStreamLocked(stream)
 }
 
 func (s *exactRunState) turnIDSnapshot() string {
