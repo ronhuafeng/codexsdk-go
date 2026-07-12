@@ -231,6 +231,7 @@ if [[ "${compare_only}" -eq 1 ]]; then
   generated="${candidate}"
 else
   generated="${out}/schema"
+  stable_generated="${out}/stable-schema"
 fi
 if [[ "${generated}" == "/" || "${reports}" == "/" ]]; then
   echo "refusing to use unsafe output paths under --out=${out}" >&2
@@ -243,8 +244,8 @@ if [[ "${compare_only}" -eq 1 ]]; then
   generator="compare-only"
   generator_detail="candidate schema: ${generated}"
 else
-  rm -rf "${generated}" "${reports}"
-  mkdir -p "${generated}" "${reports}"
+  rm -rf "${generated}" "${stable_generated}" "${reports}"
+  mkdir -p "${generated}" "${stable_generated}" "${reports}"
 
   case "${generator}" in
     binary)
@@ -252,6 +253,7 @@ else
         echo "generating schema with binary: ${codex_bin}" >&2
       fi
       "${codex_bin}" app-server generate-json-schema --experimental --out "${generated}" 1>&2
+      "${codex_bin}" app-server generate-json-schema --out "${stable_generated}" 1>&2
       codex_version="$("${codex_bin}" --version 2>/dev/null || true)"
       generator_detail="${codex_bin}"
       ;;
@@ -264,6 +266,7 @@ else
       (
         cd "${worktree}/codex-rs"
         cargo run -p codex-cli -- app-server generate-json-schema --experimental --out "${generated}" 1>&2
+        cargo run -p codex-cli -- app-server generate-json-schema --out "${stable_generated}" 1>&2
       )
       codex_version="$(
         cd "${worktree}/codex-rs"
