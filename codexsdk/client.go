@@ -67,6 +67,7 @@ type Client struct {
 	// testAfterExactStreamPublished pauses the deterministic test seam after an
 	// exact stream becomes live and before pending evidence is replayed.
 	testAfterExactStreamPublished  func()
+	testAfterExactTurnPublished    func()
 	testBeforeExactStreamOrderGate func()
 	testBeforeExactTurnAttach      func()
 	testPendingExactNotification   func(rpcNotification)
@@ -606,6 +607,12 @@ func (c *Client) attachExactStream(stream *exactRunState) {
 		c.testBeforeExactStreamOrderGate()
 	}
 	stream.notificationOrderMu.Lock()
+	c.attachExactStreamLocked(stream)
+}
+
+// attachExactStreamLocked requires turnMu and the stream notification order
+// mutex. It releases both before returning.
+func (c *Client) attachExactStreamLocked(stream *exactRunState) {
 	stream.mu.Lock()
 	terminal := stream.terminal
 	stream.mu.Unlock()
