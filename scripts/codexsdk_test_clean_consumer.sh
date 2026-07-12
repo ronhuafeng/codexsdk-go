@@ -7,7 +7,9 @@ trap 'rm -rf "${consumer}"' EXIT
 
 cd "${consumer}"
 go mod init example.com/codexsdk-clean-consumer >/dev/null
-go mod edit -replace "github.com/ronhuafeng/codexsdk-go=${repo_root}"
+if [[ -z "${CODEXSDK_CONSUMER_REF:-}" ]]; then
+	go mod edit -replace "github.com/ronhuafeng/codexsdk-go=${repo_root}"
+fi
 
 cat > client_test.go <<'EOF'
 package consumer
@@ -42,5 +44,8 @@ func TestZeroValueLifecycle(t *testing.T) {
 }
 EOF
 
+if [[ -n "${CODEXSDK_CONSUMER_REF:-}" ]]; then
+	GOWORK=off go get "github.com/ronhuafeng/codexsdk-go@${CODEXSDK_CONSUMER_REF}"
+fi
 GOWORK=off go mod tidy
 GOWORK=off go test ./...
