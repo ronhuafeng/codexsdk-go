@@ -159,9 +159,8 @@ partial snapshot with `ctx.Err()` without canceling the run or changing
 `Stream.Err`. Use `Stream.Close` for explicit shared run cancellation. `Next`
 retains its existing bounded live-delivery and cancellation semantics.
 
-Exact server requests are lifecycle-isolated from the deprecated
-`ThreadClient` callback queue. Configure `ServerRequestHandler` when the
-application can provide generated response data. With no exact handler, the
+Configure `ServerRequestHandler` when the application can provide generated
+response data. With no handler, the
 SDK immediately returns a generated fail-closed response for requests that
 have a safe denial or empty-answer form. Requests requiring application data,
 including authentication refresh, dynamic tool output, and attestation, return
@@ -176,9 +175,9 @@ failure shutdown cancels accepted callbacks immediately while preserving the
 first failure cause and partial run evidence. Handlers must return when their
 context is canceled and must not call `Close` reentrantly.
 
-The v0.1 `ThreadClient`, copied request/result models, event projections, and
-conversion helpers remain deprecated compatibility surface through v0.2. New
-code should use generated params and `ThreadRunner`.
+The removed v0.1 lifecycle and copied protocol models have no compatibility
+aliases. See [the migration mapping](docs/v0.2-migration.md#removed-v01-mapping)
+for exact replacements.
 
 ## Real App-Server Smoke Test
 

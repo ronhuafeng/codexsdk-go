@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -194,35 +193,6 @@ func TestInternalJSONRPCWriterSerializesConcurrentWrites(t *testing.T) {
 	}
 }
 
-func TestInternalJSONRPCRoutesEventsByTurnID(t *testing.T) {
-	c := newTransportHarness()
-	first := newThreadStream(c, "thread-1").state
-	first.setTurnID("turn-1")
-	second := newThreadStream(c, "thread-2").state
-	second.setTurnID("turn-2")
-	c.streams["turn-1"] = map[*threadStreamState]struct{}{first: {}}
-	c.streams["turn-2"] = map[*threadStreamState]struct{}{second: {}}
-
-	c.routeNotification(rpcNotification{
-		method: "item/agentMessage/delta",
-		params: map[string]any{"threadId": "thread-2", "turnId": "turn-2", "itemId": "item-2", "delta": "only second"},
-	})
-
-	select {
-	case event := <-second.events:
-		if event.Kind != ThreadEventOutputDelta || event.TurnID != "turn-2" || event.OutputDelta != "only second" {
-			t.Fatalf("second stream event = %#v", event)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for routed second stream event")
-	}
-	select {
-	case event := <-first.events:
-		t.Fatalf("first stream received event for wrong turn: %#v", event)
-	default:
-	}
-}
-
 func TestInternalJSONRPCRejectsMissingObjectResult(t *testing.T) {
 	c := newTransportHarness()
 	errCh := make(chan error, 1)
@@ -372,93 +342,6 @@ func TestInternalJSONRPCReadLoopRoutesTypedResponseByID(t *testing.T) {
 	}
 }
 
-func TestInternalJSONRPCReadLoopServerRequestTypedValidation(t *testing.T) {
-	t.Run("valid request reaches handler", func(t *testing.T) {
-		c := newTransportHarness()
-		writer := c.stdin.(*recordingWriteCloser)
-		handlerSeen := make(chan ServerRequest, 1)
-		c.options.LegacyServerRequestHandler = func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
-			handlerSeen <- req
-			return LegacyServerRequestResponse{ApprovalDecision: ApprovalDecline}, nil
-		}
-
-		c.readLoop(strings.NewReader(`{"id":"server-1","method":"applyPatchApproval","params":{"callId":"call-1","conversationId":"thread-1","fileChanges":{"/repo/file.txt":{"content":"old","type":"delete"}}}}` + "\n"))
-
-		select {
-		case req := <-handlerSeen:
-			if req.Kind != ServerRequestApplyPatchApproval || req.Method != protocolv2.MethodApplyPatchApproval || req.ItemID != "call-1" {
-				t.Fatalf("server request = %#v", req)
-			}
-		case <-time.After(time.Second):
-			t.Fatal("valid server request did not reach handler")
-		}
-		response := recordedJSONMessage(t, writer)
-		result, _ := response["result"].(map[string]any)
-		if response["id"] != "server-1" || result["decision"] != "denied" {
-			t.Fatalf("valid server request response = %#v", response)
-		}
-	})
-
-	t.Run("malformed request does not reach handler", func(t *testing.T) {
-		c := newTransportHarness()
-		writer := c.stdin.(*recordingWriteCloser)
-		handlerCalled := make(chan struct{}, 1)
-		c.options.LegacyServerRequestHandler = func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
-			handlerCalled <- struct{}{}
-			return LegacyServerRequestResponse{}, errors.New("handler should not be called")
-		}
-
-		c.readLoop(strings.NewReader(`{"id":"server-1","method":"item/commandExecution/requestApproval","params":{"itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}}` + "\n"))
-
-		select {
-		case <-handlerCalled:
-			t.Fatal("malformed server request invoked handler")
-		default:
-		}
-		response := recordedJSONMessage(t, writer)
-		errorObject, _ := response["error"].(map[string]any)
-		message, _ := errorObject["message"].(string)
-		if response["id"] != "server-1" ||
-			errorObject["code"] != float64(-32602) ||
-			!strings.Contains(message, "codexsdk: decode ServerRequest") ||
-			!strings.Contains(message, "CommandExecutionRequestApprovalParams.startedAtMs") {
-			t.Fatalf("malformed server request error response = %#v", response)
-		}
-		if err := c.pendingErrors["turn-1"]; err == nil || !strings.Contains(err.Error(), "codexsdk: decode ServerRequest") {
-			t.Fatalf("malformed server request pending error = %v", err)
-		}
-	})
-
-	t.Run("unknown method does not reach handler", func(t *testing.T) {
-		c := newTransportHarness()
-		writer := c.stdin.(*recordingWriteCloser)
-		handlerCalled := make(chan struct{}, 1)
-		c.options.LegacyServerRequestHandler = func(ctx context.Context, req ServerRequest) (LegacyServerRequestResponse, error) {
-			handlerCalled <- struct{}{}
-			return LegacyServerRequestResponse{}, errors.New("handler should not be called")
-		}
-
-		c.readLoop(strings.NewReader(`{"id":"server-1","method":"server/unknown","params":{"threadId":"thread-1","turnId":"turn-1"}}` + "\n"))
-
-		select {
-		case <-handlerCalled:
-			t.Fatal("unknown server request invoked handler")
-		default:
-		}
-		response := recordedJSONMessage(t, writer)
-		errorObject, _ := response["error"].(map[string]any)
-		message, _ := errorObject["message"].(string)
-		if response["id"] != "server-1" ||
-			errorObject["code"] != float64(-32602) ||
-			!strings.Contains(message, `unknown variant "server/unknown"`) {
-			t.Fatalf("unknown server request error response = %#v", response)
-		}
-		if err := c.pendingErrors["turn-1"]; err == nil || !strings.Contains(err.Error(), `unknown variant "server/unknown"`) {
-			t.Fatalf("unknown server request pending error = %v", err)
-		}
-	})
-}
-
 func TestInternalJSONRPCReadLoopEOFFailsPendingWaits(t *testing.T) {
 	c := newTransportHarness()
 	errCh := make(chan error, 1)
@@ -490,15 +373,13 @@ func TestInternalJSONRPCReadLoopEOFFailsPendingWaits(t *testing.T) {
 func newTransportHarness() *Client {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Client{
-		ctx:                 ctx,
-		cancel:              cancel,
-		stdin:               &recordingWriteCloser{},
-		streams:             map[string]map[*threadStreamState]struct{}{},
-		pendingEvents:       map[string][]rpcNotification{},
-		pendingErrors:       map[string]error{},
-		pendingServer:       map[string][]rpcServerRequest{},
-		pendingThreadEvents: map[string][]rpcNotification{},
-		readerDone:          make(chan struct{}),
+		ctx:            ctx,
+		cancel:         cancel,
+		stdin:          &recordingWriteCloser{},
+		pendingEvents:  map[string][]rpcNotification{},
+		exactStreams:   map[string]map[*exactRunState]struct{}{},
+		exactAttaching: map[string]map[*exactRunState]struct{}{},
+		readerDone:     make(chan struct{}),
 	}
 }
 

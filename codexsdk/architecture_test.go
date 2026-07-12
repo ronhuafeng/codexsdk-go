@@ -87,25 +87,8 @@ func TestCodexSDKPublicSurfaceHasNoRawProtocolEscapeHatch(t *testing.T) {
 		reflect.TypeOf(ServerRequestResponse{}),
 		reflect.TypeOf(ProtocolError{}),
 		reflect.TypeOf(TurnError{}),
-		reflect.TypeOf(ClientCapabilities{}),
-		reflect.TypeOf(ThreadClientOptions{}),
-		reflect.TypeOf(InputItem{}),
-		reflect.TypeOf(StartThreadRequest{}),
-		reflect.TypeOf(ResumeThreadRequest{}),
-		reflect.TypeOf(ForkThreadRequest{}),
-		reflect.TypeOf(ServerRequest{}),
-		reflect.TypeOf(LegacyServerRequestResponse{}),
-		reflect.TypeOf(ApprovalRequest{}),
-		reflect.TypeOf(LegacyThreadRunResult{}),
-		reflect.TypeOf(ThreadItem{}),
-		reflect.TypeOf(ThreadForkResult{}),
-		reflect.TypeOf(Usage{}),
 		reflect.TypeOf(InputStats{}),
 		reflect.TypeOf(DiagnosticRef{}),
-		reflect.TypeOf(ThreadEvent{}),
-		reflect.TypeOf(TurnWarningEvent{}),
-		reflect.TypeOf(ModelEvent{}),
-		reflect.TypeOf(WarningEvent{}),
 	}
 	for _, typ := range publicRootStructs {
 		assertNoPublicRawProtocolType(t, typ.Name(), typ, map[reflect.Type]bool{})
@@ -114,7 +97,7 @@ func TestCodexSDKPublicSurfaceHasNoRawProtocolEscapeHatch(t *testing.T) {
 
 func publicProtocolInterfaces() []reflect.Type {
 	root := reflect.TypeOf((*Client)(nil)).Elem()
-	out := []reflect.Type{root, reflect.TypeOf((*ThreadClient)(nil)).Elem()}
+	out := []reflect.Type{root}
 	seen := map[reflect.Type]bool{}
 	for _, typ := range out {
 		seen[typ] = true
@@ -239,26 +222,6 @@ func TestProtocolV2PublicSourceHasNoRawPayloadPassthrough(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestThreadClientFinalAPIDrainsStreamingImplementation(t *testing.T) {
-	root, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "client.go"), nil, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	startCalls := methodCallNames(file, "StartThread")
-	if !startCalls["StartThreadStream"] || !startCalls["drainStream"] {
-		t.Fatalf("StartThread must call StartThreadStream and drainStream, got calls %#v", startCalls)
-	}
-	resumeCalls := methodCallNames(file, "ResumeThread")
-	if !resumeCalls["ResumeThreadStream"] || !resumeCalls["drainStream"] {
-		t.Fatalf("ResumeThread must call ResumeThreadStream and drainStream, got calls %#v", resumeCalls)
 	}
 }
 

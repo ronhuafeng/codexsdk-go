@@ -39,54 +39,60 @@ func TestRealAppServerSmokeStartResumeFork(t *testing.T) {
 	}
 	defer root.Close()
 
-	threads := root.ThreadClient(ThreadClientOptions{
-		DefaultModel:  model,
-		DefaultEffort: ReasoningEffortLow,
-	})
 	// Resume needs a persisted rollout; fork stays ephemeral below.
-	started, err := threads.StartThread(ctx, StartThreadRequest{
-		Input:          Text("Reply with a short confirmation for codexsdk start smoke."),
-		Ephemeral:      Bool(false),
-		ApprovalPolicy: ApprovalPolicyNever,
+	started, err := root.ThreadRunner().Start(ctx, StartThreadRunRequest{
+		Thread: protocolv2.ThreadStartParams{
+			Model:          protocolv2.Value(model),
+			Ephemeral:      protocolv2.Value(false),
+			ApprovalPolicy: protocolv2.Value(protocolv2.NewAskForApprovalNever()),
+		},
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{
+			protocolv2.NewUserInputText(protocolv2.UserInputText{Text: "Reply with a short confirmation for codexsdk start smoke."}),
+		}},
 	})
 	if err != nil {
 		t.Fatalf("real StartThread smoke failed: %v", err)
 	}
-	if started.ThreadID == "" {
+	if started.Start.Thread.ID == "" {
 		t.Fatalf("real StartThread smoke returned result without thread id: %#v", started)
 	}
 	defer func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		if _, err := root.Threads().Archive(cleanupCtx, protocolv2.ThreadArchiveParams{ThreadID: started.ThreadID}); err != nil {
-			t.Logf("archive real app-server smoke thread %s: %v", started.ThreadID, err)
+		if _, err := root.Threads().Archive(cleanupCtx, protocolv2.ThreadArchiveParams{ThreadID: started.Start.Thread.ID}); err != nil {
+			t.Logf("archive real app-server smoke thread %s: %v", started.Start.Thread.ID, err)
 		}
 	}()
-	if started.TurnID == "" || started.FinalResponse == "" {
+	if started.Run.Turn.ID == "" || started.Run.FinalResponse == "" {
 		t.Fatalf("real StartThread smoke returned incomplete result: %#v", started)
 	}
 
-	resumed, err := threads.ResumeThread(ctx, ResumeThreadRequest{
-		ThreadID:       started.ThreadID,
-		Input:          Text("Reply with a short confirmation for codexsdk resume smoke."),
-		ApprovalPolicy: ApprovalPolicyNever,
+	resumed, err := root.ThreadRunner().Resume(ctx, ResumeThreadRunRequest{
+		Thread: protocolv2.ThreadResumeParams{
+			ThreadID:       started.Start.Thread.ID,
+			ApprovalPolicy: protocolv2.Value(protocolv2.NewAskForApprovalNever()),
+		},
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{
+			protocolv2.NewUserInputText(protocolv2.UserInputText{Text: "Reply with a short confirmation for codexsdk resume smoke."}),
+		}},
 	})
 	if err != nil {
 		t.Fatalf("real ResumeThread smoke failed: %v", err)
 	}
-	if resumed.ThreadID == "" || resumed.TurnID == "" || resumed.FinalResponse == "" {
+	if resumed.Resume.Thread.ID == "" || resumed.Run.Turn.ID == "" || resumed.Run.FinalResponse == "" {
 		t.Fatalf("real ResumeThread smoke returned incomplete result: %#v", resumed)
 	}
 
-	forked, err := threads.ForkThread(ctx, ForkThreadRequest{
-		ParentThreadID: started.ThreadID,
-		Ephemeral:      Bool(true),
-		ApprovalPolicy: ApprovalPolicyNever,
+	ephemeral := true
+	forked, err := root.Threads().Fork(ctx, protocolv2.ThreadForkParams{
+		ThreadID:       started.Start.Thread.ID,
+		Ephemeral:      &ephemeral,
+		ApprovalPolicy: protocolv2.Value(protocolv2.NewAskForApprovalNever()),
 	})
 	if err != nil {
 		t.Fatalf("real ForkThread smoke failed: %v", err)
 	}
-	if forked.ThreadID == "" || forked.ForkedFromID != started.ThreadID {
+	if forked.Thread.ID == "" {
 		t.Fatalf("real ForkThread smoke returned incomplete result: %#v", forked)
 	}
 }
