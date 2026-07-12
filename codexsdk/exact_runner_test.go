@@ -533,6 +533,7 @@ func TestRequestArrivingDuringCloseFailsClosedWithoutStartingNewHandler(t *testi
 
 func TestFailureShutdownRejectsLateRequestWithoutStartingHandler(t *testing.T) {
 	record := tempRecord(t)
+	notificationAccepted := filepath.Join(t.TempDir(), "notification-accepted")
 	release := filepath.Join(t.TempDir(), "failure-observed")
 	lateSent := filepath.Join(t.TempDir(), "late-request-sent")
 	t.Setenv("CODEXSDK_FAKE_RECORD", record)
@@ -543,9 +544,12 @@ func TestFailureShutdownRejectsLateRequestWithoutStartingHandler(t *testing.T) {
 	var calls atomic.Int32
 	root, err := New(ClientOptions{
 		CWD:     t.TempDir(),
-		Command: fakeCommand("late-approval-during-failure", release, lateSent),
+		Command: fakeCommand("late-approval-during-failure", notificationAccepted, release, lateSent),
 		ServerNotificationHandler: func(ctx context.Context, _ protocolv2.ServerNotification) error {
 			close(notificationStarted)
+			if err := os.WriteFile(notificationAccepted, []byte("accepted"), 0o600); err != nil {
+				return err
+			}
 			<-ctx.Done()
 			<-allowNotificationFinish
 			return ctx.Err()
