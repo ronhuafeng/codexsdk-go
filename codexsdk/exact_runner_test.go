@@ -404,22 +404,33 @@ func TestNormalCloseWaitsForAcceptedNotificationHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
-	if err != nil {
-		t.Fatal(err)
+	type streamOutcome struct {
+		stream *Stream[StartedThreadRun]
+		err    error
 	}
+	streamed := make(chan streamOutcome, 1)
+	go func() {
+		stream, streamErr := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+		streamed <- streamOutcome{stream: stream, err: streamErr}
+	}()
 	<-started
 	closed := make(chan error, 1)
 	go func() { closed <- root.Close() }()
+	<-root.(*client).dispatchStop
 	select {
 	case err := <-closed:
 		t.Fatalf("Close returned before handler: %v", err)
-	case <-time.After(25 * time.Millisecond):
+	default:
 	}
 	close(release)
 	if err := <-closed; err != nil {
 		t.Fatal(err)
 	}
+	got := <-streamed
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	stream := got.stream
 	for stream.Next(context.Background()) {
 	}
 }
