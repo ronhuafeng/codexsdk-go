@@ -1366,6 +1366,68 @@ func TestExactRunAttachPreservesPendingBeforeLiveOrder(t *testing.T) {
 	}
 }
 
+func TestExactRunAttachPreservesAcceptedPendingEvidenceBeforeTransportFailure(t *testing.T) {
+	c := &Client{
+		exactStreams:       map[string]map[*exactRunState]struct{}{},
+		exactAttaching:     map[string]map[*exactRunState]struct{}{},
+		pendingEvents:      map[string][]rpcNotification{},
+		pendingDiagnostics: map[string][]DiagnosticRef{},
+	}
+	state := newExactRunState(c, "thread-transport-failure", StartedThreadRun{Start: facadeThreadStartResponse("thread-transport-failure", "model")})
+	state.turnID = "turn-transport-failure"
+	c.exactAttaching[state.threadID] = map[*exactRunState]struct{}{state: {}}
+	accepted := rpcNotification{method: protocolv2.MethodItemCompleted, params: map[string]any{
+		"completedAtMs": float64(1234),
+		"threadId":      state.threadID,
+		"turnId":        state.turnID,
+		"item": map[string]any{
+			"id": "accepted-item", "type": "agentMessage", "text": "accepted", "phase": "final_answer",
+		},
+	}}
+	accepted.evidence = &notificationEvidence{ready: make(chan struct{}), state: state}
+	rerouted := rpcNotification{method: protocolv2.MethodModelRerouted, params: map[string]any{
+		"threadId": state.threadID, "turnId": state.turnID, "fromModel": "model-a", "toModel": "model-b", "reason": "highRiskCyberActivity",
+	}}
+	rerouted.evidence = &notificationEvidence{ready: make(chan struct{}), state: state}
+	c.pendingEvents[state.turnID] = []rpcNotification{accepted, rerouted}
+
+	published := make(chan struct{})
+	releaseReplay := make(chan struct{})
+	c.testAfterExactStreamPublished = func() {
+		close(published)
+		<-releaseReplay
+	}
+	attached := make(chan struct{})
+	go func() {
+		c.attachExactStream(state)
+		close(attached)
+	}()
+	<-published
+
+	transportErr := errors.New("transport failed after accepted notification")
+	failed := make(chan struct{})
+	go func() {
+		c.failAll(transportErr)
+		close(failed)
+	}()
+	<-failed
+	close(releaseReplay)
+	<-attached
+
+	stream := &Stream[StartedThreadRun]{state: state}
+	result, ok := stream.Result()
+	if !ok || !errors.Is(stream.Err(), transportErr) {
+		t.Fatalf("result ok=%v err=%v, want transport cause", ok, stream.Err())
+	}
+	want := []protocolv2.ServerNotificationKind{
+		protocolv2.ServerNotificationKindItemCompleted,
+		protocolv2.ServerNotificationKindModelRerouted,
+	}
+	if got := exactNotificationKinds(state); !reflect.DeepEqual(got, want) {
+		t.Fatalf("accepted notification evidence = %#v", result.Run.Notifications)
+	}
+}
+
 func TestExactTerminalDeliveryDoesNotDeadlockWithAttachment(t *testing.T) {
 	c := &Client{
 		exactStreams:       map[string]map[*exactRunState]struct{}{},
