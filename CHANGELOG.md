@@ -4,7 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+
+- Non-destructive exact `Stream.Wait` observation for independent concurrent
+  consumers, with immutable complete or partial result snapshots and
+  caller-local context cancellation.
 
 ## [0.2.0] - 2026-07-11
 

@@ -236,15 +236,59 @@ func (s *Stream[R]) Notification() protocolv2.ServerNotification {
 	return cloned
 }
 
+// Wait observes run completion without consuming notifications or owning the
+// run lifecycle. Context cancellation stops only this call and returns the
+// latest immutable partial result; use Close to cancel the shared run.
+func (s *Stream[R]) Wait(ctx context.Context) (R, error) {
+	var zero R
+	if s == nil || s.state == nil {
+		return zero, ErrStreamClosed
+	}
+	if result, err, terminal := s.waitSnapshot(nil); terminal {
+		return result, err
+	}
+	select {
+	case <-s.state.done:
+		result, err, _ := s.waitSnapshot(nil)
+		return result, err
+	case <-ctx.Done():
+		// Recheck terminal state while taking the snapshot so an already
+		// completed run wins over caller-local cancellation.
+		result, err, _ := s.waitSnapshot(ctx.Err())
+		return result, err
+	}
+}
+
+func (s *Stream[R]) waitSnapshot(waitErr error) (R, error, bool) {
+	var zero R
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	result, ok := s.state.result.(R)
+	if !ok || !s.state.hasResult {
+		if s.state.terminal {
+			return zero, s.state.err, true
+		}
+		return zero, waitErr, false
+	}
+	cloned, err := cloneExactResult(result)
+	if err != nil {
+		return zero, err, s.state.terminal
+	}
+	if s.state.terminal {
+		return cloned, s.state.err, true
+	}
+	return cloned, waitErr, false
+}
+
 func (s *Stream[R]) Result() (R, bool) {
 	var zero R
 	if s == nil || s.state == nil {
 		return zero, false
 	}
 	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
 	result, ok := s.state.result.(R)
 	hasResult := s.state.hasResult
-	s.state.mu.Unlock()
 	if !ok || !hasResult {
 		return zero, false
 	}

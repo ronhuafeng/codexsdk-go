@@ -151,6 +151,14 @@ func main() {
 contains the latest immutable partial snapshot. More compile-checked examples
 live in `codexsdk/examples_test.go`.
 
+Call `Stream.Wait` when multiple consumers need to observe the same run without
+coordinating ownership of `Next`. Any number of waiters can block independently
+and each receives an immutable result snapshot plus the run's stable terminal
+error. A waiter's context bounds only that call: cancellation returns the latest
+partial snapshot with `ctx.Err()` without canceling the run or changing
+`Stream.Err`. Use `Stream.Close` for explicit shared run cancellation. `Next`
+retains its existing bounded live-delivery and cancellation semantics.
+
 Exact server requests are lifecycle-isolated from the deprecated
 `ThreadClient` callback queue. Configure `ServerRequestHandler` when the
 application can provide generated response data. With no exact handler, the

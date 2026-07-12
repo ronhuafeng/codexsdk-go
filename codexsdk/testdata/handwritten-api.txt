@@ -61,6 +61,7 @@ method github.com/ronhuafeng/codexsdk-go/codexsdk.Stream.Errfunc() error
 method github.com/ronhuafeng/codexsdk-go/codexsdk.Stream.Nextfunc(ctx context.Context) bool
 method github.com/ronhuafeng/codexsdk-go/codexsdk.Stream.Notificationfunc() github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2.ServerNotification
 method github.com/ronhuafeng/codexsdk-go/codexsdk.Stream.Resultfunc() (R, bool)
+method github.com/ronhuafeng/codexsdk-go/codexsdk.Stream.Waitfunc(ctx context.Context) (R, error)
 method github.com/ronhuafeng/codexsdk-go/codexsdk.ThreadStream.Closefunc() error
 method github.com/ronhuafeng/codexsdk-go/codexsdk.ThreadStream.Errfunc() error
 method github.com/ronhuafeng/codexsdk-go/codexsdk.ThreadStream.Eventfunc() github.com/ronhuafeng/codexsdk-go/codexsdk.ThreadEvent

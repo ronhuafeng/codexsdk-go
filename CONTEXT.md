@@ -35,3 +35,17 @@ _Avoid_: private API, runtime-enabled surface
 A narrow interface declared by an application at the point where it consumes a
 Lifecycle API or Generated Facade.
 _Avoid_: SDK umbrella interface
+
+**Exact Run**:
+One composed thread/turn execution together with its ordered attributable
+protocol evidence, partial result, and stable terminal cause.
+_Avoid_: workflow, request
+
+**Exact Run Waiter**:
+An independent, non-destructive observer of an Exact Run's completion and
+immutable result snapshot.
+_Avoid_: subscriber, cursor, stream consumer
+
+**Shared Run Cancellation**:
+An explicit lifecycle boundary that terminates an Exact Run for every observer.
+_Avoid_: waiter cancellation, timeout
