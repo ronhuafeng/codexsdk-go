@@ -68,6 +68,8 @@ type client struct {
 	// exact stream becomes live and before pending evidence is replayed.
 	testAfterExactStreamPublished  func()
 	testBeforeExactStreamOrderGate func()
+	testBeforeExactTurnAttach      func()
+	testPendingExactNotification   func(rpcNotification)
 	testExactStreamQueueCapacity   int
 
 	readerDone chan struct{}
@@ -90,13 +92,20 @@ type pendingCall struct {
 }
 
 type rpcNotification struct {
-	method string
-	params map[string]any
+	method   string
+	params   map[string]any
+	evidence *notificationEvidence
+}
+
+type notificationEvidence struct {
+	ready      chan struct{}
+	dispatched chan struct{}
 }
 
 type acceptedNotification struct {
-	notification protocolv2.ServerNotification
-	dispatched   chan struct{}
+	notification  protocolv2.ServerNotification
+	evidenceReady <-chan struct{}
+	dispatched    chan struct{}
 }
 
 type rpcServerRequest struct {
@@ -598,6 +607,7 @@ func (c *client) startTurnStream(ctx context.Context, threadID string, input []I
 	pending, serverRequests, pendingErr := c.attachStreamAndDrainPending(turnID, stream.state)
 	for _, notification := range pending {
 		stream.state.handleNotificationLocked(notification.method, notification.params)
+		notification.acceptEvidence()
 	}
 	if pendingErr != nil {
 		stream.state.finishErr(pendingErr)
@@ -835,13 +845,14 @@ func (c *client) routeNotification(notification rpcNotification) {
 		return
 	}
 	var terminalCompletions []func()
+	var evidence *notificationEvidence
 	defer func() {
-		dispatched, err := c.enqueueNotification(typed, len(terminalCompletions) > 0)
+		dispatched, err := c.enqueueNotification(typed, evidence, len(terminalCompletions) > 0)
 		if err != nil {
 			c.failClient(err)
 			return
 		}
-		if dispatched != nil {
+		if dispatched != nil && len(terminalCompletions) > 0 {
 			<-dispatched
 		}
 		for _, complete := range terminalCompletions {
@@ -849,7 +860,7 @@ func (c *client) routeNotification(notification rpcNotification) {
 		}
 	}()
 	var routed bool
-	routed, terminalCompletions = c.routeExactNotificationBeforeTerminalCompletion(notification, typed)
+	routed, terminalCompletions, evidence = c.routeExactNotificationBeforeTerminalCompletion(notification, typed)
 	if routed {
 		return
 	}
@@ -888,38 +899,42 @@ func exactNotification(notification rpcNotification) (protocolv2.ServerNotificat
 }
 
 func (c *client) routeExactNotification(notification rpcNotification, typed protocolv2.ServerNotification) bool {
-	routed, completions := c.routeExactNotificationBeforeTerminalCompletion(notification, typed)
+	routed, completions, _ := c.routeExactNotificationBeforeTerminalCompletion(notification, typed)
 	for _, complete := range completions {
 		complete()
 	}
 	return routed
 }
 
-func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpcNotification, typed protocolv2.ServerNotification) (bool, []func()) {
+func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpcNotification, typed protocolv2.ServerNotification) (bool, []func(), *notificationEvidence) {
 	class, identity := attributionFor(typed)
 	if class == notificationAttributionGlobal || class == notificationAttributionUnsupported {
-		return false, nil
+		return false, nil, nil
 	}
 	c.turnMu.Lock()
 	var targets []*exactRunState
+	var pendingExact bool
 	switch class {
 	case notificationAttributionTurn:
 		if identity.turnID == "" {
 			c.turnMu.Unlock()
-			return false, nil
+			return false, nil, nil
 		}
 		for stream := range c.exactStreams[identity.turnID] {
 			targets = append(targets, stream)
 		}
 		for stream := range c.exactAttaching[identity.threadID] {
-			if stream.turnIDSnapshot() == identity.turnID {
+			turnID := stream.turnIDSnapshot()
+			if turnID == identity.turnID {
 				targets = append(targets, stream)
+			} else if turnID == "" {
+				pendingExact = true
 			}
 		}
 	case notificationAttributionThread:
 		if identity.threadID == "" {
 			c.turnMu.Unlock()
-			return false, nil
+			return false, nil, nil
 		}
 		for _, streams := range c.exactStreams {
 			for stream := range streams {
@@ -935,6 +950,19 @@ func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpc
 				}
 			}
 		}
+	}
+	if len(targets) == 0 && pendingExact {
+		evidence := &notificationEvidence{ready: make(chan struct{})}
+		if c.options.ServerNotificationHandler != nil {
+			evidence.dispatched = make(chan struct{})
+		}
+		notification.evidence = evidence
+		c.pendingEvents[identity.turnID] = append(c.pendingEvents[identity.turnID], notification)
+		c.turnMu.Unlock()
+		if c.testPendingExactNotification != nil {
+			c.testPendingExactNotification(notification)
+		}
+		return true, nil, evidence
 	}
 	c.turnMu.Unlock()
 	var deliveryErr error
@@ -955,7 +983,7 @@ func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpc
 	if deliveryErr != nil {
 		c.failExactNotificationDelivery(failedStream, deliveryErr)
 	}
-	return len(targets) > 0, terminalCompletions
+	return len(targets) > 0, terminalCompletions, nil
 }
 
 func (c *client) failExactNotificationDelivery(stream *exactRunState, err error) {
@@ -1185,10 +1213,17 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	for _, notification := range pending {
 		typed, err := exactNotification(notification)
 		if err != nil {
+			notification.acceptEvidence()
 			stream.finish(err)
 			return
 		}
-		if err := stream.accept(typed); err != nil {
+		_, completeTerminal, err := stream.acceptState(typed, true)
+		notification.acceptEvidence()
+		if completeTerminal != nil {
+			notification.awaitEvidenceHandler()
+			completeTerminal()
+		}
+		if err != nil {
 			c.failExactNotificationDelivery(stream, err)
 			return
 		}
@@ -1198,6 +1233,18 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	}
 	if err := errors.Join(pendingErr, globalErr); err != nil {
 		c.failClient(err)
+	}
+}
+
+func (n rpcNotification) acceptEvidence() {
+	if n.evidence != nil {
+		close(n.evidence.ready)
+	}
+}
+
+func (n rpcNotification) awaitEvidenceHandler() {
+	if n.evidence != nil && n.evidence.dispatched != nil {
+		<-n.evidence.dispatched
 	}
 }
 
