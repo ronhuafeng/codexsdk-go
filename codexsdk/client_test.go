@@ -2931,19 +2931,19 @@ func TestThreadTurnsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *
 		turnsList.NextCursor == nil || turnsList.NextCursor.Value == nil || *turnsList.NextCursor.Value != "next-turn" {
 		t.Fatalf("thread/turns/list response = %#v", turnsList)
 	}
-	itemsList, err := threads.TurnsItemsList(context.Background(), protocolv2.ThreadTurnsItemsListParams{
+	itemsList, err := threads.ItemsList(context.Background(), protocolv2.ThreadItemsListParams{
 		Cursor:        protocolv2.Null[string](),
 		Limit:         protocolv2.Value(uint32(10)),
 		SortDirection: protocolv2.Value(protocolv2.SortDirectionAsc),
 		ThreadID:      "thread-1",
-		TurnID:        "turn-list-1",
+		TurnID:        protocolv2.Value("turn-list-1"),
 	})
 	if err != nil {
-		t.Fatalf("Threads().TurnsItemsList returned error after experimental opt-in: %v", err)
+		t.Fatalf("Threads().ItemsList returned error after experimental opt-in: %v", err)
 	}
 	if len(itemsList.Data) != 1 || itemsList.Data[0].Kind() != protocolv2.ThreadItemKindAgentMessage ||
 		itemsList.NextCursor == nil || itemsList.NextCursor.Value == nil || *itemsList.NextCursor.Value != "next-item" {
-		t.Fatalf("thread/turns/items/list response = %#v", itemsList)
+		t.Fatalf("thread/items/list response = %#v", itemsList)
 	}
 
 	records := readRecords(t, record)
@@ -2953,11 +2953,11 @@ func TestThreadTurnsProtocolFamilyFacadeSendsTypedMethodsAndDecodesResponses(t *
 		turnsParams["sortDirection"] != "desc" {
 		t.Fatalf("thread/turns/list params = %#v", turnsParams)
 	}
-	itemsParams := firstRecord(records, "recv", protocolv2.MethodThreadTurnsItemsList)["params"].(map[string]any)
+	itemsParams := firstRecord(records, "recv", protocolv2.MethodThreadItemsList)["params"].(map[string]any)
 	if itemsParams["threadId"] != "thread-1" || itemsParams["turnId"] != "turn-list-1" ||
 		itemsParams["cursor"] != nil || itemsParams["limit"] != float64(10) ||
 		itemsParams["sortDirection"] != "asc" {
-		t.Fatalf("thread/turns/items/list params = %#v", itemsParams)
+		t.Fatalf("thread/items/list params = %#v", itemsParams)
 	}
 }
 
@@ -2984,12 +2984,12 @@ func TestThreadTurnsProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWriteUnl
 			},
 		},
 		{
-			name:   "turnsItemsList",
-			method: protocolv2.MethodThreadTurnsItemsList,
+			name:   "itemsList",
+			method: protocolv2.MethodThreadItemsList,
 			call: func() error {
-				_, err := root.Threads().TurnsItemsList(context.Background(), protocolv2.ThreadTurnsItemsListParams{
+				_, err := root.Threads().ItemsList(context.Background(), protocolv2.ThreadItemsListParams{
 					ThreadID: "thread-1",
-					TurnID:   "turn-list-1",
+					TurnID:   protocolv2.Value("turn-list-1"),
 				})
 				return err
 			},
@@ -3009,7 +3009,7 @@ func TestThreadTurnsProtocolFamilyFacadeRejectsExperimentalMethodsBeforeWriteUnl
 	records := readRecords(t, record)
 	for _, method := range []string{
 		protocolv2.MethodThreadTurnsList,
-		protocolv2.MethodThreadTurnsItemsList,
+		protocolv2.MethodThreadItemsList,
 	} {
 		if firstRecord(records, "recv", method) != nil {
 			t.Fatalf("%s was sent after experimental method guard failure", method)
@@ -3063,16 +3063,16 @@ func TestThreadTurnsProtocolFamilyFacadeRejectsMalformedTypedResponses(t *testin
 			wantSub: "ThreadTurnsListResponse.data",
 		},
 		{
-			name:   "turnsItemsList",
-			method: protocolv2.MethodThreadTurnsItemsList,
+			name:   "itemsList",
+			method: protocolv2.MethodThreadItemsList,
 			call: func(threads Threads) error {
-				_, err := threads.TurnsItemsList(context.Background(), protocolv2.ThreadTurnsItemsListParams{
+				_, err := threads.ItemsList(context.Background(), protocolv2.ThreadItemsListParams{
 					ThreadID: "thread-1",
-					TurnID:   "turn-list-1",
+					TurnID:   protocolv2.Value("turn-list-1"),
 				})
 				return err
 			},
-			wantSub: "ThreadTurnsItemsListResponse.data",
+			wantSub: "ThreadItemsListResponse.data",
 		},
 	}
 	for _, tc := range cases {
@@ -6757,12 +6757,12 @@ func runFakeAppServer(mode string, extra []string) {
 				continue
 			}
 			sendProtocolResult(id, protocolv2.ThreadBackgroundTerminalsCleanResponse{})
-		case "thread/turns/items/list":
+		case "thread/items/list":
 			if mode == "thread-turns-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{"nextCursor": "next-item"}})
 				continue
 			}
-			sendProtocolResult(id, protocolv2.ThreadTurnsItemsListResponse{
+			sendProtocolResult(id, protocolv2.ThreadItemsListResponse{
 				BackwardsCursor: protocolv2.Null[string](),
 				Data:            []protocolv2.ThreadItem{facadeThreadAgentMessageItem("item-agent-1", "final text")},
 				NextCursor:      protocolv2.Value("next-item"),

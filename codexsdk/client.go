@@ -560,7 +560,7 @@ func protocolApprovalPolicy(value ApprovalPolicy) (*protocolv2.Nullable[protocol
 	case ApprovalPolicyUntrusted:
 		return protocolv2.Value(protocolv2.NewAskForApprovalUntrusted()), nil
 	case ApprovalPolicyOnFailure:
-		return protocolv2.Value(protocolv2.NewAskForApprovalOnFailure()), nil
+		return nil, fmt.Errorf("codexsdk: unsupported ApprovalPolicy %q", value)
 	case ApprovalPolicyOnRequest:
 		return protocolv2.Value(protocolv2.NewAskForApprovalOnRequest()), nil
 	case ApprovalPolicyNever:

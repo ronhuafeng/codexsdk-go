@@ -408,6 +408,7 @@ type Threads interface {
 	GoalSet(ctx context.Context, params protocolv2.ThreadGoalSetParams) (protocolv2.ThreadGoalSetResponse, error)
 	IncrementElicitation(ctx context.Context, params protocolv2.ThreadIncrementElicitationParams) (protocolv2.ThreadIncrementElicitationResponse, error)
 	InjectItems(ctx context.Context, params protocolv2.ThreadInjectItemsParams) (protocolv2.ThreadInjectItemsResponse, error)
+	ItemsList(ctx context.Context, params protocolv2.ThreadItemsListParams) (protocolv2.ThreadItemsListResponse, error)
 	List(ctx context.Context, params protocolv2.ThreadListParams) (protocolv2.ThreadListResponse, error)
 	LoadedList(ctx context.Context, params protocolv2.ThreadLoadedListParams) (protocolv2.ThreadLoadedListResponse, error)
 	MemoryModeSet(ctx context.Context, params protocolv2.ThreadMemoryModeSetParams) (protocolv2.ThreadMemoryModeSetResponse, error)
@@ -425,7 +426,6 @@ type Threads interface {
 	SettingsUpdate(ctx context.Context, params protocolv2.ThreadSettingsUpdateParams) (protocolv2.ThreadSettingsUpdateResponse, error)
 	ShellCommand(ctx context.Context, params protocolv2.ThreadShellCommandParams) (protocolv2.ThreadShellCommandResponse, error)
 	Start(ctx context.Context, params protocolv2.ThreadStartParams) (protocolv2.ThreadStartResponse, error)
-	TurnsItemsList(ctx context.Context, params protocolv2.ThreadTurnsItemsListParams) (protocolv2.ThreadTurnsItemsListResponse, error)
 	TurnsList(ctx context.Context, params protocolv2.ThreadTurnsListParams) (protocolv2.ThreadTurnsListResponse, error)
 	Unarchive(ctx context.Context, params protocolv2.ThreadUnarchiveParams) (protocolv2.ThreadUnarchiveResponse, error)
 	Unsubscribe(ctx context.Context, params protocolv2.ThreadUnsubscribeParams) (protocolv2.ThreadUnsubscribeResponse, error)
@@ -1174,6 +1174,14 @@ func (f threadsFacade) InjectItems(ctx context.Context, params protocolv2.Thread
 	return response, nil
 }
 
+func (f threadsFacade) ItemsList(ctx context.Context, params protocolv2.ThreadItemsListParams) (protocolv2.ThreadItemsListResponse, error) {
+	var response protocolv2.ThreadItemsListResponse
+	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadItemsList, params, &response); err != nil {
+		return protocolv2.ThreadItemsListResponse{}, err
+	}
+	return response, nil
+}
+
 func (f threadsFacade) List(ctx context.Context, params protocolv2.ThreadListParams) (protocolv2.ThreadListResponse, error) {
 	var response protocolv2.ThreadListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadList, params, &response); err != nil {
@@ -1306,14 +1314,6 @@ func (f threadsFacade) Start(ctx context.Context, params protocolv2.ThreadStartP
 	var response protocolv2.ThreadStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadStart, params, &response); err != nil {
 		return protocolv2.ThreadStartResponse{}, err
-	}
-	return response, nil
-}
-
-func (f threadsFacade) TurnsItemsList(ctx context.Context, params protocolv2.ThreadTurnsItemsListParams) (protocolv2.ThreadTurnsItemsListResponse, error) {
-	var response protocolv2.ThreadTurnsItemsListResponse
-	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadTurnsItemsList, params, &response); err != nil {
-		return protocolv2.ThreadTurnsItemsListResponse{}, err
 	}
 	return response, nil
 }
