@@ -374,7 +374,7 @@ func TestExactRunNilHandlerUnsafeRequestPreservesPartialEvidenceAndTypedFirstCau
 	notificationAccepted := filepath.Join(t.TempDir(), "notification-accepted")
 	root, err := New(ClientOptions{
 		CWD:     t.TempDir(),
-		Command: fakeCommand("auth-refresh-after-notification", notificationAccepted),
+		Command: fakeAuthRefreshAfterNotificationCommand(notificationAccepted),
 		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
 			return os.WriteFile(notificationAccepted, []byte("accepted"), 0o600)
 		},
@@ -382,22 +382,20 @@ func TestExactRunNilHandlerUnsafeRequestPreservesPartialEvidenceAndTypedFirstCau
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	result, runErr := root.ThreadRunner().Start(ctx, StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
 	if !errors.Is(runErr, ErrExactServerRequest) {
 		t.Fatalf("run error = %v, want typed exact server request cause", runErr)
+	}
+	if errors.Is(runErr, context.DeadlineExceeded) {
+		t.Fatalf("unsafe exact request was retained instead of rejected: %v", runErr)
 	}
 	if len(result.Run.Notifications) == 0 {
 		t.Fatal("exact fail-closed termination erased accepted notification evidence")
 	}
 	if closeErr := root.Close(); !errors.Is(closeErr, ErrExactServerRequest) {
 		t.Fatalf("Close error = %v, want first exact server request cause", closeErr)
-	}
-	client := root.(*client)
-	client.turnMu.Lock()
-	pending := len(client.pendingServer)
-	client.turnMu.Unlock()
-	if pending != 0 {
-		t.Fatalf("unsafe exact request entered legacy pending queue: %#v", client.pendingServer)
 	}
 }
 
@@ -544,7 +542,7 @@ func TestFailureShutdownRejectsLateRequestWithoutStartingHandler(t *testing.T) {
 	var calls atomic.Int32
 	root, err := New(ClientOptions{
 		CWD:     t.TempDir(),
-		Command: fakeCommand("late-approval-during-failure", notificationAccepted, release, lateSent),
+		Command: fakeLateApprovalDuringFailureCommand(notificationAccepted, release, lateSent),
 		ServerNotificationHandler: func(ctx context.Context, _ protocolv2.ServerNotification) error {
 			close(notificationStarted)
 			if err := os.WriteFile(notificationAccepted, []byte("accepted"), 0o600); err != nil {
@@ -609,7 +607,7 @@ func TestFailureShutdownPreservesHandlerCauseOverLaterTransportError(t *testing.
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
 		CWD:     t.TempDir(),
-		Command: fakeCommand("handler-error-then-transport-close", release),
+		Command: fakeHandlerErrorThenTransportCloseCommand(release),
 		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
 			return handlerCause
 		},
@@ -639,7 +637,7 @@ func TestFailureShutdownPreservesHandlerCauseOverLaterTransportError(t *testing.
 func TestProtocolFailureFinishesActiveStreamsWithIndependentPartialResults(t *testing.T) {
 	release := filepath.Join(t.TempDir(), "release-protocol-failure")
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
-	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("protocol-failure-multiple-streams", release)})
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeProtocolFailureMultipleStreamsCommand(release)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -663,11 +661,29 @@ func TestProtocolFailureFinishesActiveStreamsWithIndependentPartialResults(t *te
 	if first.Err() == nil || first.Err() != second.Err() {
 		t.Fatalf("active stream causes = %v and %v, want one shared protocol cause", first.Err(), second.Err())
 	}
+	results := make([]StartedThreadRun, 0, 2)
 	for index, stream := range []*Stream[StartedThreadRun]{first, second} {
 		result, ok := stream.Result()
 		if !ok || len(result.Run.Notifications) != 1 {
 			t.Fatalf("stream %d partial result = %#v, ok=%v", index, result.Run, ok)
 		}
+		completed, ok := result.Run.Notifications[0].AsItemCompleted()
+		wantTurnID := "turn-" + itoa(index+1)
+		if !ok || completed.Params.TurnID != wantTurnID || result.Start.Thread.ID != "thread-"+itoa(index+1) {
+			t.Fatalf("stream %d evidence attribution = %#v, start = %#v", index, completed.Params, result.Start.Thread)
+		}
+		results = append(results, result)
+	}
+	firstCompleted, _ := results[0].Run.Notifications[0].AsItemCompleted()
+	firstMessage, _ := firstCompleted.Params.Item.AsAgentMessage()
+	if firstMessage.Phase == nil || firstMessage.Phase.Value == nil {
+		t.Fatalf("first partial message phase = %#v", firstMessage.Phase)
+	}
+	*firstMessage.Phase.Value = protocolv2.MessagePhaseFinalAnswer
+	secondCompleted, _ := results[1].Run.Notifications[0].AsItemCompleted()
+	secondMessage, _ := secondCompleted.Params.Item.AsAgentMessage()
+	if secondMessage.Phase == nil || secondMessage.Phase.Value == nil || *secondMessage.Phase.Value != protocolv2.MessagePhaseCommentary {
+		t.Fatalf("mutating first stream changed second stream evidence: %#v", secondMessage)
 	}
 	if closeErr := root.Close(); closeErr != first.Err() {
 		t.Fatalf("Close error = %v, want shared protocol cause %v", closeErr, first.Err())
@@ -745,25 +761,43 @@ func TestExactRunnerStreamOrdersNotificationsAndReturnsIsolatedSnapshots(t *test
 	}
 	first.Start.Model = "mutated-model"
 	first.Start.Thread.ID = "mutated-thread"
-	first.Start.Thread.Turns = nil
+	if first.Start.Thread.ThreadSource == nil || first.Start.Thread.ThreadSource.Value == nil {
+		t.Fatalf("start thread source = %#v", first.Start.Thread.ThreadSource)
+	}
+	*first.Start.Thread.ThreadSource.Value = protocolv2.ThreadSource("mutated-source")
 	first.Run.Turn.ID = "mutated-turn"
-	first.Run.Turn.Items = nil
+	turnMessage, ok := first.Run.Turn.Items[0].AsAgentMessage()
+	if !ok || turnMessage.Phase == nil || turnMessage.Phase.Value == nil {
+		t.Fatalf("turn message = %#v", first.Run.Turn.Items)
+	}
+	*turnMessage.Phase.Value = protocolv2.MessagePhaseCommentary
 	first.Run.Usage.Total.InputTokens = 999
-	first.Run.Notifications[0] = protocolv2.ServerNotification{}
+	completed, ok := first.Run.Notifications[0].AsItemCompleted()
+	if !ok {
+		t.Fatalf("first notification = %#v", first.Run.Notifications[0])
+	}
+	notificationMessage, ok := completed.Params.Item.AsAgentMessage()
+	if !ok || notificationMessage.Phase == nil || notificationMessage.Phase.Value == nil {
+		t.Fatalf("notification message = %#v", completed.Params.Item)
+	}
+	*notificationMessage.Phase.Value = protocolv2.MessagePhaseCommentary
 	second, ok := stream.Result()
 	if !ok {
 		t.Fatal("second result snapshot unavailable")
 	}
-	if second.Start.Model != "gpt-exact" || second.Start.Thread.ID == "mutated-thread" || second.Start.Thread.Turns == nil {
+	if second.Start.Model != "gpt-exact" || second.Start.Thread.ID == "mutated-thread" || second.Start.Thread.ThreadSource == nil || second.Start.Thread.ThreadSource.Value == nil || *second.Start.Thread.ThreadSource.Value != protocolv2.ThreadSource("user") {
 		t.Fatalf("start response snapshot was mutable: %#v", second.Start)
 	}
-	if second.Run.Turn.ID == "mutated-turn" || second.Run.Turn.Items == nil {
+	secondTurnMessage, ok := second.Run.Turn.Items[0].AsAgentMessage()
+	if second.Run.Turn.ID == "mutated-turn" || !ok || secondTurnMessage.Phase == nil || secondTurnMessage.Phase.Value == nil || *secondTurnMessage.Phase.Value != protocolv2.MessagePhaseFinalAnswer {
 		t.Fatalf("turn snapshot was mutable: %#v", second.Run.Turn)
 	}
 	if second.Run.Usage == nil || second.Run.Usage.Total.InputTokens != 30 {
 		t.Fatalf("usage snapshot was mutable: %#v", second.Run.Usage)
 	}
-	if len(second.Run.Notifications) != 3 || second.Run.Notifications[0].Kind() != want[0] {
+	secondCompleted, ok := second.Run.Notifications[0].AsItemCompleted()
+	secondNotificationMessage, itemOK := secondCompleted.Params.Item.AsAgentMessage()
+	if len(second.Run.Notifications) != 3 || !ok || !itemOK || secondNotificationMessage.Phase == nil || secondNotificationMessage.Phase.Value == nil || *secondNotificationMessage.Phase.Value != protocolv2.MessagePhaseFinalAnswer {
 		t.Fatalf("notification snapshot was mutable: %#v", second.Run.Notifications)
 	}
 	if len(second.Run.Diagnostics) != 0 {
