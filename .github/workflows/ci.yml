@@ -103,5 +103,5 @@ jobs:
       - name: Repeat deterministic runtime concurrency contracts
         run: >-
           go test ./codexsdk
-          -run 'Test(ExactRunAttach|ExactNotificationOverflow|ExactTerminalOverflow|ExactAttribution|ConcurrentAttribution|ThreadAttributionReachesEveryCurrentRunOnSameThread|RunEvidenceAppendPrecedesGlobalHandlerEnqueue|NotificationHandlerFailureCancelsStreamWithPartialEvidence|HandlerFailureDiscardsQueuedTerminalWithoutBlockingRun|ExactRunNilHandlerUnsafeRequestPreservesPartialEvidence|RequestArrivingDuringClose|CloseIdempotencyAndConcurrentRouting|CloseJoinsNotificationAndServerRequestHandlers|NormalCloseCancelsAndJoinsExactServerRequestHandler|FailureShutdown|ProtocolFailureFinishesActiveStreams)'
+          -run 'Test(ExactStreamWait|ExactRunAttach|ExactNotificationOverflow|ExactTerminalOverflow|ExactAttribution|ConcurrentAttribution|ThreadAttributionReachesEveryCurrentRunOnSameThread|RunEvidenceAppendPrecedesGlobalHandlerEnqueue|NotificationHandlerFailureCancelsStreamWithPartialEvidence|HandlerFailureDiscardsQueuedTerminalWithoutBlockingRun|ExactRunNilHandlerUnsafeRequestPreservesPartialEvidence|RequestArrivingDuringClose|CloseIdempotencyAndConcurrentRouting|CloseJoinsNotificationAndServerRequestHandlers|NormalCloseCancelsAndJoinsExactServerRequestHandler|FailureShutdown|ProtocolFailureFinishesActiveStreams)'
           -count=50

@@ -1041,11 +1041,18 @@ func TestExactRunnerDiagnosticSnapshotsAreIsolated(t *testing.T) {
 }
 
 func TestExactStreamWaitersObserveIndependentTerminalSnapshots(t *testing.T) {
-	state := newExactRunState(nil, "thread-wait", StartedThreadRun{
-		Start: facadeThreadStartResponse("thread-wait", "model"),
-		Run:   ThreadRunResult{Notifications: []protocolv2.ServerNotification{}},
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("failed")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
 	})
-	stream := &Stream[StartedThreadRun]{state: state}
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	type outcome struct {
 		result StartedThreadRun
@@ -1060,18 +1067,22 @@ func TestExactStreamWaitersObserveIndependentTerminalSnapshots(t *testing.T) {
 		}()
 	}
 
-	terminalCause := errors.New("terminal cause")
-	state.finish(terminalCause)
 	results := make([]StartedThreadRun, 0, waiterCount)
+	var terminalCause error
 	for range waiterCount {
 		got := <-outcomes
-		if !errors.Is(got.err, terminalCause) {
-			t.Fatalf("Wait error = %v, want terminal cause", got.err)
+		if !errors.Is(got.err, ErrTurnFailed) {
+			t.Fatalf("Wait error = %v, want ErrTurnFailed", got.err)
+		}
+		if terminalCause == nil {
+			terminalCause = got.err
+		} else if got.err != terminalCause {
+			t.Fatalf("Wait terminal cause = %p, want stable cause %p", got.err, terminalCause)
 		}
 		results = append(results, got.result)
 	}
 	results[0].Start.Thread.ID = "mutated"
-	if results[1].Start.Thread.ID != "thread-wait" {
+	if results[1].Start.Thread.ID == "mutated" || results[1].Run.Turn.Status != protocolv2.TurnStatusFailed {
 		t.Fatalf("waiter snapshots share mutable state: %#v", results[1].Start.Thread)
 	}
 	if stream.Err() != terminalCause {
@@ -1080,15 +1091,18 @@ func TestExactStreamWaitersObserveIndependentTerminalSnapshots(t *testing.T) {
 }
 
 func TestExactStreamWaitCancellationIsCallerLocalAndReturnsPartialSnapshot(t *testing.T) {
-	state := newExactRunState(nil, "thread-wait-cancel", StartedThreadRun{
-		Start: facadeThreadStartResponse("thread-wait-cancel", "model"),
-		Run: ThreadRunResult{Notifications: []protocolv2.ServerNotification{
-			protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{
-				Params: protocolv2.ConfigWarningNotification{Summary: "partial"},
-			}),
-		}},
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("hang")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
 	})
-	stream := &Stream[StartedThreadRun]{state: state}
+	if err != nil {
+		t.Fatal(err)
+	}
 	other := make(chan error, 1)
 	go func() {
 		_, err := stream.Wait(context.Background())
@@ -1100,9 +1114,6 @@ func TestExactStreamWaitCancellationIsCallerLocalAndReturnsPartialSnapshot(t *te
 	partial, err := stream.Wait(ctx)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Wait error = %v, want context.Canceled", err)
-	}
-	if len(partial.Run.Notifications) != 1 {
-		t.Fatalf("partial notifications = %d, want 1", len(partial.Run.Notifications))
 	}
 	if partial.Start.Thread.ThreadSource == nil || partial.Start.Thread.ThreadSource.Value == nil {
 		t.Fatalf("partial thread source = %#v", partial.Start.Thread.ThreadSource)
@@ -1119,56 +1130,74 @@ func TestExactStreamWaitCancellationIsCallerLocalAndReturnsPartialSnapshot(t *te
 	default:
 	}
 
-	state.finish(nil)
-	if err := <-other; err != nil {
-		t.Fatalf("other Wait error = %v", err)
+	if err := stream.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-other; !errors.Is(err, ErrStreamClosed) {
+		t.Fatalf("other Wait error = %v, want ErrStreamClosed", err)
 	}
 	final, ok := stream.Result()
-	if !ok || final.Start.Thread.ID != "thread-wait-cancel" || final.Start.Thread.ThreadSource == nil || final.Start.Thread.ThreadSource.Value == nil || *final.Start.Thread.ThreadSource.Value != protocolv2.ThreadSource("user") || len(final.Run.Notifications) != 1 {
+	if !ok || final.Start.Thread.ID == "mutated" || final.Start.Thread.ThreadSource == nil || final.Start.Thread.ThreadSource.Value == nil || *final.Start.Thread.ThreadSource.Value != protocolv2.ThreadSource("user") {
 		t.Fatalf("partial Wait snapshot mutated shared result: %#v, ok=%v", final, ok)
 	}
 }
 
 func TestExactStreamWaitPrefersTerminalWhenContextIsAlsoDone(t *testing.T) {
-	state := newExactRunState(nil, "thread-terminal-priority", StartedThreadRun{
-		Start: facadeThreadStartResponse("thread-terminal-priority", "model"),
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("failed")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
 	})
-	stream := &Stream[StartedThreadRun]{state: state}
-	terminalCause := errors.New("first terminal cause")
-	state.finish(terminalCause)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Wait(context.Background()); !errors.Is(err, ErrTurnFailed) {
+		t.Fatalf("initial Wait error = %v, want ErrTurnFailed", err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	result, err := stream.Wait(ctx)
-	if !errors.Is(err, terminalCause) || result.Start.Thread.ID != "thread-terminal-priority" {
+	if !errors.Is(err, ErrTurnFailed) || result.Run.Turn.Status != protocolv2.TurnStatusFailed {
 		t.Fatalf("Wait = (%#v, %v), want terminal result and cause", result, err)
 	}
 }
 
 func TestExactStreamWaitAndNextObserveSameCompleteRun(t *testing.T) {
-	state := newExactRunState(nil, "thread-wait-next", StartedThreadRun{
-		Start: facadeThreadStartResponse("thread-wait-next", "model"),
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
 	})
-	stream := &Stream[StartedThreadRun]{state: state}
+	if err != nil {
+		t.Fatal(err)
+	}
 	waited := make(chan StartedThreadRun, 1)
 	go func() {
 		result, _ := stream.Wait(context.Background())
 		waited <- result
 	}()
 
-	notification := protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{
-		Params: protocolv2.ConfigWarningNotification{Summary: "ordered evidence"},
-	})
-	if err := state.accept(notification); err != nil {
-		t.Fatal(err)
+	var kinds []protocolv2.ServerNotificationKind
+	for stream.Next(context.Background()) {
+		kinds = append(kinds, stream.Notification().Kind())
 	}
-	if !stream.Next(context.Background()) || stream.Notification().Kind() != notification.Kind() {
-		t.Fatalf("Next did not receive live notification: %#v", stream.Notification())
-	}
-	state.finish(nil)
 	result := <-waited
-	if len(result.Run.Notifications) != 1 || result.Run.Notifications[0].Kind() != notification.Kind() {
+	if len(result.Run.Notifications) != len(kinds) {
 		t.Fatalf("Wait history = %#v, want complete ordered evidence", result.Run.Notifications)
+	}
+	for index, notification := range result.Run.Notifications {
+		if notification.Kind() != kinds[index] {
+			t.Fatalf("Wait history kind %d = %s, want %s", index, notification.Kind(), kinds[index])
+		}
 	}
 }
 
@@ -1178,13 +1207,23 @@ func TestExactStreamWaitNilAndClosedSemantics(t *testing.T) {
 		t.Fatalf("nil Wait = (%#v, %v), want zero and ErrStreamClosed", result, err)
 	}
 
-	state := newExactRunState(nil, "thread-closed", StartedThreadRun{Start: facadeThreadStartResponse("thread-closed", "model")})
-	stream := &Stream[StartedThreadRun]{state: state}
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("hang")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := stream.Close(); err != nil {
 		t.Fatal(err)
 	}
 	result, err := stream.Wait(context.Background())
-	if !errors.Is(err, ErrStreamClosed) || result.Start.Thread.ID != "thread-closed" {
+	if !errors.Is(err, ErrStreamClosed) || result.Start.Thread.ID == "" {
 		t.Fatalf("closed Wait = (%#v, %v), want partial result and ErrStreamClosed", result, err)
 	}
 }
