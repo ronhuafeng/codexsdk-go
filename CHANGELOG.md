@@ -10,6 +10,37 @@ All notable changes to this project are documented here.
   consumers, with immutable complete or partial result snapshots and
   caller-local context cancellation.
 
+## [0.2.1] - 2026-07-12
+
+### Fixed
+
+- Exact-run server requests now stay on the generated handler path. A missing
+  handler returns a request-kind-aware fail-closed response when safe, while
+  requests that require application data fail with a typed cause and preserve
+  partial run evidence.
+- Notifications accepted before exact-stream attachment remain ordered before
+  live notifications, including terminal, usage, reroute, and diagnostic
+  evidence.
+- Per-run notification backpressure now has timing-independent, client-wide
+  first-failure semantics for both pending replay and live delivery.
+- Handler admission and shutdown now share one atomic boundary, so accepted
+  callbacks are cancelled or joined before transport teardown and late
+  callbacks cannot start.
+- Notification evidence accepted by an exact run is committed before a failing
+  notification handler terminates the run, preserving the handler cause and
+  partial result together.
+- Generated notification kinds now use a schema-derived attribution policy;
+  global facts are not copied into unrelated run histories, and turn- and
+  thread-scoped facts reach only their documented targets.
+- Exact-run turn attribution is synchronized across publication, routing, and
+  lifecycle cleanup.
+
+### Compatibility
+
+- The deprecated v0.1 `ThreadClient` surface remains available and covered by
+  compatibility tests. The generated protocol baseline is synchronized to the
+  stable `rust-v0.144.1` schema; this patch adds no public convenience APIs.
+
 ## [0.2.0] - 2026-07-11
 
 ### Added
