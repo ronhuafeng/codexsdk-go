@@ -25,9 +25,10 @@ type Stream[R any] struct {
 type exactRunState struct {
 	client   *client
 	threadID string
-	turnID   string
-	events   chan protocolv2.ServerNotification
-	done     chan struct{}
+	// turnID is guarded by mu, including reads performed while routing the run.
+	turnID string
+	events chan protocolv2.ServerNotification
+	done   chan struct{}
 
 	// notificationOrderMu preserves the ingestion order of pending and live
 	// notifications across attachment. It is per run so unrelated turns do not
@@ -352,6 +353,12 @@ func (s *exactRunState) setTurn(turn protocolv2.Turn) {
 	s.turnID = turn.ID
 	s.updateRunLocked(func(run *ThreadRunResult) { run.Turn = turn })
 	s.mu.Unlock()
+}
+
+func (s *exactRunState) turnIDSnapshot() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.turnID
 }
 
 func (s *exactRunState) accept(notification protocolv2.ServerNotification) error {

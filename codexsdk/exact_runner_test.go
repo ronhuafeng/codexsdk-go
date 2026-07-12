@@ -850,6 +850,52 @@ func TestExactTerminalBeforeAttachmentIsNotPublishedAsLive(t *testing.T) {
 	}
 }
 
+func TestExactRunTurnIDAccessIsRaceFreeAcrossAttributionAndLifecycle(t *testing.T) {
+	const repetitions = 100
+	for index := 0; index < repetitions; index++ {
+		c := &client{
+			exactStreams:        map[string]map[*exactRunState]struct{}{},
+			exactAttaching:      map[string]map[*exactRunState]struct{}{},
+			pendingEvents:       map[string][]rpcNotification{},
+			pendingErrors:       map[string]error{},
+			pendingDiagnostics:  map[string][]DiagnosticRef{},
+			pendingThreadEvents: map[string][]rpcNotification{},
+		}
+		threadID := "thread-race-" + itoa(index)
+		turnID := "turn-race-" + itoa(index)
+		state := newExactRunState(c, threadID, StartedThreadRun{Start: facadeThreadStartResponse(threadID, "model")})
+		c.registerAttachingExactStream(state)
+		notification := rpcNotification{method: protocolv2.MethodModelRerouted, params: map[string]any{
+			"threadId": threadID, "turnId": turnID, "fromModel": "a", "toModel": "b", "reason": "highRiskCyberActivity",
+		}}
+		typed, err := exactNotification(notification)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			<-start
+			state.setTurn(protocolv2.Turn{ID: turnID, Status: protocolv2.TurnStatusInProgress})
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			c.routeExactNotification(notification, typed)
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			c.unregisterExactRun(state)
+		}()
+		close(start)
+		wg.Wait()
+	}
+}
+
 func TestExactNotificationOverflowHasTimingIndependentClientFailureSemantics(t *testing.T) {
 	for _, test := range []struct {
 		name string

@@ -888,7 +888,7 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 			targets = append(targets, stream)
 		}
 		for stream := range c.exactAttaching[identity.threadID] {
-			if stream.turnID == identity.turnID {
+			if stream.turnIDSnapshot() == identity.turnID {
 				targets = append(targets, stream)
 			}
 		}
@@ -931,7 +931,7 @@ func (c *client) routeExactNotification(notification rpcNotification, typed prot
 
 func (c *client) failExactNotificationDelivery(stream *exactRunState, err error) {
 	if errors.Is(err, ErrNotificationBackpressure) {
-		err = fmt.Errorf("%w: turn_id=%s", ErrNotificationBackpressure, stream.turnID)
+		err = fmt.Errorf("%w: turn_id=%s", ErrNotificationBackpressure, stream.turnIDSnapshot())
 	}
 	c.failClient(err)
 }
@@ -1122,6 +1122,7 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	stream.mu.Lock()
 	terminal := stream.terminal
 	stream.mu.Unlock()
+	turnID := stream.turnIDSnapshot()
 	delete(c.exactAttaching[stream.threadID], stream)
 	if len(c.exactAttaching[stream.threadID]) == 0 {
 		delete(c.exactAttaching, stream.threadID)
@@ -1131,20 +1132,20 @@ func (c *client) attachExactStream(stream *exactRunState) {
 		stream.notificationOrderMu.Unlock()
 		return
 	}
-	if c.exactStreams[stream.turnID] == nil {
-		c.exactStreams[stream.turnID] = map[*exactRunState]struct{}{}
+	if c.exactStreams[turnID] == nil {
+		c.exactStreams[turnID] = map[*exactRunState]struct{}{}
 	}
-	c.exactStreams[stream.turnID][stream] = struct{}{}
+	c.exactStreams[turnID][stream] = struct{}{}
 	pending := append([]rpcNotification(nil), c.pendingGlobalEvents...)
 	c.pendingGlobalEvents = nil
 	pending = append(pending, c.pendingThreadEvents[stream.threadID]...)
 	delete(c.pendingThreadEvents, stream.threadID)
-	pending = append(pending, c.pendingEvents[stream.turnID]...)
-	delete(c.pendingEvents, stream.turnID)
-	pendingErr := c.pendingErrors[stream.turnID]
-	delete(c.pendingErrors, stream.turnID)
-	diagnostics := append([]DiagnosticRef(nil), c.pendingDiagnostics[stream.turnID]...)
-	delete(c.pendingDiagnostics, stream.turnID)
+	pending = append(pending, c.pendingEvents[turnID]...)
+	delete(c.pendingEvents, turnID)
+	pendingErr := c.pendingErrors[turnID]
+	delete(c.pendingErrors, turnID)
+	diagnostics := append([]DiagnosticRef(nil), c.pendingDiagnostics[turnID]...)
+	delete(c.pendingDiagnostics, turnID)
 	globalErr := c.pendingGlobal
 	c.pendingGlobal = nil
 	c.turnMu.Unlock()
@@ -1211,7 +1212,7 @@ func (c *client) unregisterExactRun(stream *exactRunState) {
 	if len(c.exactAttaching[stream.threadID]) == 0 {
 		delete(c.exactAttaching, stream.threadID)
 	}
-	turnID := stream.turnID
+	turnID := stream.turnIDSnapshot()
 	delete(c.exactStreams[turnID], stream)
 	if len(c.exactStreams[turnID]) == 0 {
 		delete(c.exactStreams, turnID)
