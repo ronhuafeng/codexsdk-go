@@ -168,6 +168,15 @@ func TestNotificationHandlerFailureCancelsStreamWithPartialEvidence(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	pendingSeen := make(chan struct{})
+	releaseAttach := make(chan struct{})
+	client := root.(*client)
+	client.testBeforeExactTurnAttach = func() { <-releaseAttach }
+	client.testPendingExactNotification = func(notification rpcNotification) {
+		if notification.method == protocolv2.MethodTurnCompleted {
+			close(pendingSeen)
+		}
+	}
 	type outcome struct {
 		result StartedThreadRun
 		err    error
@@ -177,6 +186,13 @@ func TestNotificationHandlerFailureCancelsStreamWithPartialEvidence(t *testing.T
 		result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
 		finished <- outcome{result: result, err: runErr}
 	}()
+	<-pendingSeen
+	select {
+	case <-handlerEntered:
+		t.Fatal("global handler ran before pending exact evidence was appended")
+	default:
+	}
+	close(releaseAttach)
 	<-handlerEntered
 	select {
 	case got := <-finished:
@@ -217,7 +233,7 @@ func TestNotificationDispatchFenceCompletesOnCancellationAndShutdownDrain(t *tes
 			}},
 		}
 		c.handlerWG.Add(1)
-		c.notifications <- acceptedNotification{notification: notification, dispatched: fence}
+		c.notifications <- acceptedNotification{notification: notification, evidenceReady: make(chan struct{}), dispatched: fence}
 		go c.notificationDispatcher()
 		<-c.dispatcherDone
 		select {
@@ -240,7 +256,7 @@ func TestNotificationDispatchFenceCompletesOnCancellationAndShutdownDrain(t *tes
 			}},
 		}
 		c.handlerWG.Add(1)
-		c.notifications <- acceptedNotification{notification: notification, dispatched: fence}
+		c.notifications <- acceptedNotification{notification: notification, evidenceReady: make(chan struct{}), dispatched: fence}
 		close(c.dispatchStop)
 		go c.notificationDispatcher()
 		<-c.dispatcherDone
@@ -295,8 +311,6 @@ func TestNormalCloseWaitsForAcceptedNotificationHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for stream.Next(context.Background()) {
-	}
 	<-started
 	closed := make(chan error, 1)
 	go func() { closed <- root.Close() }()
@@ -308,6 +322,8 @@ func TestNormalCloseWaitsForAcceptedNotificationHandler(t *testing.T) {
 	close(release)
 	if err := <-closed; err != nil {
 		t.Fatal(err)
+	}
+	for stream.Next(context.Background()) {
 	}
 }
 

@@ -119,6 +119,9 @@ func (r *exactRunner) StartStream(ctx context.Context, request StartThreadRunReq
 		state.finish(errors.New("codexsdk: turn/start response missing turn id"))
 		return stream, nil
 	}
+	if r.client.testBeforeExactTurnAttach != nil {
+		r.client.testBeforeExactTurnAttach()
+	}
 	state.setTurn(turnStarted.Turn)
 	r.client.attachExactStream(state)
 	return stream, nil

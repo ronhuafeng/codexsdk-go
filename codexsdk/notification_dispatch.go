@@ -9,7 +9,7 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-func (c *client) enqueueNotification(notification protocolv2.ServerNotification, waitForDispatch bool) (<-chan struct{}, error) {
+func (c *client) enqueueNotification(notification protocolv2.ServerNotification, evidence *notificationEvidence, waitForDispatch bool) (<-chan struct{}, error) {
 	c.closeMu.Lock()
 	defer c.closeMu.Unlock()
 	if c.closed {
@@ -17,10 +17,14 @@ func (c *client) enqueueNotification(notification protocolv2.ServerNotification,
 	}
 	hasHandler := c.options.ServerNotificationHandler != nil
 	var dispatched chan struct{}
-	if hasHandler && waitForDispatch {
+	var evidenceReady <-chan struct{}
+	if evidence != nil {
+		evidenceReady = evidence.ready
+		dispatched = evidence.dispatched
+	} else if hasHandler && waitForDispatch {
 		dispatched = make(chan struct{})
 	}
-	accepted := acceptedNotification{notification: notification, dispatched: dispatched}
+	accepted := acceptedNotification{notification: notification, evidenceReady: evidenceReady, dispatched: dispatched}
 	if hasHandler {
 		c.handlerWG.Add(1)
 	}
@@ -48,6 +52,19 @@ func (c *client) notificationDispatcher() {
 				}
 				c.discardAcceptedNotifications()
 				return
+			}
+			if accepted.evidenceReady != nil {
+				select {
+				case <-accepted.evidenceReady:
+				case <-c.ctx.Done():
+					c.endNotificationHandler()
+					if accepted.dispatched != nil {
+						close(accepted.dispatched)
+					}
+					c.discardAcceptedNotifications()
+					return
+				case <-c.dispatchStop:
+				}
 			}
 			if handler != nil && !c.dispatchAcceptedNotification(handler, accepted) {
 				return
