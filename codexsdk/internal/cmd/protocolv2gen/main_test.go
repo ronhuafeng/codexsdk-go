@@ -33,7 +33,7 @@ func TestRunStdoutModeWritesOnlyRequestedArtifact(t *testing.T) {
 	outDir := filepath.Join(t.TempDir(), "generated")
 	var stdout bytes.Buffer
 
-	if err := run(schemaRoot, "", outDir, "method-registry", &stdout); err != nil {
+	if err := run(schemaRoot, "", outDir, "method-registry", "", "", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	checkedIn, err := os.ReadFile(filepath.Join("..", "..", "..", "protocolv2", "method_registry.gen.go"))
@@ -50,11 +50,11 @@ func TestRunStdoutModeWritesOnlyRequestedArtifact(t *testing.T) {
 
 func TestRunRejectsUnknownStdoutArtifact(t *testing.T) {
 	schemaRoot := filepath.Join("..", "..", "protocolschema", "appserver", "v2")
-	err := run(schemaRoot, "", t.TempDir(), "both", &bytes.Buffer{})
+	err := run(schemaRoot, "", t.TempDir(), "both", "", "", &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("run accepted unknown stdout artifact")
 	}
-	if !strings.Contains(err.Error(), "-stdout must be method-registry or protocol-types") {
+	if !strings.Contains(err.Error(), "-stdout must be method-registry, protocol-types, or classified-surface") {
 		t.Fatalf("unknown stdout artifact error = %v", err)
 	}
 }

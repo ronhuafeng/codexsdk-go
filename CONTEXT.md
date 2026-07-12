@@ -31,6 +31,17 @@ schema and documented as requiring experimental runtime opt-in or carrying
 weaker support expectations.
 _Avoid_: private API, runtime-enabled surface
 
+**Classified Generated Surface**:
+The manifest-owned set of exported generated Go declarations and compatibility-
+relevant members, each classified by stable-versus-experimental schema visibility.
+_Avoid_: API allowlist, handwritten inventory
+
+**Mixed Generated Type**:
+A generated type visible in the stable schema whose members include both stable
+and experimental classifications. Mixed describes the aggregate; each member
+retains its own classification.
+_Avoid_: partially compatible type, SemVer exception
+
 **Consumer-Owned Interface**:
 A narrow interface declared by an application at the point where it consumes a
 Lifecycle API or Generated Facade.

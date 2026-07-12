@@ -22,6 +22,8 @@ from typing import Any
 
 import codexsdk_schema_diff as schema_diff
 import codexsdk_schema_utils as schema_utils
+import codexsdk_classified_manifest as classified_manifest
+import codexsdk_release_report as release_report
 
 
 DEFAULT_BASELINE = Path("codexsdk/internal/protocolschema/appserver/v2")
@@ -369,6 +371,7 @@ def build_manifest(root: Path, old_manifest: dict[str, Any], mappings: dict[str,
         "classification_sources": old_manifest.get("classification_sources", []),
         "description": old_manifest.get("description", "Classified app-server protocol manifest."),
         "entries": sorted(entries, key=lambda item: item["method"]),
+        "surface": old_manifest.get("surface", []),
         "schema_version": old_manifest.get("schema_version", 1),
         "status": "classified-manifest",
     }
@@ -548,7 +551,16 @@ def build_metadata(root: Path, old: dict[str, Any], target_ref: str, target_kind
     }
 
 
-def write_clean_reports(root: Path, candidate: Path, reports: Path, target_ref: str, target_kind: str, target_sha: str, codex_version: str) -> None:
+def write_clean_reports(
+    root: Path,
+    candidate: Path,
+    reports: Path,
+    target_ref: str,
+    target_kind: str,
+    target_sha: str,
+    codex_version: str,
+    generated_compatibility: dict[str, Any],
+) -> None:
     drift, matrix, _summary = schema_diff.build_reports(
         baseline=root,
         candidate=candidate,
@@ -561,6 +573,12 @@ def write_clean_reports(root: Path, candidate: Path, reports: Path, target_ref: 
         generator_detail="codex app-server generate-json-schema --experimental --out codexsdk/internal/protocolschema/appserver/v2",
     )
     drift["target"]["schema_bundle_sha256"] = schema_utils.schema_bundle_sha256(root)
+    drift["generated_compatibility"] = generated_compatibility
+    matrix["generated_compatibility_updates"] = {
+        "added": generated_compatibility["added"],
+        "removed": generated_compatibility["removed"],
+        "reclassified": generated_compatibility["reclassified"],
+    }
     write_json(root / "drift_report.json", drift)
     write_json(root / "matrix_update_skeleton.json", matrix)
 
@@ -569,6 +587,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE, help="checked-in app-server v2 schema baseline root")
     parser.add_argument("--candidate", required=True, type=Path, help="trusted candidate schema directory")
+    parser.add_argument("--stable-candidate", required=True, type=Path, help="schema generated from the same source without experimental visibility")
     parser.add_argument("--codex-repo", type=Path, help="local openai/codex clone used to verify common.rs content")
     parser.add_argument("--reports", type=Path, help="candidate drift report directory")
     parser.add_argument("--common-rs", required=True, type=Path, help="upstream common.rs response mapping source")
@@ -587,6 +606,8 @@ def main() -> int:
         raise SystemExit(f"baseline directory does not exist: {baseline}")
     if not candidate.is_dir():
         raise SystemExit(f"candidate directory does not exist: {candidate}")
+    if not args.stable_candidate.is_dir():
+        raise SystemExit(f"stable candidate directory does not exist: {args.stable_candidate}")
     if not args.common_rs.is_file():
         raise SystemExit(f"common.rs does not exist: {args.common_rs}")
     try:
@@ -619,7 +640,22 @@ def main() -> int:
     write_json(baseline / "manifest.json", manifest)
     coverage = build_coverage(baseline, old_coverage, manifest, added_schemas | changed_schemas)
     write_json(baseline / "coverage_matrix.json", coverage)
-    write_clean_reports(baseline, candidate, reports, args.target_ref, args.target_kind, args.target_sha, codex_version)
+    classified_manifest.update_manifest(
+        baseline / "manifest.json",
+        classified_manifest.derive_surface(args.stable_candidate, baseline),
+    )
+    manifest = load_json(baseline / "manifest.json")
+    generated_compatibility = release_report.compatibility_report(old_manifest, manifest)
+    write_clean_reports(
+        baseline,
+        candidate,
+        reports,
+        args.target_ref,
+        args.target_kind,
+        args.target_sha,
+        codex_version,
+        generated_compatibility,
+    )
 
     if not args.skip_codegen:
         subprocess.run(
@@ -642,6 +678,8 @@ def main() -> int:
         "method_count": len(manifest["entries"]),
         "coverage_type_count": len(coverage["types"]),
         "coverage_field_count": len(coverage["fields"]),
+        "classified_surface_count": len(manifest["surface"]),
+        "generated_compatibility_impact": generated_compatibility["compatibility_impact"],
         "target_ref": args.target_ref,
         "target_sha": args.target_sha,
     }

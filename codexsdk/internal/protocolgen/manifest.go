@@ -9,8 +9,17 @@ import (
 const classifiedManifestStatus = "classified-manifest"
 
 type Manifest struct {
-	Entries []ManifestEntry `json:"entries"`
-	Status  string          `json:"status"`
+	Entries       []ManifestEntry `json:"entries"`
+	SchemaVersion int             `json:"schema_version"`
+	Surface       []SurfaceEntry  `json:"surface"`
+	Status        string          `json:"status"`
+}
+
+type SurfaceEntry struct {
+	Kind      SurfaceKind `json:"kind"`
+	Name      string      `json:"name"`
+	Owner     string      `json:"owner,omitempty"`
+	Stability Stability   `json:"stability"`
 }
 
 type ManifestEntry struct {
@@ -37,6 +46,11 @@ func LoadManifest(path string) (Manifest, error) {
 	}
 	if manifest.Status != classifiedManifestStatus {
 		return Manifest{}, fmt.Errorf("manifest status %q is not %q", manifest.Status, classifiedManifestStatus)
+	}
+	if manifest.SchemaVersion >= 2 {
+		if err := ValidateSurface(manifest.Surface); err != nil {
+			return Manifest{}, fmt.Errorf("validate manifest surface: %w", err)
+		}
 	}
 	seen := map[string]bool{}
 	for _, entry := range manifest.Entries {

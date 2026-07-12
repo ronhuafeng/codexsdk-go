@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+import codexsdk_release_report as release_report
+
+
+def manifest(*entries: tuple[str, str, str]) -> dict[str, object]:
+    return {
+        "surface": [
+            {"kind": kind, "name": name, "stability": stability}
+            for kind, name, stability in entries
+        ]
+    }
+
+
+class ReleaseReportTest(unittest.TestCase):
+    def test_experimental_removal_is_incompatible_and_classified(self) -> None:
+        base = manifest(
+            ("type", "Event", "mixed"),
+            ("field", "Event.ID", "stable"),
+            ("field", "Event.Preview", "experimental"),
+        )
+        target = manifest(
+            ("type", "Event", "stable"),
+            ("field", "Event.ID", "stable"),
+        )
+
+        report = release_report.compatibility_report(base, target)
+
+        self.assertEqual(report["compatibility_impact"], "incompatible")
+        self.assertEqual(report["removed"][0]["name"], "Event.Preview")
+        self.assertEqual(report["removed"][0]["classification"], "experimental")
+        self.assertEqual(report["counts_by_classification"]["experimental"]["removed"], 1)
+        self.assertEqual(report["reclassified"][0], {"kind": "type", "name": "Event", "from": "mixed", "to": "stable"})
+
+    def test_additive_surface_is_not_incompatible(self) -> None:
+        base = manifest(("type", "Event", "stable"))
+        target = manifest(
+            ("type", "Event", "stable"),
+            ("type", "Preview", "experimental"),
+        )
+
+        report = release_report.compatibility_report(base, target)
+
+        self.assertEqual(report["compatibility_impact"], "additive_or_metadata_only")
+        self.assertEqual(report["counts_by_classification"]["experimental"]["added"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
