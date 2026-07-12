@@ -70,7 +70,7 @@ type client struct {
 	testBeforeExactStreamOrderGate func()
 	testBeforeExactTurnAttach      func()
 	testPendingExactNotification   func(rpcNotification)
-	testAfterTerminalDispatch      func()
+	testBeforePendingTerminalFence func()
 	testExactStreamQueueCapacity   int
 
 	readerDone chan struct{}
@@ -857,9 +857,6 @@ func (c *client) routeNotification(notification rpcNotification) {
 			c.failClient(err)
 			return
 		}
-		if dispatched != nil && len(terminalCompletions) > 0 && c.testAfterTerminalDispatch != nil {
-			c.testAfterTerminalDispatch()
-		}
 		if dispatched != nil && len(terminalCompletions) > 0 {
 			<-dispatched
 		}
@@ -1231,6 +1228,9 @@ func (c *client) attachExactStream(stream *exactRunState) {
 				return stream.acceptStateBeforeTerminalCompletion(typed)
 			})
 			if notification.evidenceCompletion() != nil {
+				if c.testBeforePendingTerminalFence != nil {
+					c.testBeforePendingTerminalFence()
+				}
 				notification.awaitEvidenceHandler()
 				notification.completeEvidenceTerminal()
 			}
