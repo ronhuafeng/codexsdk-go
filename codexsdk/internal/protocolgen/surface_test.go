@@ -100,6 +100,22 @@ const (
 	}
 }
 
+func TestClassifyExportedSurfaceCountsStableOwnerAsMixedEvidence(t *testing.T) {
+	stable := []byte("package protocolv2\ntype Event struct{}\n")
+	complete := []byte("package protocolv2\ntype Event struct { Preview string }\n")
+
+	got, err := ClassifyExportedSurface(stable, complete)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range got {
+		if entry.Name == "Event" && entry.Stability == StabilityMixed {
+			return
+		}
+	}
+	t.Fatalf("surface = %#v, want mixed Event", got)
+}
+
 func TestVerifyExportedSurfaceRejectsUnclassifiedExport(t *testing.T) {
 	source := []byte("package protocolv2\ntype Event struct { ID string }\n")
 	err := VerifyExportedSurface(source, []SurfaceEntry{{Kind: SurfaceType, Name: "Event", Stability: StabilityStable}})

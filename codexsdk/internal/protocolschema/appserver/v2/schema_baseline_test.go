@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/ronhuafeng/codexsdk-go/codexsdk/internal/protocolgen"
 )
 
 var metadataFiles = map[string]bool{
@@ -23,9 +25,11 @@ var metadataFiles = map[string]bool{
 }
 
 type manifestFile struct {
-	AggregateSchemas []string        `json:"aggregate_schemas"`
-	Entries          []manifestEntry `json:"entries"`
-	Status           string          `json:"status"`
+	AggregateSchemas []string                   `json:"aggregate_schemas"`
+	Entries          []manifestEntry            `json:"entries"`
+	SchemaVersion    int                        `json:"schema_version"`
+	Status           string                     `json:"status"`
+	Surface          []protocolgen.SurfaceEntry `json:"surface"`
 }
 
 type manifestEntry struct {
@@ -205,6 +209,29 @@ func TestManifestClassifiedMatchesAggregateSchemas(t *testing.T) {
 	}
 	assertManifestEntry(t, manifest.Entries, "turn/start", "stable", "v2/TurnStartResponse.json", "Turns().Start")
 	assertManifestEntry(t, manifest.Entries, "thread/realtime/start", "experimental", "v2/ThreadRealtimeStartResponse.json", "Threads().RealtimeStart")
+}
+
+func TestManifestClassifiesEveryGeneratedProtocolExport(t *testing.T) {
+	var manifest manifestFile
+	readJSON(t, "manifest.json", &manifest)
+	if manifest.SchemaVersion < 2 {
+		t.Fatalf("manifest schema_version = %d, want at least 2", manifest.SchemaVersion)
+	}
+	root := filepath.Join("..", "..", "..", "..", "protocolv2")
+	var sources [][]byte
+	for _, name := range []string{"method_registry.gen.go", "protocol_types.gen.go"} {
+		raw, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sources = append(sources, raw)
+	}
+	if err := protocolgen.ValidateSurface(manifest.Surface); err != nil {
+		t.Fatal(err)
+	}
+	if err := protocolgen.VerifyExportedPackage(sources, manifest.Surface); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCoverageMatrixClassifiesBaselineSurface(t *testing.T) {

@@ -193,6 +193,25 @@ class SyncStateTest(unittest.TestCase):
 
             self.assertIn("manifest_stale_method", codes(sync_state.validate_baseline(root)))
 
+    def test_schema_v2_manifest_requires_classified_unique_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_valid_baseline(root)
+            manifest_path = root / "manifest.json"
+            manifest = schema_utils.load_json(manifest_path)
+            manifest["schema_version"] = 2
+            manifest["surface"] = [
+                {"kind": "field", "name": "Event.ID", "stability": ""},
+                {"kind": "field", "name": "Event.ID", "stability": "mixed"},
+                {"kind": "field", "name": "Event.ID", "stability": "stable"},
+            ]
+            write_json(manifest_path, manifest)
+
+            self.assertTrue(
+                {"manifest_unclassified_surface", "manifest_invalid_surface", "manifest_duplicate_surface"}
+                <= codes(sync_state.validate_baseline(root))
+            )
+
     def test_stale_coverage_method_type_and_field_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -95,7 +95,11 @@ func ValidateSurface(entries []SurfaceEntry) error {
 }
 
 func VerifyExportedSurface(completeSource []byte, entries []SurfaceEntry) error {
-	exported, err := exportedPackageSurface([][]byte{completeSource})
+	return VerifyExportedPackage([][]byte{completeSource}, entries)
+}
+
+func VerifyExportedPackage(completeSources [][]byte, entries []SurfaceEntry) error {
+	exported, err := exportedPackageSurface(completeSources)
 	if err != nil {
 		return err
 	}
@@ -119,6 +123,12 @@ func VerifyExportedSurface(completeSource []byte, entries []SurfaceEntry) error 
 func markMixedOwners(entries []SurfaceEntry) {
 	owners := map[string]map[Stability]bool{}
 	for _, entry := range entries {
+		if entry.Kind == SurfaceType {
+			if owners[entry.Name] == nil {
+				owners[entry.Name] = map[Stability]bool{}
+			}
+			owners[entry.Name][entry.Stability] = true
+		}
 		owner := memberOwner(entry)
 		if owner == "" {
 			continue
