@@ -183,6 +183,27 @@ def validate_manifest(root: Path) -> list[Finding]:
 
     for method in sorted(set(manifest_methods) - set(aggregate_methods)):
         findings.append(finding("manifest_stale_method", str(manifest_path), f"manifest method {method!r} is not present in aggregate schemas"))
+
+    if int(manifest.get("schema_version", 1)) >= 2:
+        surface = manifest.get("surface", [])
+        if not surface:
+            findings.append(finding("manifest_empty_surface", str(manifest_path), "schema v2 manifest has no classified generated surface"))
+        seen_surface: set[tuple[str, str]] = set()
+        valid_kinds = {"const", "field", "func", "interface_method", "method", "type", "value", "var"}
+        valid_stability = {"stable", "experimental", "mixed"}
+        for entry in surface:
+            kind = entry.get("kind", "")
+            name = entry.get("name", "")
+            stability = entry.get("stability", "")
+            identity = (kind, name)
+            if not kind or not name or stability not in valid_stability:
+                findings.append(finding("manifest_unclassified_surface", str(manifest_path), f"invalid surface entry: {entry!r}"))
+                continue
+            if kind not in valid_kinds or (stability == "mixed" and kind != "type"):
+                findings.append(finding("manifest_invalid_surface", str(manifest_path), f"invalid classified surface entry: {entry!r}"))
+            if identity in seen_surface:
+                findings.append(finding("manifest_duplicate_surface", str(manifest_path), f"duplicate surface identity {kind} {name!r}"))
+            seen_surface.add(identity)
     return findings
 
 

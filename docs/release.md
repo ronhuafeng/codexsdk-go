@@ -18,11 +18,11 @@ Use this checklist before tagging or publishing a release.
   major change after v1.0 unless preserving compatibility would be unsafe.
 
 The classified `manifest.json` is the accepted single source for generated
-stability metadata. It currently classifies methods from stable-versus-
-experimental schema visibility. Extending it to classify exported generated
-types and members, and enforcing that coverage in release tooling, requires a
-new bounded implementation issue after #44. Until then, do not maintain a
-second handwritten stability inventory.
+stability metadata. Its `surface` classifies every exported generated Go
+declaration and compatibility-relevant member by comparing package generation
+without and with experimental schema visibility. A type is `mixed` when its
+members span stable and experimental classifications; each member retains its
+own classification. Do not maintain a second handwritten stability inventory.
 
 The handwritten public API is mechanically recorded in
 `codexsdk/testdata/handwritten-api.txt`. Generated `protocolv2` declarations and
@@ -50,6 +50,9 @@ protocol fact guarded by generator reproducibility tests.
    count, and schema bundle checksum.
 7. Update `manifest.json`, `coverage_matrix.json`, `drift_report.json`, and
    `matrix_update_skeleton.json`.
+   The sync path derives `manifest.json.surface` and embeds its classified
+   compatibility impact in both reports. Any removed generated identity is
+   incompatible regardless of classification.
 8. Regenerate Go code:
 
    ```sh
@@ -92,6 +95,10 @@ GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -stdout method-registry 
   diff -u codexsdk/protocolv2/method_registry.gen.go -
 GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
   diff -u codexsdk/protocolv2/protocol_types.gen.go -
+
+python3 scripts/codexsdk_release_report.py \
+  --base-manifest /path/to/previous/manifest.json \
+  --target-manifest codexsdk/internal/protocolschema/appserver/v2/manifest.json
 ```
 
 Check for public-readiness leaks:

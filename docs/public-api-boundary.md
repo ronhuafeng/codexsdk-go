@@ -74,11 +74,11 @@ release reports consume it instead of maintaining handwritten lists.
   post-v1 minor-release source breakage, and is rejected until concrete demand
   justifies its additional complexity.
 
-The current manifest classifies methods. A later bounded issue must extend the
-same source of truth across generated types and members and add enforcement;
-this design PR does not modify generated protocol metadata or code. Issue #45
-is closed because its design was folded into #44; new implementation work must
-use new bounded issues rather than reopening or repurposing #45.
+The manifest classifies methods plus every exported generated declaration and
+compatibility-relevant member. Sync derives the surface by comparing generation
+without and with experimental schema visibility, and release evidence reports
+impact by classification. Missing classifications fail validation. Issue #45
+remains closed because its design was folded into #44.
 
 ## Migration window
 

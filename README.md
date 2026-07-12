@@ -211,8 +211,9 @@ tracked with:
 - `baseline_metadata.json`: upstream tag/ref name, target kind, peeled commit,
   Codex version, generation command, source license, file count, and schema
   bundle checksum.
-- `manifest.json`: classified method surface, request/notification direction,
-  response schema mapping, facade target, and stable-vs-experimental marking.
+- `manifest.json`: classified method and exported generated Go surface,
+  request/notification direction, response schema mapping, facade target, and
+  mechanically derived stable, experimental, or mixed marking.
 - `coverage_matrix.json`: reviewed support status for methods, types, and key
   fields.
 - `drift_report.json` and `matrix_update_skeleton.json`: last clean comparison
