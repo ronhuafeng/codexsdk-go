@@ -5901,6 +5901,10 @@ func fakeAuthRefreshAfterNotificationCommand(notificationAccepted string) []stri
 	return fakeCommand("auth-refresh-after-notification", notificationAccepted)
 }
 
+func fakeNotificationOverflowCommand(notificationAccepted string) []string {
+	return fakeCommand("notification-overflow", notificationAccepted)
+}
+
 func tempRecord(t *testing.T) string {
 	t.Helper()
 	file, err := os.CreateTemp(t.TempDir(), "codexsdk-record-*.jsonl")
@@ -6978,6 +6982,12 @@ func runFakeAppServer(mode string, extra []string) {
 			case "notification-and-approval":
 				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "item-before-close", "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
+			case "notification-overflow":
+				notificationAccepted := extra[0]
+				sendExactReroute(threadID, turnID, "model-a", "model-b")
+				waitForFakePath(notificationAccepted)
+				sendExactReroute(threadID, turnID, "model-b", "model-c")
+				sendExactReroute(threadID, turnID, "model-c", "model-d")
 			case "late-approval-during-close":
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 				waitForFakePath(extra[0])
