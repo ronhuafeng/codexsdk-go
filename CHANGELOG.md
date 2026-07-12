@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## [0.3.0-rc.2] - 2026-07-13
+
+### Fixed
+
+- Notifications accepted while an exact stream attaches are now published in
+  acceptance order, so pending replay cannot be overtaken by live delivery.
+
 ## [0.3.0-rc.1] - 2026-07-12
 
 ### Changed
