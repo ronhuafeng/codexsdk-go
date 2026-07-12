@@ -519,7 +519,7 @@ func TestExactServerRequestHandlerRejectsMismatchedAndEmptyResponses(t *testing.
 	}
 }
 
-func TestExactRunWithoutHandlerFailsClosedInsteadOfUsingLegacyPendingQueue(t *testing.T) {
+func TestExactRunWithoutHandlerFailsClosedImmediately(t *testing.T) {
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("approval")})
 	if err != nil {
@@ -531,9 +531,6 @@ func TestExactRunWithoutHandlerFailsClosedInsteadOfUsingLegacyPendingQueue(t *te
 	if runErr != nil {
 		t.Fatalf("nil-handler command approval should decline and complete: %v (result %#v)", runErr, result)
 	}
-	client := root
-	client.turnMu.Lock()
-	client.turnMu.Unlock()
 	if err := root.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -552,9 +549,6 @@ func TestExactRunNilHandlerFailClosedResponsesAreDeterministic(t *testing.T) {
 			if _, err := root.ThreadRunner().Start(ctx, StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}}); err != nil {
 				t.Fatalf("exact nil-handler %s did not fail closed: %v", mode, err)
 			}
-			client := root
-			client.turnMu.Lock()
-			client.turnMu.Unlock()
 			if err := root.Close(); err != nil {
 				t.Fatal(err)
 			}
