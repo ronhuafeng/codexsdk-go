@@ -6968,10 +6968,11 @@ func runFakeAppServer(mode string, extra []string) {
 				send(map[string]any{"id": "server-approval-late", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 			case "late-approval-during-failure":
 				send(map[string]any{"method": "item/completed", "params": map[string]any{"completedAtMs": 1, "threadId": threadID, "turnId": turnID, "item": map[string]any{"id": "partial", "type": "agentMessage", "text": "partial", "phase": "commentary"}}})
-				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 				waitForFakePath(extra[0])
+				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
+				waitForFakePath(extra[1])
 				send(map[string]any{"id": "server-approval-late", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
-				if err := os.WriteFile(extra[1], []byte("sent"), 0o600); err != nil {
+				if err := os.WriteFile(extra[2], []byte("sent"), 0o600); err != nil {
 					return
 				}
 			case "handler-error-then-transport-close":
