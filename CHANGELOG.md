@@ -10,6 +10,17 @@ All notable changes to this project are documented here.
   consumers, with immutable complete or partial result snapshots and
   caller-local context cancellation.
 
+## [0.2.2] - 2026-07-12
+
+### Fixed
+
+- Notifications accepted before exact-stream attachment remain in partial run
+  evidence when transport failure races pending-evidence replay.
+
+### Compatibility
+
+- Preserves the complete v0.2.1 public API and generated protocol baseline.
+
 ## [0.2.1] - 2026-07-12
 
 ### Fixed

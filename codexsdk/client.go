@@ -52,11 +52,14 @@ type client struct {
 	nextID  atomic.Uint64
 	pending sync.Map
 
-	turnMu              sync.Mutex
-	streams             map[string]map[*threadStreamState]struct{}
-	exactStreams        map[string]map[*exactRunState]struct{}
-	exactAttaching      map[string]map[*exactRunState]struct{}
-	pendingEvents       map[string][]rpcNotification
+	turnMu         sync.Mutex
+	streams        map[string]map[*threadStreamState]struct{}
+	exactStreams   map[string]map[*exactRunState]struct{}
+	exactAttaching map[string]map[*exactRunState]struct{}
+	pendingEvents  map[string][]rpcNotification
+	// replayingEvents keeps accepted evidence visible to terminalization after
+	// attachment removes it from pending queues and until replay commits it.
+	replayingEvents     map[*exactRunState][]rpcNotification
 	pendingErrors       map[string]error
 	pendingDiagnostics  map[string][]DiagnosticRef
 	pendingServer       map[string][]rpcServerRequest
@@ -1204,6 +1207,12 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	delete(c.pendingThreadEvents, stream.threadID)
 	pending = append(pending, c.pendingEvents[turnID]...)
 	delete(c.pendingEvents, turnID)
+	if len(pending) > 0 {
+		if c.replayingEvents == nil {
+			c.replayingEvents = map[*exactRunState][]rpcNotification{}
+		}
+		c.replayingEvents[stream] = pending
+	}
 	pendingErr := c.pendingErrors[turnID]
 	delete(c.pendingErrors, turnID)
 	diagnostics := append([]DiagnosticRef(nil), c.pendingDiagnostics[turnID]...)
@@ -1211,7 +1220,6 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	globalErr := c.pendingGlobal
 	c.pendingGlobal = nil
 	c.turnMu.Unlock()
-	defer stream.notificationOrderMu.Unlock()
 	if c.testAfterExactStreamPublished != nil {
 		c.testAfterExactStreamPublished()
 	}
@@ -1236,16 +1244,28 @@ func (c *client) attachExactStream(stream *exactRunState) {
 			}
 		}
 		if err != nil {
+			c.finishExactPendingReplay(stream)
+			stream.notificationOrderMu.Unlock()
 			c.failExactNotificationDelivery(stream, err)
 			return
 		}
 	}
+	c.finishExactPendingReplay(stream)
 	for _, diagnostic := range diagnostics {
 		stream.addDiagnostic(diagnostic)
 	}
 	if err := errors.Join(pendingErr, globalErr); err != nil {
+		stream.notificationOrderMu.Unlock()
 		c.failClient(err)
+		return
 	}
+	stream.notificationOrderMu.Unlock()
+}
+
+func (c *client) finishExactPendingReplay(stream *exactRunState) {
+	c.turnMu.Lock()
+	delete(c.replayingEvents, stream)
+	c.turnMu.Unlock()
 }
 
 func (n rpcNotification) resolveEvidence(accept func(protocolv2.ServerNotification) (func(), error)) error {
@@ -1268,6 +1288,13 @@ func (n rpcNotification) resolvePendingEvidence() error {
 		return nil
 	}
 	return n.resolveEvidence(n.evidence.state.acceptOrderedBeforeTerminalCompletion)
+}
+
+func (n rpcNotification) resolveReplayingEvidence() error {
+	if n.evidence == nil || n.evidence.state == nil {
+		return nil
+	}
+	return n.resolveEvidence(n.evidence.state.acceptStateBeforeTerminalCompletion)
 }
 
 func (n rpcNotification) awaitEvidenceHandler() {
@@ -1383,6 +1410,14 @@ func (c *client) failAll(err error) {
 			}
 		}
 	}
+	var replayingEvidence []rpcNotification
+	for _, notifications := range c.replayingEvents {
+		for _, notification := range notifications {
+			if notification.evidence != nil {
+				replayingEvidence = append(replayingEvidence, notification)
+			}
+		}
+	}
 	var serverRequests []rpcServerRequest
 	for turnID, requests := range c.pendingServer {
 		serverRequests = append(serverRequests, requests...)
@@ -1391,6 +1426,9 @@ func (c *client) failAll(err error) {
 	c.turnMu.Unlock()
 	for _, notification := range pendingEvidence {
 		_ = notification.resolvePendingEvidence()
+	}
+	for _, notification := range replayingEvidence {
+		_ = notification.resolveReplayingEvidence()
 	}
 	for _, call := range pendingCalls {
 		call.response <- rpcResponse{err: err}
