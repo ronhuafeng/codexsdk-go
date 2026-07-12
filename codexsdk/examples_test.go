@@ -38,6 +38,35 @@ func ExampleThreadRunner_start() {
 	_ = result.Run.Notifications
 }
 
+func ExampleStream_Wait() {
+	ctx := context.Background()
+	root, err := codexsdk.New(codexsdk.ClientOptions{
+		CWD:     os.TempDir(),
+		Command: []string{"codex", "app-server", "--listen", "stdio://"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer root.Close()
+
+	stream, err := root.ThreadRunner().StartStream(ctx, codexsdk.StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{
+			protocolv2.NewUserInputText(protocolv2.UserInputText{Text: "Reply briefly."}),
+		}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer stream.Close()
+
+	result, err := stream.Wait(ctx)
+	if err != nil {
+		// result still contains any exact evidence accepted before failure.
+		panic(err)
+	}
+	_ = result.Run.Notifications
+}
+
 func ExampleThreadClient_textAndFileInputEphemeralStart() {
 	ctx := context.Background()
 	workspace, err := os.Getwd()

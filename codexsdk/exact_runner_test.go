@@ -1040,6 +1040,155 @@ func TestExactRunnerDiagnosticSnapshotsAreIsolated(t *testing.T) {
 	}
 }
 
+func TestExactStreamWaitersObserveIndependentTerminalSnapshots(t *testing.T) {
+	state := newExactRunState(nil, "thread-wait", StartedThreadRun{
+		Start: facadeThreadStartResponse("thread-wait", "model"),
+		Run:   ThreadRunResult{Notifications: []protocolv2.ServerNotification{}},
+	})
+	stream := &Stream[StartedThreadRun]{state: state}
+
+	type outcome struct {
+		result StartedThreadRun
+		err    error
+	}
+	const waiterCount = 8
+	outcomes := make(chan outcome, waiterCount)
+	for range waiterCount {
+		go func() {
+			result, err := stream.Wait(context.Background())
+			outcomes <- outcome{result: result, err: err}
+		}()
+	}
+
+	terminalCause := errors.New("terminal cause")
+	state.finish(terminalCause)
+	results := make([]StartedThreadRun, 0, waiterCount)
+	for range waiterCount {
+		got := <-outcomes
+		if !errors.Is(got.err, terminalCause) {
+			t.Fatalf("Wait error = %v, want terminal cause", got.err)
+		}
+		results = append(results, got.result)
+	}
+	results[0].Start.Thread.ID = "mutated"
+	if results[1].Start.Thread.ID != "thread-wait" {
+		t.Fatalf("waiter snapshots share mutable state: %#v", results[1].Start.Thread)
+	}
+	if stream.Err() != terminalCause {
+		t.Fatalf("stream error = %v, want stable terminal cause", stream.Err())
+	}
+}
+
+func TestExactStreamWaitCancellationIsCallerLocalAndReturnsPartialSnapshot(t *testing.T) {
+	state := newExactRunState(nil, "thread-wait-cancel", StartedThreadRun{
+		Start: facadeThreadStartResponse("thread-wait-cancel", "model"),
+		Run: ThreadRunResult{Notifications: []protocolv2.ServerNotification{
+			protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{
+				Params: protocolv2.ConfigWarningNotification{Summary: "partial"},
+			}),
+		}},
+	})
+	stream := &Stream[StartedThreadRun]{state: state}
+	other := make(chan error, 1)
+	go func() {
+		_, err := stream.Wait(context.Background())
+		other <- err
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	partial, err := stream.Wait(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Wait error = %v, want context.Canceled", err)
+	}
+	if len(partial.Run.Notifications) != 1 {
+		t.Fatalf("partial notifications = %d, want 1", len(partial.Run.Notifications))
+	}
+	if partial.Start.Thread.ThreadSource == nil || partial.Start.Thread.ThreadSource.Value == nil {
+		t.Fatalf("partial thread source = %#v", partial.Start.Thread.ThreadSource)
+	}
+	partial.Start.Thread.ID = "mutated"
+	*partial.Start.Thread.ThreadSource.Value = protocolv2.ThreadSource("mutated")
+	partial.Run.Notifications = nil
+	if stream.Err() != nil {
+		t.Fatalf("caller cancellation changed stream error: %v", stream.Err())
+	}
+	select {
+	case err := <-other:
+		t.Fatalf("caller cancellation released another waiter: %v", err)
+	default:
+	}
+
+	state.finish(nil)
+	if err := <-other; err != nil {
+		t.Fatalf("other Wait error = %v", err)
+	}
+	final, ok := stream.Result()
+	if !ok || final.Start.Thread.ID != "thread-wait-cancel" || final.Start.Thread.ThreadSource == nil || final.Start.Thread.ThreadSource.Value == nil || *final.Start.Thread.ThreadSource.Value != protocolv2.ThreadSource("user") || len(final.Run.Notifications) != 1 {
+		t.Fatalf("partial Wait snapshot mutated shared result: %#v, ok=%v", final, ok)
+	}
+}
+
+func TestExactStreamWaitPrefersTerminalWhenContextIsAlsoDone(t *testing.T) {
+	state := newExactRunState(nil, "thread-terminal-priority", StartedThreadRun{
+		Start: facadeThreadStartResponse("thread-terminal-priority", "model"),
+	})
+	stream := &Stream[StartedThreadRun]{state: state}
+	terminalCause := errors.New("first terminal cause")
+	state.finish(terminalCause)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result, err := stream.Wait(ctx)
+	if !errors.Is(err, terminalCause) || result.Start.Thread.ID != "thread-terminal-priority" {
+		t.Fatalf("Wait = (%#v, %v), want terminal result and cause", result, err)
+	}
+}
+
+func TestExactStreamWaitAndNextObserveSameCompleteRun(t *testing.T) {
+	state := newExactRunState(nil, "thread-wait-next", StartedThreadRun{
+		Start: facadeThreadStartResponse("thread-wait-next", "model"),
+	})
+	stream := &Stream[StartedThreadRun]{state: state}
+	waited := make(chan StartedThreadRun, 1)
+	go func() {
+		result, _ := stream.Wait(context.Background())
+		waited <- result
+	}()
+
+	notification := protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{
+		Params: protocolv2.ConfigWarningNotification{Summary: "ordered evidence"},
+	})
+	if err := state.accept(notification); err != nil {
+		t.Fatal(err)
+	}
+	if !stream.Next(context.Background()) || stream.Notification().Kind() != notification.Kind() {
+		t.Fatalf("Next did not receive live notification: %#v", stream.Notification())
+	}
+	state.finish(nil)
+	result := <-waited
+	if len(result.Run.Notifications) != 1 || result.Run.Notifications[0].Kind() != notification.Kind() {
+		t.Fatalf("Wait history = %#v, want complete ordered evidence", result.Run.Notifications)
+	}
+}
+
+func TestExactStreamWaitNilAndClosedSemantics(t *testing.T) {
+	var nilStream *Stream[StartedThreadRun]
+	if result, err := nilStream.Wait(context.Background()); !errors.Is(err, ErrStreamClosed) || !reflect.DeepEqual(result, StartedThreadRun{}) {
+		t.Fatalf("nil Wait = (%#v, %v), want zero and ErrStreamClosed", result, err)
+	}
+
+	state := newExactRunState(nil, "thread-closed", StartedThreadRun{Start: facadeThreadStartResponse("thread-closed", "model")})
+	stream := &Stream[StartedThreadRun]{state: state}
+	if err := stream.Close(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := stream.Wait(context.Background())
+	if !errors.Is(err, ErrStreamClosed) || result.Start.Thread.ID != "thread-closed" {
+		t.Fatalf("closed Wait = (%#v, %v), want partial result and ErrStreamClosed", result, err)
+	}
+}
+
 func TestExactRunnerRejectsOwnedThreadIDBeforeTransport(t *testing.T) {
 	runner := &exactRunner{client: &client{}}
 	_, err := runner.StartStream(context.Background(), StartThreadRunRequest{
