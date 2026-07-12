@@ -150,18 +150,42 @@ func TestNotificationHandlerReceivesExactNotificationsInOrder(t *testing.T) {
 
 func TestNotificationHandlerFailureCancelsStreamWithPartialEvidence(t *testing.T) {
 	handlerErr := errors.New("handler failed")
+	handlerEntered := make(chan struct{})
+	releaseFailure := make(chan struct{})
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
 		CWD:     t.TempDir(),
 		Command: fakeCommand("happy"),
-		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+		ServerNotificationHandler: func(_ context.Context, notification protocolv2.ServerNotification) error {
+			if notification.Kind() != protocolv2.ServerNotificationKindTurnCompleted {
+				return nil
+			}
+			close(handlerEntered)
+			<-releaseFailure
 			return handlerErr
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	type outcome struct {
+		result StartedThreadRun
+		err    error
+	}
+	finished := make(chan outcome, 1)
+	go func() {
+		result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+		finished <- outcome{result: result, err: runErr}
+	}()
+	<-handlerEntered
+	select {
+	case got := <-finished:
+		t.Fatalf("run completed before terminal notification handler published its result: %v", got.err)
+	default:
+	}
+	close(releaseFailure)
+	got := <-finished
+	result, runErr := got.result, got.err
 	if !errors.Is(runErr, ErrHandlerFailed) || !errors.Is(runErr, handlerErr) {
 		t.Fatalf("run error = %v, want handler cause", runErr)
 	}
@@ -171,6 +195,62 @@ func TestNotificationHandlerFailureCancelsStreamWithPartialEvidence(t *testing.T
 	if closeErr := root.Close(); !errors.Is(closeErr, handlerErr) {
 		t.Fatalf("Close error = %v, want first handler cause", closeErr)
 	}
+}
+
+func TestNotificationDispatchFenceCompletesOnCancellationAndShutdownDrain(t *testing.T) {
+	notification := protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{
+		Params: protocolv2.ConfigWarningNotification{Summary: "fenced"},
+	})
+
+	t.Run("cancellation discards accepted fence", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		fence := make(chan struct{})
+		c := &client{
+			ctx:            ctx,
+			dispatcherDone: make(chan struct{}),
+			dispatchStop:   make(chan struct{}),
+			notifications:  make(chan acceptedNotification, 1),
+			options: ClientOptions{ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+				t.Fatal("cancelled dispatcher invoked handler")
+				return nil
+			}},
+		}
+		c.handlerWG.Add(1)
+		c.notifications <- acceptedNotification{notification: notification, dispatched: fence}
+		go c.notificationDispatcher()
+		<-c.dispatcherDone
+		select {
+		case <-fence:
+		default:
+			t.Fatal("cancelled dispatcher left accepted notification fence incomplete")
+		}
+		c.handlerWG.Wait()
+	})
+
+	t.Run("normal shutdown drains accepted fence", func(t *testing.T) {
+		fence := make(chan struct{})
+		c := &client{
+			ctx:            context.Background(),
+			dispatcherDone: make(chan struct{}),
+			dispatchStop:   make(chan struct{}),
+			notifications:  make(chan acceptedNotification, 1),
+			options: ClientOptions{ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+				return nil
+			}},
+		}
+		c.handlerWG.Add(1)
+		c.notifications <- acceptedNotification{notification: notification, dispatched: fence}
+		close(c.dispatchStop)
+		go c.notificationDispatcher()
+		<-c.dispatcherDone
+		select {
+		case <-fence:
+		default:
+			t.Fatal("shutdown drain left accepted notification fence incomplete")
+		}
+		c.handlerWG.Wait()
+	})
 }
 
 func TestNotificationHandlerPanicBecomesTypedClientFailure(t *testing.T) {
