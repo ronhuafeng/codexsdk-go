@@ -135,6 +135,36 @@ func TestClassifyExportedSurfaceSignaturesIncludeTagsAndTypedValues(t *testing.T
 	}
 }
 
+func TestClassifyExportedSurfaceIncludesAnonymousExportedFields(t *testing.T) {
+	source := []byte("package protocolv2\ntype Embedded struct{}\ntype Holder struct { Embedded }\n")
+
+	got, err := ClassifyExportedSurface(source, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range got {
+		if entry.Name == "Holder.Embedded" && entry.Owner == "Holder" && entry.Kind == SurfaceField {
+			return
+		}
+	}
+	t.Fatalf("surface = %#v, want anonymous exported field", got)
+}
+
+func TestValidateSurfaceRejectsUnknownOwnerAndInconsistentMixedType(t *testing.T) {
+	entries := []SurfaceEntry{
+		{Kind: SurfaceType, Name: "Event", Signature: "struct{}", Stability: StabilityMixed},
+		{Kind: SurfaceValue, Name: "EventPreview", Owner: "Missing", Signature: `Event = "preview"`, Stability: StabilityExperimental},
+	}
+	if err := ValidateSurface(entries); err == nil || !strings.Contains(err.Error(), "unknown owner") {
+		t.Fatalf("error = %v, want unknown owner", err)
+	}
+	entries[1].Owner = "Event"
+	entries[1].Stability = StabilityStable
+	if err := ValidateSurface(entries); err == nil || !strings.Contains(err.Error(), "does not match member classifications") {
+		t.Fatalf("error = %v, want inconsistent mixed type", err)
+	}
+}
+
 func TestVerifyExportedSurfaceRejectsUnclassifiedExport(t *testing.T) {
 	source := []byte("package protocolv2\ntype Event struct { ID string }\n")
 	err := VerifyExportedSurface(source, []SurfaceEntry{{Kind: SurfaceType, Name: "Event", Signature: "struct{ ID string }", Stability: StabilityStable}})

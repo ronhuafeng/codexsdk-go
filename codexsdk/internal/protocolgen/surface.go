@@ -69,6 +69,8 @@ func ValidateSurface(entries []SurfaceEntry) error {
 		return fmt.Errorf("surface has no exported identities")
 	}
 	seen := map[string]bool{}
+	types := map[string]Stability{}
+	ownerStability := map[string]map[Stability]bool{}
 	for _, entry := range entries {
 		key := string(entry.Kind) + "\x00" + entry.Name
 		if entry.Name == "" || entry.Signature == "" {
@@ -92,6 +94,42 @@ func ValidateSurface(entries []SurfaceEntry) error {
 			return fmt.Errorf("surface identity %s %q appears more than once", entry.Kind, entry.Name)
 		}
 		seen[key] = true
+		if entry.Kind == SurfaceType {
+			types[entry.Name] = entry.Stability
+			if ownerStability[entry.Name] == nil {
+				ownerStability[entry.Name] = map[Stability]bool{}
+			}
+			if entry.Stability == StabilityExperimental {
+				ownerStability[entry.Name][StabilityExperimental] = true
+			} else {
+				ownerStability[entry.Name][StabilityStable] = true
+			}
+		}
+		if entry.Owner != "" {
+			if ownerStability[entry.Owner] == nil {
+				ownerStability[entry.Owner] = map[Stability]bool{}
+			}
+			ownerStability[entry.Owner][entry.Stability] = true
+		}
+	}
+	for _, entry := range entries {
+		if entry.Owner != "" {
+			if _, ok := types[entry.Owner]; !ok {
+				return fmt.Errorf("surface entry %q references unknown owner type %q", entry.Name, entry.Owner)
+			}
+		}
+		switch entry.Kind {
+		case SurfaceField, SurfaceInterface, SurfaceMethod, SurfaceValue:
+			if entry.Owner == "" {
+				return fmt.Errorf("surface member %q has no owner type", entry.Name)
+			}
+		}
+	}
+	for name, stability := range types {
+		mixedMembers := ownerStability[name][StabilityStable] && ownerStability[name][StabilityExperimental]
+		if (stability == StabilityMixed) != mixedMembers {
+			return fmt.Errorf("surface type %q stability %q does not match member classifications", name, stability)
+		}
 	}
 	return nil
 }
@@ -256,6 +294,15 @@ func collectTypeMembers(fileSet *token.FileSet, add func(SurfaceKind, string, st
 	switch node := expression.(type) {
 	case *ast.StructType:
 		for _, field := range node.Fields.List {
+			if len(field.Names) == 0 {
+				if name := embeddedFieldName(field.Type); ast.IsExported(name) {
+					signature := formatNode(fileSet, field.Type)
+					if field.Tag != nil {
+						signature += " " + field.Tag.Value
+					}
+					add(SurfaceField, owner+"."+name, owner, signature)
+				}
+			}
 			for _, name := range field.Names {
 				if name.IsExported() {
 					signature := formatNode(fileSet, field.Type)
@@ -274,6 +321,19 @@ func collectTypeMembers(fileSet *token.FileSet, add func(SurfaceKind, string, st
 				}
 			}
 		}
+	}
+}
+
+func embeddedFieldName(expression ast.Expr) string {
+	switch node := expression.(type) {
+	case *ast.Ident:
+		return node.Name
+	case *ast.StarExpr:
+		return embeddedFieldName(node.X)
+	case *ast.SelectorExpr:
+		return node.Sel.Name
+	default:
+		return ""
 	}
 }
 
