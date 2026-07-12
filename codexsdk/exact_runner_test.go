@@ -217,7 +217,9 @@ func TestHandlerFailureDiscardsQueuedTerminalWithoutBlockingRun(t *testing.T) {
 	handlerErr := errors.New("first handler failed")
 	handlerEntered := make(chan struct{})
 	releaseFailure := make(chan struct{})
-	terminalQueued := make(chan struct{})
+	releaseAttach := make(chan struct{})
+	terminalEvidenceQueued := make(chan struct{})
+	terminalEvidenceAccepted := make(chan struct{})
 	var calls atomic.Int32
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
@@ -235,7 +237,21 @@ func TestHandlerFailureDiscardsQueuedTerminalWithoutBlockingRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root.(*client).testAfterTerminalDispatch = func() { close(terminalQueued) }
+	client := root.(*client)
+	client.testBeforeExactTurnAttach = func() { <-releaseAttach }
+	client.testPendingExactNotification = func(notification rpcNotification) {
+		if notification.method == protocolv2.MethodTurnCompleted {
+			close(terminalEvidenceQueued)
+		}
+	}
+	client.testBeforePendingTerminalFence = func() { close(terminalEvidenceAccepted) }
+	queued := protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{
+		Params: protocolv2.ConfigWarningNotification{Summary: "hold handler"},
+	})
+	if _, err := client.enqueueNotification(queued, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	<-handlerEntered
 	type outcome struct {
 		result StartedThreadRun
 		err    error
@@ -245,8 +261,14 @@ func TestHandlerFailureDiscardsQueuedTerminalWithoutBlockingRun(t *testing.T) {
 		result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
 		finished <- outcome{result: result, err: runErr}
 	}()
-	<-handlerEntered
-	<-terminalQueued
+	<-terminalEvidenceQueued
+	close(releaseAttach)
+	<-terminalEvidenceAccepted
+	select {
+	case got := <-finished:
+		t.Fatalf("run completed before queued terminal handler disposition: %v", got.err)
+	default:
+	}
 	close(releaseFailure)
 	got := <-finished
 	if !errors.Is(got.err, handlerErr) {
