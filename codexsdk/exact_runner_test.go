@@ -213,60 +213,126 @@ func TestNotificationHandlerFailureCancelsStreamWithPartialEvidence(t *testing.T
 	}
 }
 
-func TestNotificationDispatchFenceCompletesOnCancellationAndShutdownDrain(t *testing.T) {
-	notification := protocolv2.NewServerNotificationConfigWarning(protocolv2.ServerNotificationConfigWarning{
-		Params: protocolv2.ConfigWarningNotification{Summary: "fenced"},
+func TestHandlerFailureDiscardsQueuedTerminalWithoutBlockingRun(t *testing.T) {
+	handlerErr := errors.New("first handler failed")
+	handlerEntered := make(chan struct{})
+	releaseFailure := make(chan struct{})
+	terminalQueued := make(chan struct{})
+	var calls atomic.Int32
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("happy"),
+		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+			if calls.Add(1) != 1 {
+				t.Fatal("discarded notification reached the handler")
+			}
+			close(handlerEntered)
+			<-releaseFailure
+			return handlerErr
+		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root.(*client).testAfterTerminalDispatch = func() { close(terminalQueued) }
+	type outcome struct {
+		result StartedThreadRun
+		err    error
+	}
+	finished := make(chan outcome, 1)
+	go func() {
+		result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+		finished <- outcome{result: result, err: runErr}
+	}()
+	<-handlerEntered
+	<-terminalQueued
+	close(releaseFailure)
+	got := <-finished
+	if !errors.Is(got.err, handlerErr) {
+		t.Fatalf("run error = %v, want first handler cause", got.err)
+	}
+	if len(got.result.Run.Notifications) == 0 {
+		t.Fatal("discarding queued handler work erased accepted run evidence")
+	}
+	if closeErr := root.Close(); !errors.Is(closeErr, handlerErr) {
+		t.Fatalf("Close error = %v, want first handler cause", closeErr)
+	}
+}
 
-	t.Run("cancellation discards accepted fence", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		fence := make(chan struct{})
-		c := &client{
-			ctx:            ctx,
-			dispatcherDone: make(chan struct{}),
-			dispatchStop:   make(chan struct{}),
-			notifications:  make(chan acceptedNotification, 1),
-			options: ClientOptions{ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
-				t.Fatal("cancelled dispatcher invoked handler")
-				return nil
-			}},
-		}
-		c.handlerWG.Add(1)
-		c.notifications <- acceptedNotification{notification: notification, evidenceReady: make(chan struct{}), dispatched: fence}
-		go c.notificationDispatcher()
-		<-c.dispatcherDone
-		select {
-		case <-fence:
-		default:
-			t.Fatal("cancelled dispatcher left accepted notification fence incomplete")
-		}
-		c.handlerWG.Wait()
+func TestProtocolCancellationReleasesPendingTerminalHandlerFence(t *testing.T) {
+	handlerCalled := make(chan struct{}, 1)
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("pending-terminal-protocol-failure"),
+		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+			handlerCalled <- struct{}{}
+			return nil
+		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if runErr == nil {
+		t.Fatal("protocol failure did not terminate the run")
+	}
+	if len(result.Run.Notifications) == 0 {
+		t.Fatal("protocol cancellation erased pending terminal evidence")
+	}
+	select {
+	case <-handlerCalled:
+		t.Fatal("protocol cancellation invoked a handler still waiting for evidence publication")
+	default:
+	}
+	if closeErr := root.Close(); closeErr == nil {
+		t.Fatal("Close lost the protocol first cause")
+	}
+}
 
-	t.Run("normal shutdown drains accepted fence", func(t *testing.T) {
-		fence := make(chan struct{})
-		c := &client{
-			ctx:            context.Background(),
-			dispatcherDone: make(chan struct{}),
-			dispatchStop:   make(chan struct{}),
-			notifications:  make(chan acceptedNotification, 1),
-			options: ClientOptions{ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
-				return nil
-			}},
-		}
-		c.handlerWG.Add(1)
-		c.notifications <- acceptedNotification{notification: notification, evidenceReady: make(chan struct{}), dispatched: fence}
-		close(c.dispatchStop)
-		go c.notificationDispatcher()
-		<-c.dispatcherDone
-		select {
-		case <-fence:
-		default:
-			t.Fatal("shutdown drain left accepted notification fence incomplete")
-		}
-		c.handlerWG.Wait()
+func TestNormalCloseDrainsPendingExactHandlerAfterEvidence(t *testing.T) {
+	handlerObserved := filepath.Join(t.TempDir(), "pending-handler-observed")
+	pendingSeen := make(chan struct{})
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{
+		CWD:     t.TempDir(),
+		Command: fakeCommand("pending-terminal-close", handlerObserved),
+		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+			return os.WriteFile(handlerObserved, []byte("handled"), 0o600)
+		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root.(*client).testPendingExactNotification = func(notification rpcNotification) {
+		if notification.method == protocolv2.MethodTurnCompleted {
+			close(pendingSeen)
+		}
+	}
+	type outcome struct {
+		result StartedThreadRun
+		err    error
+	}
+	finished := make(chan outcome, 1)
+	go func() {
+		result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+		finished <- outcome{result: result, err: runErr}
+	}()
+	<-pendingSeen
+	if closeErr := root.Close(); closeErr != nil {
+		t.Fatalf("normal Close returned %v", closeErr)
+	}
+	got := <-finished
+	if !errors.Is(got.err, ErrClientClosed) {
+		t.Fatalf("run error = %v, want ErrClientClosed", got.err)
+	}
+	if len(got.result.Run.Notifications) == 0 {
+		t.Fatal("normal Close erased pending exact evidence")
+	}
+	if _, err := os.Stat(handlerObserved); err != nil {
+		t.Fatalf("normal Close did not drain the evidence-ordered handler: %v", err)
+	}
 }
 
 func TestNotificationHandlerPanicBecomesTypedClientFailure(t *testing.T) {
@@ -274,14 +340,23 @@ func TestNotificationHandlerPanicBecomesTypedClientFailure(t *testing.T) {
 	root, err := New(ClientOptions{
 		CWD:     t.TempDir(),
 		Command: fakeCommand("happy"),
-		ServerNotificationHandler: func(context.Context, protocolv2.ServerNotification) error {
+		ServerNotificationHandler: func(_ context.Context, notification protocolv2.ServerNotification) error {
+			if notification.Kind() != protocolv2.ServerNotificationKindTurnCompleted {
+				return nil
+			}
 			panic("boom")
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _ = root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	result, runErr := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+	if !errors.Is(runErr, ErrHandlerFailed) {
+		t.Fatalf("run error = %v, want ErrHandlerFailed", runErr)
+	}
+	if len(result.Run.Notifications) == 0 {
+		t.Fatal("handler panic erased accepted run notification")
+	}
 	if closeErr := root.Close(); !errors.Is(closeErr, ErrHandlerFailed) {
 		t.Fatalf("Close error = %v, want ErrHandlerFailed", closeErr)
 	}

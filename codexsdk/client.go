@@ -70,6 +70,7 @@ type client struct {
 	testBeforeExactStreamOrderGate func()
 	testBeforeExactTurnAttach      func()
 	testPendingExactNotification   func(rpcNotification)
+	testAfterTerminalDispatch      func()
 	testExactStreamQueueCapacity   int
 
 	readerDone chan struct{}
@@ -100,12 +101,16 @@ type rpcNotification struct {
 type notificationEvidence struct {
 	ready      chan struct{}
 	dispatched chan struct{}
+	state      *exactRunState
+	once       sync.Once
+	completion func()
+	err        error
 }
 
 type acceptedNotification struct {
-	notification  protocolv2.ServerNotification
-	evidenceReady <-chan struct{}
-	dispatched    chan struct{}
+	notification protocolv2.ServerNotification
+	evidence     *notificationEvidence
+	dispatched   chan struct{}
 }
 
 type rpcServerRequest struct {
@@ -607,7 +612,7 @@ func (c *client) startTurnStream(ctx context.Context, threadID string, input []I
 	pending, serverRequests, pendingErr := c.attachStreamAndDrainPending(turnID, stream.state)
 	for _, notification := range pending {
 		stream.state.handleNotificationLocked(notification.method, notification.params)
-		notification.acceptEvidence()
+		_ = notification.resolvePendingEvidence()
 	}
 	if pendingErr != nil {
 		stream.state.finishErr(pendingErr)
@@ -852,6 +857,9 @@ func (c *client) routeNotification(notification rpcNotification) {
 			c.failClient(err)
 			return
 		}
+		if dispatched != nil && len(terminalCompletions) > 0 && c.testAfterTerminalDispatch != nil {
+			c.testAfterTerminalDispatch()
+		}
 		if dispatched != nil && len(terminalCompletions) > 0 {
 			<-dispatched
 		}
@@ -913,7 +921,7 @@ func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpc
 	}
 	c.turnMu.Lock()
 	var targets []*exactRunState
-	var pendingExact bool
+	var pendingExact []*exactRunState
 	switch class {
 	case notificationAttributionTurn:
 		if identity.turnID == "" {
@@ -928,7 +936,7 @@ func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpc
 			if turnID == identity.turnID {
 				targets = append(targets, stream)
 			} else if turnID == "" {
-				pendingExact = true
+				pendingExact = append(pendingExact, stream)
 			}
 		}
 	case notificationAttributionThread:
@@ -951,8 +959,8 @@ func (c *client) routeExactNotificationBeforeTerminalCompletion(notification rpc
 			}
 		}
 	}
-	if len(targets) == 0 && pendingExact {
-		evidence := &notificationEvidence{ready: make(chan struct{})}
+	if len(targets) == 0 && len(pendingExact) == 1 {
+		evidence := &notificationEvidence{ready: make(chan struct{}), state: pendingExact[0]}
 		if c.options.ServerNotificationHandler != nil {
 			evidence.dispatched = make(chan struct{})
 		}
@@ -1211,17 +1219,21 @@ func (c *client) attachExactStream(stream *exactRunState) {
 		c.testAfterExactStreamPublished()
 	}
 	for _, notification := range pending {
-		typed, err := exactNotification(notification)
-		if err != nil {
-			notification.acceptEvidence()
-			stream.finish(err)
-			return
-		}
-		_, completeTerminal, err := stream.acceptState(typed, true)
-		notification.acceptEvidence()
-		if completeTerminal != nil {
-			notification.awaitEvidenceHandler()
-			completeTerminal()
+		var err error
+		if notification.evidence == nil {
+			var typed protocolv2.ServerNotification
+			typed, err = exactNotification(notification)
+			if err == nil {
+				err = stream.accept(typed)
+			}
+		} else {
+			err = notification.resolveEvidence(func(typed protocolv2.ServerNotification) (func(), error) {
+				return stream.acceptStateBeforeTerminalCompletion(typed)
+			})
+			if notification.evidenceCompletion() != nil {
+				notification.awaitEvidenceHandler()
+				notification.completeEvidenceTerminal()
+			}
 		}
 		if err != nil {
 			c.failExactNotificationDelivery(stream, err)
@@ -1236,15 +1248,44 @@ func (c *client) attachExactStream(stream *exactRunState) {
 	}
 }
 
-func (n rpcNotification) acceptEvidence() {
-	if n.evidence != nil {
-		close(n.evidence.ready)
+func (n rpcNotification) resolveEvidence(accept func(protocolv2.ServerNotification) (func(), error)) error {
+	if n.evidence == nil {
+		return nil
 	}
+	n.evidence.once.Do(func() {
+		typed, err := exactNotification(n)
+		if err == nil {
+			n.evidence.completion, err = accept(typed)
+		}
+		n.evidence.err = err
+		close(n.evidence.ready)
+	})
+	return n.evidence.err
+}
+
+func (n rpcNotification) resolvePendingEvidence() error {
+	if n.evidence == nil || n.evidence.state == nil {
+		return nil
+	}
+	return n.resolveEvidence(n.evidence.state.acceptOrderedBeforeTerminalCompletion)
 }
 
 func (n rpcNotification) awaitEvidenceHandler() {
 	if n.evidence != nil && n.evidence.dispatched != nil {
 		<-n.evidence.dispatched
+	}
+}
+
+func (n rpcNotification) evidenceCompletion() func() {
+	if n.evidence == nil {
+		return nil
+	}
+	return n.evidence.completion
+}
+
+func (n rpcNotification) completeEvidenceTerminal() {
+	if completion := n.evidenceCompletion(); completion != nil {
+		completion()
 	}
 }
 
@@ -1310,9 +1351,10 @@ func (c *client) streamContext(turnID string) context.Context {
 }
 
 func (c *client) failAll(err error) {
+	var pendingCalls []pendingCall
 	c.pending.Range(func(key, value any) bool {
 		c.pending.Delete(key)
-		value.(pendingCall).response <- rpcResponse{err: err}
+		pendingCalls = append(pendingCalls, value.(pendingCall))
 		return true
 	})
 	c.turnMu.Lock()
@@ -1333,12 +1375,26 @@ func (c *client) failAll(err error) {
 			exactStreams = append(exactStreams, stream)
 		}
 	}
+	var pendingEvidence []rpcNotification
+	for _, notifications := range c.pendingEvents {
+		for _, notification := range notifications {
+			if notification.evidence != nil {
+				pendingEvidence = append(pendingEvidence, notification)
+			}
+		}
+	}
 	var serverRequests []rpcServerRequest
 	for turnID, requests := range c.pendingServer {
 		serverRequests = append(serverRequests, requests...)
 		delete(c.pendingServer, turnID)
 	}
 	c.turnMu.Unlock()
+	for _, notification := range pendingEvidence {
+		_ = notification.resolvePendingEvidence()
+	}
+	for _, call := range pendingCalls {
+		call.response <- rpcResponse{err: err}
+	}
 	for _, stream := range streams {
 		stream.finishErr(err)
 	}

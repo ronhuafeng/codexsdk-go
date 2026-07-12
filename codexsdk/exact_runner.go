@@ -365,22 +365,22 @@ func (s *exactRunState) turnIDSnapshot() string {
 }
 
 func (s *exactRunState) accept(notification protocolv2.ServerNotification) error {
-	finished, _, err := s.acceptState(notification, false)
-	if finished {
-		s.unregister()
+	completeTerminal, err := s.acceptStateBeforeTerminalCompletion(notification)
+	if completeTerminal != nil {
+		completeTerminal()
 	}
 	return err
 }
 
-func (s *exactRunState) acceptState(notification protocolv2.ServerNotification, deferTerminal bool) (bool, func(), error) {
+func (s *exactRunState) acceptStateBeforeTerminalCompletion(notification protocolv2.ServerNotification) (func(), error) {
 	cloned, err := cloneJSON(notification)
 	if err != nil {
-		return false, nil, err
+		return nil, err
 	}
 	s.mu.Lock()
 	if s.terminal {
 		s.mu.Unlock()
-		return false, nil, nil
+		return nil, nil
 	}
 	s.updateRunLocked(func(run *ThreadRunResult) {
 		run.Notifications = append(run.Notifications, cloned)
@@ -395,21 +395,18 @@ func (s *exactRunState) acceptState(notification protocolv2.ServerNotification, 
 	select {
 	case s.events <- cloned:
 	case <-s.done:
-		return false, nil, nil
+		return nil, nil
 	default:
-		return false, nil, ErrNotificationBackpressure
+		return nil, ErrNotificationBackpressure
 	}
 	if terminal {
-		if deferTerminal {
-			return false, func() {
-				if s.finishState(terminalErr) {
-					s.unregister()
-				}
-			}, nil
-		}
-		return s.finishState(terminalErr), nil, nil
+		return func() {
+			if s.finishState(terminalErr) {
+				s.unregister()
+			}
+		}, nil
 	}
-	return false, nil, nil
+	return nil, nil
 }
 
 func (s *exactRunState) acceptOrdered(notification protocolv2.ServerNotification) error {
@@ -428,7 +425,7 @@ func (s *exactRunState) acceptOrderedBeforeTerminalCompletion(notification proto
 	if s.testAfterNotificationOrderLocked != nil {
 		s.testAfterNotificationOrderLocked()
 	}
-	_, completion, err := s.acceptState(notification, true)
+	completion, err := s.acceptStateBeforeTerminalCompletion(notification)
 	s.notificationOrderMu.Unlock()
 	return completion, err
 }

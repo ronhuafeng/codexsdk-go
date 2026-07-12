@@ -6951,6 +6951,15 @@ func runFakeAppServer(mode string, extra []string) {
 					sendExactReroute(threadID, turnID, "model-b", "model-c")
 				}
 			}
+			if mode == "pending-terminal-protocol-failure" {
+				completeTurn(threadID, turnID)
+				_, _ = fmt.Fprintln(os.Stdout, "{")
+				return
+			}
+			if mode == "pending-terminal-close" {
+				completeTurn(threadID, turnID)
+				waitForFakePath(extra[0])
+			}
 			sendProtocolResult(id, protocolv2.TurnStartResponse{
 				Turn: protocolv2.Turn{
 					ID:     turnID,

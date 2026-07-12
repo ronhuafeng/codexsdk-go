@@ -17,14 +17,12 @@ func (c *client) enqueueNotification(notification protocolv2.ServerNotification,
 	}
 	hasHandler := c.options.ServerNotificationHandler != nil
 	var dispatched chan struct{}
-	var evidenceReady <-chan struct{}
 	if evidence != nil {
-		evidenceReady = evidence.ready
 		dispatched = evidence.dispatched
 	} else if hasHandler && waitForDispatch {
 		dispatched = make(chan struct{})
 	}
-	accepted := acceptedNotification{notification: notification, evidenceReady: evidenceReady, dispatched: dispatched}
+	accepted := acceptedNotification{notification: notification, evidence: evidence, dispatched: dispatched}
 	if hasHandler {
 		c.handlerWG.Add(1)
 	}
@@ -46,25 +44,20 @@ func (c *client) notificationDispatcher() {
 		select {
 		case accepted := <-c.notifications:
 			if c.ctx.Err() != nil {
-				c.endNotificationHandler()
-				if accepted.dispatched != nil {
-					close(accepted.dispatched)
-				}
-				c.discardAcceptedNotifications()
+				c.discardCurrentAndQueuedNotifications(accepted)
 				return
 			}
-			if accepted.evidenceReady != nil {
+			if accepted.evidence != nil {
 				select {
-				case <-accepted.evidenceReady:
+				case <-accepted.evidence.ready:
 				case <-c.ctx.Done():
-					c.endNotificationHandler()
-					if accepted.dispatched != nil {
-						close(accepted.dispatched)
-					}
-					c.discardAcceptedNotifications()
+					c.discardCurrentAndQueuedNotifications(accepted)
 					return
-				case <-c.dispatchStop:
 				}
+			}
+			if c.ctx.Err() != nil {
+				c.discardCurrentAndQueuedNotifications(accepted)
+				return
 			}
 			if handler != nil && !c.dispatchAcceptedNotification(handler, accepted) {
 				return
@@ -85,6 +78,14 @@ func (c *client) notificationDispatcher() {
 			return
 		}
 	}
+}
+
+func (c *client) discardCurrentAndQueuedNotifications(accepted acceptedNotification) {
+	c.endNotificationHandler()
+	if accepted.dispatched != nil {
+		close(accepted.dispatched)
+	}
+	c.discardAcceptedNotifications()
 }
 
 func (c *client) dispatchAcceptedNotification(handler ServerNotificationHandler, accepted acceptedNotification) bool {
