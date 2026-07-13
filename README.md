@@ -97,6 +97,14 @@ func main() {
 `turn/start` params. The result retains the exact start response, terminal turn,
 usage, and every attributable generated notification.
 
+A successfully decoded lifecycle response remains observable as partial
+evidence even when a required thread or turn identity is missing. In that case,
+the simple operation returns the decoded facts with `ErrMissingThreadID` or
+`ErrMissingTurnID`; the streaming operation returns a non-nil terminal stream
+whose `Wait`, `Result`, and `Err` expose the same facts and cause. Identity
+failure prevents later lifecycle requests or live run registration without
+closing the Client. See the [v0.5 migration guide](docs/v0.5-migration.md).
+
 ```go
 package main
 
@@ -153,12 +161,6 @@ func main() {
 `protocolv2.ServerNotification`; `Result` remains available on failures and
 contains the latest immutable partial snapshot. More compile-checked examples
 live in `codexsdk/examples_test.go`.
-
-A `thread/start` response that decodes but lacks a thread ID fails closed with
-`ErrMissingThreadID` before `turn/start`. `Start` returns the decoded
-`StartedThreadRun.Start` together with that error; `StartStream` returns a
-terminal stream whose `Wait` and `Result` expose the same isolated partial
-evidence. The malformed run is never registered, and the Client remains open.
 
 Call `Stream.Wait` when multiple consumers need to observe the same run without
 coordinating ownership of `Next`. Any number of waiters can block independently

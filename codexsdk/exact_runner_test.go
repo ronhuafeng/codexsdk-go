@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1353,6 +1352,152 @@ func TestExactRunnerPreservesPartialStartOnTurnStartFailure(t *testing.T) {
 	}
 }
 
+func TestExactRunnerMalformedLifecycleResponseMatrix(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation string
+		stage     string
+		streaming bool
+		mode      string
+		wantErr   error
+	}{
+		{name: "start thread response simple", operation: "start", stage: "thread", mode: "thread-start-missing-id-once", wantErr: ErrMissingThreadID},
+		{name: "start thread response stream", operation: "start", stage: "thread", streaming: true, mode: "thread-start-missing-id-once", wantErr: ErrMissingThreadID},
+		{name: "resume thread response simple", operation: "resume", stage: "thread", mode: "thread-resume-missing-id-once", wantErr: ErrMissingThreadID},
+		{name: "resume thread response stream", operation: "resume", stage: "thread", streaming: true, mode: "thread-resume-missing-id-once", wantErr: ErrMissingThreadID},
+		{name: "start turn response simple", operation: "start", stage: "turn", mode: "turn-start-missing-id-once", wantErr: ErrMissingTurnID},
+		{name: "start turn response stream", operation: "start", stage: "turn", streaming: true, mode: "turn-start-missing-id-once", wantErr: ErrMissingTurnID},
+		{name: "resume turn response simple", operation: "resume", stage: "turn", mode: "turn-start-missing-id-once", wantErr: ErrMissingTurnID},
+		{name: "resume turn response stream", operation: "resume", stage: "turn", streaming: true, mode: "turn-start-missing-id-once", wantErr: ErrMissingTurnID},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			record := tempRecord(t)
+			t.Setenv("CODEXSDK_FAKE_RECORD", record)
+			root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand(test.mode)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer root.Close()
+
+			response, run, terminalErr, streamErr := observeMalformedLifecycle(t, root, test.operation, test.stage, test.streaming)
+			if !errors.Is(terminalErr, test.wantErr) {
+				t.Fatalf("terminal error = %v, want %v", terminalErr, test.wantErr)
+			}
+			if test.streaming && streamErr != terminalErr {
+				t.Fatalf("Stream.Err = %p, Wait error = %p; want stable terminal cause", streamErr, terminalErr)
+			}
+			if test.stage == "thread" {
+				if response.threadID != "" || response.model == "" || response.sessionID == "" {
+					t.Fatalf("thread response evidence = %#v", response)
+				}
+				if run.Turn.ID != "" || run.Turn.Status != "" {
+					t.Fatalf("unexpected turn evidence = %#v", run.Turn)
+				}
+				if firstRecord(readRecords(t, record), "recv", protocolv2.MethodTurnStart) != nil {
+					t.Fatal("turn/start was sent after missing thread id")
+				}
+			} else {
+				if response.threadID == "" || run.Turn.ID != "" || run.Turn.Status != protocolv2.TurnStatusInProgress || len(run.Turn.Items) != 1 {
+					t.Fatalf("turn response partial evidence = response %#v, run %#v", response, run)
+				}
+			}
+		})
+	}
+}
+
+type malformedLifecycleThreadEvidence struct {
+	threadID  string
+	model     string
+	sessionID string
+}
+
+func observeMalformedLifecycle(t *testing.T, root *Client, operation, stage string, streaming bool) (malformedLifecycleThreadEvidence, ThreadRunResult, error, error) {
+	t.Helper()
+	input := []protocolv2.UserInput{protocolv2.NewUserInputText(protocolv2.UserInputText{Text: "evidence"})}
+	if operation == "start" {
+		request := StartThreadRunRequest{Thread: protocolv2.ThreadStartParams{Model: protocolv2.Value("requested-model")}, Turn: protocolv2.TurnStartParams{Input: input}}
+		var result StartedThreadRun
+		var err error
+		var streamErr error
+		if streaming {
+			stream, startErr := root.ThreadRunner().StartStream(context.Background(), request)
+			if startErr != nil || stream == nil {
+				t.Fatalf("StartStream = (%v, %v), want terminal stream", stream, startErr)
+			}
+			result, err = stream.Wait(context.Background())
+			streamErr = stream.Err()
+		} else {
+			result, err = root.ThreadRunner().Start(context.Background(), request)
+		}
+		return malformedLifecycleThreadEvidence{threadID: result.Start.Thread.ID, model: result.Start.Model, sessionID: result.Start.Thread.SessionID}, result.Run, err, streamErr
+	}
+
+	threadID := ""
+	if stage == "turn" {
+		threadID = "thread-existing"
+	}
+	request := ResumeThreadRunRequest{Thread: protocolv2.ThreadResumeParams{ThreadID: threadID, Model: protocolv2.Value("requested-model")}, Turn: protocolv2.TurnStartParams{Input: input}}
+	var result ResumedThreadRun
+	var err error
+	var streamErr error
+	if streaming {
+		stream, resumeErr := root.ThreadRunner().ResumeStream(context.Background(), request)
+		if resumeErr != nil || stream == nil {
+			t.Fatalf("ResumeStream = (%v, %v), want terminal stream", stream, resumeErr)
+		}
+		result, err = stream.Wait(context.Background())
+		streamErr = stream.Err()
+	} else {
+		result, err = root.ThreadRunner().Resume(context.Background(), request)
+	}
+	return malformedLifecycleThreadEvidence{threadID: result.Resume.Thread.ID, model: result.Resume.Model, sessionID: result.Resume.Thread.SessionID}, result.Run, err, streamErr
+}
+
+func TestExactRunnerUndecodedLifecycleResponsesReturnNoStream(t *testing.T) {
+	tests := []struct {
+		name string
+		mode string
+		run  func(*Client) (bool, error)
+	}{
+		{
+			name: "thread start",
+			mode: "thread-start-malformed-response",
+			run: func(root *Client) (bool, error) {
+				stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+				return stream != nil, err
+			},
+		},
+		{
+			name: "thread resume",
+			mode: "thread-resume-malformed-response",
+			run: func(root *Client) (bool, error) {
+				stream, err := root.ThreadRunner().ResumeStream(context.Background(), ResumeThreadRunRequest{Thread: protocolv2.ThreadResumeParams{ThreadID: "thread-existing"}, Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+				return stream != nil, err
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+			root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand(test.mode)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer root.Close()
+			hasStream, err := test.run(root)
+			if err == nil || hasStream {
+				t.Fatalf("malformed undecoded response = (stream=%v, error=%v), want nil stream and direct error", hasStream, err)
+			}
+			if errors.Is(err, ErrMissingThreadID) || errors.Is(err, ErrMissingTurnID) {
+				t.Fatalf("undecoded response reported identity error: %v", err)
+			}
+		})
+	}
+}
+
 func TestExactRunnerStartPreservesDecodedResponseMissingThreadID(t *testing.T) {
 	record := tempRecord(t)
 	t.Setenv("CODEXSDK_FAKE_RECORD", record)
@@ -1365,7 +1510,7 @@ func TestExactRunnerStartPreservesDecodedResponseMissingThreadID(t *testing.T) {
 	result, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{
 		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
 	})
-	if !errors.Is(err, ErrMissingThreadID) || !strings.Contains(err.Error(), "thread/start response missing thread id") {
+	if !errors.Is(err, ErrMissingThreadID) {
 		t.Fatalf("Start error = %v, want missing thread id", err)
 	}
 	if result.Start.Model != "decoded-model" || result.Start.Thread.SessionID == "" || result.Start.Thread.ID != "" {
@@ -1403,7 +1548,7 @@ func TestExactRunnerStartStreamPreservesDecodedResponseMissingThreadID(t *testin
 		t.Fatal("StartStream returned nil stream")
 	}
 	result, err := stream.Wait(context.Background())
-	if !errors.Is(err, ErrMissingThreadID) || !strings.Contains(err.Error(), "thread/start response missing thread id") {
+	if !errors.Is(err, ErrMissingThreadID) {
 		t.Fatalf("Wait error = %v, want missing thread id", err)
 	}
 	if stream.Err() != err {
@@ -1429,6 +1574,216 @@ func TestExactRunnerStartStreamPreservesDecodedResponseMissingThreadID(t *testin
 		t.Fatalf("second run = %#v, error = %v; want usable Client", second, err)
 	}
 	assertNoGhostNotification(t, second)
+}
+
+func TestExactRunnerResumePreservesDecodedResponseMissingThreadID(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("thread-resume-missing-id-once")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	result, err := root.ThreadRunner().Resume(context.Background(), ResumeThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if !errors.Is(err, ErrMissingThreadID) {
+		t.Fatalf("Resume error = %v, want missing thread id", err)
+	}
+	if result.Resume.Model != "decoded-resume-model" || result.Resume.Thread.SessionID == "" || result.Resume.Thread.ID != "" {
+		t.Fatalf("Resume partial evidence = %#v", result.Resume)
+	}
+	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodTurnStart) != nil {
+		t.Fatal("turn/start was sent after missing thread id")
+	}
+
+	second, err := root.ThreadRunner().Resume(context.Background(), ResumeThreadRunRequest{
+		Thread: protocolv2.ThreadResumeParams{ThreadID: "thread-existing"},
+		Turn:   protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil || second.Resume.Thread.ID == "" || second.Run.Turn.Status != protocolv2.TurnStatusCompleted {
+		t.Fatalf("second run = %#v, error = %v; want usable Client", second, err)
+	}
+	for _, notification := range second.Run.Notifications {
+		rerouted, ok := notification.AsModelRerouted()
+		if ok && rerouted.Params.ToModel == "must-not-attach" {
+			t.Fatalf("unattributed notification leaked into subsequent run: %#v", notification)
+		}
+	}
+}
+
+func TestExactRunnerResumeStreamPreservesDecodedResponseMissingThreadID(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("thread-resume-missing-id-once")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	stream, err := root.ThreadRunner().ResumeStream(context.Background(), ResumeThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{protocolv2.NewUserInputText(protocolv2.UserInputText{Text: "resume"})}},
+	})
+	if err != nil || stream == nil {
+		t.Fatalf("ResumeStream = (%v, %v), want observable terminal stream", stream, err)
+	}
+	result, err := stream.Wait(context.Background())
+	if !errors.Is(err, ErrMissingThreadID) {
+		t.Fatalf("Wait error = %v, want missing thread id", err)
+	}
+	if stream.Err() != err {
+		t.Fatalf("stream Err = %p, Wait error = %p; want stable terminal cause", stream.Err(), err)
+	}
+	if result.Resume.Model != "decoded-resume-model" || result.Resume.Thread.SessionID == "" || result.Run.InputStats.TextBytes != len("resume") {
+		t.Fatalf("Wait partial evidence = %#v", result)
+	}
+	result.Resume.Model = "mutated"
+	result.Resume.Thread.SessionID = "mutated"
+	snapshot, ok := stream.Result()
+	if !ok || snapshot.Resume.Model != "decoded-resume-model" || snapshot.Resume.Thread.SessionID == "mutated" {
+		t.Fatalf("Result snapshot aliases Wait result: %#v, ok=%v", snapshot.Resume, ok)
+	}
+	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodTurnStart) != nil {
+		t.Fatal("turn/start was sent after missing thread id")
+	}
+}
+
+func TestExactRunnerStartPreservesDecodedTurnMissingID(t *testing.T) {
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("turn-start-missing-id-once")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	result, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{
+		Thread: protocolv2.ThreadStartParams{Model: protocolv2.Value("requested-model")},
+		Turn:   protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if !errors.Is(err, ErrMissingTurnID) {
+		t.Fatalf("Start error = %v, want missing turn id", err)
+	}
+	if result.Start.Thread.ID == "" || result.Start.Model != "requested-model" {
+		t.Fatalf("Start evidence = %#v", result.Start)
+	}
+	if result.Run.Turn.ID != "" || result.Run.Turn.Status != protocolv2.TurnStatusInProgress || len(result.Run.Turn.Items) != 1 || result.Run.Turn.StartedAt == nil {
+		t.Fatalf("Turn partial evidence = %#v", result.Run.Turn)
+	}
+
+	second, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil || second.Run.Turn.ID == "" || second.Run.Turn.Status != protocolv2.TurnStatusCompleted {
+		t.Fatalf("second run = %#v, error = %v; want usable Client", second, err)
+	}
+	assertNoGhostNotification(t, second)
+}
+
+func TestExactRunnerResumePreservesDecodedTurnMissingID(t *testing.T) {
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("turn-start-missing-id-once")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	result, err := root.ThreadRunner().Resume(context.Background(), ResumeThreadRunRequest{
+		Thread: protocolv2.ThreadResumeParams{ThreadID: "thread-existing", Model: protocolv2.Value("requested-model")},
+		Turn:   protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if !errors.Is(err, ErrMissingTurnID) {
+		t.Fatalf("Resume error = %v, want missing turn id", err)
+	}
+	if result.Resume.Thread.ID != "thread-existing" || result.Resume.Model != "requested-model" {
+		t.Fatalf("Resume evidence = %#v", result.Resume)
+	}
+	if result.Run.Turn.ID != "" || result.Run.Turn.Status != protocolv2.TurnStatusInProgress || len(result.Run.Turn.Items) != 1 || result.Run.Turn.StartedAt == nil {
+		t.Fatalf("Turn partial evidence = %#v", result.Run.Turn)
+	}
+
+	second, err := root.ThreadRunner().Resume(context.Background(), ResumeThreadRunRequest{
+		Thread: protocolv2.ThreadResumeParams{ThreadID: "thread-existing"},
+		Turn:   protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil || second.Run.Turn.ID == "" || second.Run.Turn.Status != protocolv2.TurnStatusCompleted {
+		t.Fatalf("second run = %#v, error = %v; want usable Client", second, err)
+	}
+	for _, notification := range second.Run.Notifications {
+		rerouted, ok := notification.AsModelRerouted()
+		if ok && rerouted.Params.ToModel == "must-not-attach" {
+			t.Fatalf("unattributed notification leaked into subsequent run: %#v", notification)
+		}
+	}
+}
+
+func TestExactRunnerStreamsPreserveDecodedTurnMissingID(t *testing.T) {
+	tests := []struct {
+		name    string
+		observe func(*testing.T, *Client)
+	}{
+		{
+			name: "start",
+			observe: func(t *testing.T, root *Client) {
+				stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+					Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assertMissingTurnStream(t, stream, func(result StartedThreadRun) protocolv2.Turn { return result.Run.Turn })
+			},
+		},
+		{
+			name: "resume",
+			observe: func(t *testing.T, root *Client) {
+				stream, err := root.ThreadRunner().ResumeStream(context.Background(), ResumeThreadRunRequest{
+					Thread: protocolv2.ThreadResumeParams{ThreadID: "thread-existing"},
+					Turn:   protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assertMissingTurnStream(t, stream, func(result ResumedThreadRun) protocolv2.Turn { return result.Run.Turn })
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+			root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("turn-start-missing-id-once")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer root.Close()
+			test.observe(t, root)
+		})
+	}
+}
+
+func assertMissingTurnStream[R any](t *testing.T, stream *Stream[R], turnFrom func(R) protocolv2.Turn) {
+	t.Helper()
+	result, err := stream.Wait(context.Background())
+	if !errors.Is(err, ErrMissingTurnID) {
+		t.Fatalf("Wait error = %v, want ErrMissingTurnID", err)
+	}
+	if stream.Err() != err {
+		t.Fatalf("stream Err = %p, Wait error = %p; want stable terminal cause", stream.Err(), err)
+	}
+	turn := turnFrom(result)
+	if turn.ID != "" || turn.Status != protocolv2.TurnStatusInProgress || len(turn.Items) != 1 || turn.StartedAt == nil || turn.StartedAt.Value == nil {
+		t.Fatalf("Wait turn evidence = %#v", turn)
+	}
+	*turn.StartedAt.Value = 9999
+	snapshot, ok := stream.Result()
+	if !ok {
+		t.Fatal("Result has no partial evidence")
+	}
+	snapshotTurn := turnFrom(snapshot)
+	if snapshotTurn.StartedAt == nil || snapshotTurn.StartedAt.Value == nil || *snapshotTurn.StartedAt.Value != 1234 {
+		t.Fatalf("Result snapshot aliases Wait result: %#v", snapshotTurn)
+	}
 }
 
 func assertNoGhostNotification(t *testing.T, run StartedThreadRun) {
