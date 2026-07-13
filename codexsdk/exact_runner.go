@@ -12,13 +12,12 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-const exactStreamQueueCapacity = 128
-
 type exactRunner struct{ client *Client }
 
 type Stream[R any] struct {
 	mu      sync.Mutex
 	state   *exactRunState
+	cursor  int
 	current protocolv2.ServerNotification
 }
 
@@ -26,9 +25,9 @@ type exactRunState struct {
 	client   *Client
 	threadID string
 	// turnID is guarded by mu, including reads performed while routing the run.
-	turnID string
-	events chan protocolv2.ServerNotification
-	done   chan struct{}
+	turnID  string
+	updated chan struct{}
+	done    chan struct{}
 
 	// notificationOrderMu preserves the ingestion order of pending and live
 	// notifications across attachment. It is per run so unrelated turns do not
@@ -190,43 +189,32 @@ func (s *Stream[R]) Next(ctx context.Context) bool {
 	if s == nil || s.state == nil {
 		return false
 	}
-	select {
-	case notification := <-s.state.events:
+	for {
 		s.mu.Lock()
-		s.current = notification
+		s.state.mu.Lock()
+		notification, ok := s.state.notificationAtLocked(s.cursor)
+		terminal := s.state.terminal
+		updated := s.state.updated
+		if ok {
+			s.cursor++
+		}
+		s.state.mu.Unlock()
+		if ok {
+			s.current, _ = cloneJSON(notification)
+			s.mu.Unlock()
+			return true
+		}
 		s.mu.Unlock()
-		return true
-	default:
-	}
-	s.state.mu.Lock()
-	terminal := s.state.terminal
-	s.state.mu.Unlock()
-	if terminal {
-		return s.takeQueuedNotification()
-	}
-	select {
-	case notification := <-s.state.events:
-		s.mu.Lock()
-		s.current = notification
-		s.mu.Unlock()
-		return true
-	case <-ctx.Done():
-		s.state.cancel(ctx.Err())
-		return false
-	case <-s.state.done:
-		return s.takeQueuedNotification()
-	}
-}
-
-func (s *Stream[R]) takeQueuedNotification() bool {
-	select {
-	case notification := <-s.state.events:
-		s.mu.Lock()
-		s.current = notification
-		s.mu.Unlock()
-		return true
-	default:
-		return false
+		if terminal {
+			return false
+		}
+		select {
+		case <-updated:
+		case <-ctx.Done():
+			s.state.cancel(ctx.Err())
+			return false
+		case <-s.state.done:
+		}
 	}
 }
 
@@ -377,26 +365,32 @@ func (s *Stream[R]) Close() error {
 }
 
 func newExactRunState(client *Client, threadID string, result any) *exactRunState {
-	return newExactRunStateWithQueueCapacity(client, threadID, result, exactStreamQueueCapacity)
-}
-
-func (c *Client) newExactRunState(threadID string, result any) *exactRunState {
-	queueCapacity := exactStreamQueueCapacity
-	if c.testExactStreamQueueCapacity > 0 {
-		queueCapacity = c.testExactStreamQueueCapacity
-	}
-	return newExactRunStateWithQueueCapacity(c, threadID, result, queueCapacity)
-}
-
-func newExactRunStateWithQueueCapacity(client *Client, threadID string, result any, queueCapacity int) *exactRunState {
 	return &exactRunState{
 		client:    client,
 		threadID:  threadID,
-		events:    make(chan protocolv2.ServerNotification, queueCapacity),
+		updated:   make(chan struct{}),
 		done:      make(chan struct{}),
 		result:    result,
 		hasResult: true,
 	}
+}
+
+func (c *Client) newExactRunState(threadID string, result any) *exactRunState {
+	return newExactRunState(c, threadID, result)
+}
+
+func (s *exactRunState) notificationAtLocked(index int) (protocolv2.ServerNotification, bool) {
+	switch result := s.result.(type) {
+	case StartedThreadRun:
+		if index < len(result.Run.Notifications) {
+			return result.Run.Notifications[index], true
+		}
+	case ResumedThreadRun:
+		if index < len(result.Run.Notifications) {
+			return result.Run.Notifications[index], true
+		}
+	}
+	return protocolv2.ServerNotification{}, false
 }
 
 func (s *exactRunState) setTurn(turn protocolv2.Turn) {
@@ -448,15 +442,9 @@ func (s *exactRunState) acceptStateBeforeTerminalCompletion(notification protoco
 		}
 	})
 	terminal, terminalErr := s.applyTerminalLocked(cloned)
+	close(s.updated)
+	s.updated = make(chan struct{})
 	s.mu.Unlock()
-
-	select {
-	case s.events <- cloned:
-	case <-s.done:
-		return nil, nil
-	default:
-		return nil, ErrNotificationBackpressure
-	}
 	if terminal {
 		return func() {
 			if s.finishState(terminalErr) {

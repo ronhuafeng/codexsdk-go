@@ -55,7 +55,12 @@ _Avoid_: workflow, request
 **Exact Run Waiter**:
 An independent, non-destructive observer of an Exact Run's completion and
 immutable result snapshot.
-_Avoid_: subscriber, cursor, stream consumer
+_Avoid_: subscriber, stream consumer
+
+**Exact Run History Cursor**:
+The per-Stream position used by `Next` to observe the immutable ordered
+notification history already owned by an Exact Run.
+_Avoid_: delivery queue, event store
 
 **Shared Run Cancellation**:
 An explicit lifecycle boundary that terminates an Exact Run for every observer.

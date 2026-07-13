@@ -1074,20 +1074,6 @@ func runFakeAppServer(mode string, extra []string) {
 			if mode == "approval-before-turn-start" {
 				send(map[string]any{"id": "server-approval-1", "method": "item/commandExecution/requestApproval", "params": fakeCommandApprovalParams(threadID, turnID)})
 			}
-			if turnCounter == 2 && (mode == "exact-overflow-pending" || mode == "exact-overflow-terminal") {
-				sendExactReroute(threadID, turnID, "model-a", "model-b")
-				if mode == "exact-overflow-terminal" {
-					send(map[string]any{"method": "turn/completed", "params": map[string]any{
-						"threadId": threadID,
-						"turn": map[string]any{
-							"id": turnID, "status": "completed",
-							"items": []map[string]any{{"id": "answer", "type": "agentMessage", "text": "done", "phase": "final_answer"}},
-						},
-					}})
-				} else {
-					sendExactReroute(threadID, turnID, "model-b", "model-c")
-				}
-			}
 			if mode == "pending-terminal-protocol-failure" {
 				completeTurn(threadID, turnID)
 				_, _ = fmt.Fprintln(os.Stdout, "{")
@@ -1105,13 +1091,11 @@ func runFakeAppServer(mode string, extra []string) {
 				},
 			})
 			switch mode {
-			case "exact-overflow-live":
-				if turnCounter == 2 {
-					waitForFakePath(extra[0])
-					sendExactReroute(threadID, turnID, "model-a", "model-b")
-					sendExactReroute(threadID, turnID, "model-b", "model-c")
+			case "exact-history-wait":
+				for index := 0; index < exactStreamHistoryContractNotifications; index++ {
+					sendExactReroute(threadID, turnID, "model-"+itoa(index), "model-"+itoa(index+1))
 				}
-			case "exact-overflow-pending", "exact-overflow-terminal":
+				completeTurn(threadID, turnID)
 			case "failed":
 				send(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": threadID, "turn": map[string]any{"id": turnID, "items": []map[string]any{}, "status": "failed", "error": map[string]any{"message": "native failed", "codexErrorInfo": "usageLimitExceeded"}}}})
 			case "interrupted":

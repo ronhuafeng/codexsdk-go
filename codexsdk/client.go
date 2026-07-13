@@ -72,7 +72,6 @@ type Client struct {
 	testBeforeExactTurnAttach      func()
 	testPendingExactNotification   func(rpcNotification)
 	testBeforePendingTerminalFence func()
-	testExactStreamQueueCapacity   int
 
 	readerDone chan struct{}
 }

@@ -14,6 +14,10 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
+// docs/adr/0002-non-destructive-exact-run-wait.md defines 1,280 notifications
+// as the minimum Wait-only history stress contract.
+const exactStreamHistoryContractNotifications = 1280
+
 func TestExactRunnerStartPreservesGeneratedFacts(t *testing.T) {
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("happy")})
@@ -1076,6 +1080,59 @@ func TestExactStreamWaitersObserveIndependentTerminalSnapshots(t *testing.T) {
 	}
 }
 
+func TestExactStreamWaitPreservesHistoryBeyondLiveDeliveryCapacity(t *testing.T) {
+	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("exact-history-wait")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := stream.Wait(context.Background())
+	if err != nil {
+		t.Fatalf("Wait error = %v, want successful completion", err)
+	}
+	wantNotifications := exactStreamHistoryContractNotifications + 3
+	if len(result.Run.Notifications) != wantNotifications {
+		t.Fatalf("notifications = %d, want %d", len(result.Run.Notifications), wantNotifications)
+	}
+	for index := 0; index < exactStreamHistoryContractNotifications; index++ {
+		rerouted, ok := result.Run.Notifications[index].AsModelRerouted()
+		if !ok || rerouted.Params.FromModel != "model-"+itoa(index) || rerouted.Params.ToModel != "model-"+itoa(index+1) {
+			t.Fatalf("notification %d = %#v, want ordered model reroute", index, result.Run.Notifications[index])
+		}
+	}
+	if result.Run.Notifications[wantNotifications-1].Kind() != protocolv2.ServerNotificationKindTurnCompleted {
+		t.Fatalf("terminal notification = %#v", result.Run.Notifications[wantNotifications-1])
+	}
+	observed := 0
+	for stream.Next(context.Background()) {
+		if got := stream.Notification().Kind(); got != result.Run.Notifications[observed].Kind() {
+			t.Fatalf("Next notification %d kind = %s, want %s", observed, got, result.Run.Notifications[observed].Kind())
+		}
+		observed++
+	}
+	if observed != wantNotifications {
+		t.Fatalf("Next notifications = %d, want %d", observed, wantNotifications)
+	}
+
+	second, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil {
+		t.Fatalf("second run error = %v, want Client to remain usable", err)
+	}
+	if second.Run.Turn.Status != protocolv2.TurnStatusCompleted {
+		t.Fatalf("second run status = %s, want completed", second.Run.Turn.Status)
+	}
+}
+
 func TestExactStreamWaitCancellationIsCallerLocalAndReturnsPartialSnapshot(t *testing.T) {
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("hang")})
@@ -1627,98 +1684,6 @@ func TestExactRunTurnIDAccessIsRaceFreeAcrossAttributionAndLifecycle(t *testing.
 		}()
 		close(start)
 		wg.Wait()
-	}
-}
-
-func TestExactNotificationOverflowHasTimingIndependentClientFailureSemantics(t *testing.T) {
-	for _, test := range []struct {
-		name string
-		mode string
-	}{
-		{name: "live", mode: "exact-overflow-live"},
-		{name: "pending replay", mode: "exact-overflow-pending"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			assertExactOverflowClientContract(t, test.mode, false)
-		})
-	}
-}
-
-func TestExactTerminalOverflowPreservesTerminalEvidence(t *testing.T) {
-	assertExactOverflowClientContract(t, "exact-overflow-terminal", true)
-}
-
-func assertExactOverflowClientContract(t *testing.T, mode string, terminal bool) {
-	t.Helper()
-	release := filepath.Join(t.TempDir(), "release-overflow")
-	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
-	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand(mode, release)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	concrete := root
-	concrete.testExactStreamQueueCapacity = 1
-
-	other, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
-		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	overflowing, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
-		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if mode == "exact-overflow-live" {
-		if err := os.WriteFile(release, []byte("release"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	deadline := time.Now().Add(time.Second)
-	for overflowing.Err() == nil && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
-	if overflowing.Err() == nil {
-		t.Fatal("overflow did not finish the exact stream")
-	}
-
-	if !errors.Is(overflowing.Err(), ErrNotificationBackpressure) {
-		t.Fatalf("overflowing stream error = %v", overflowing.Err())
-	}
-	if !errors.Is(other.Err(), ErrNotificationBackpressure) {
-		t.Fatalf("other stream error = %v", other.Err())
-	}
-	if overflowing.Err() != other.Err() {
-		t.Fatalf("active streams received different first causes: %v and %v", overflowing.Err(), other.Err())
-	}
-	result, ok := overflowing.Result()
-	if !ok || len(result.Run.Notifications) != 2 {
-		t.Fatalf("partial notification history = %d, ok=%v", len(result.Run.Notifications), ok)
-	}
-	last := result.Run.Notifications[1]
-	if terminal {
-		if last.Kind() != protocolv2.ServerNotificationKindTurnCompleted || result.Run.FinalResponse != "done" {
-			t.Fatalf("terminal evidence = %#v, final response = %q", last, result.Run.FinalResponse)
-		}
-	} else {
-		rerouted, ok := last.AsModelRerouted()
-		if !ok || rerouted.Params.ToModel != "model-c" {
-			t.Fatalf("overflowing generated fact not preserved: %#v", last)
-		}
-	}
-	otherResult, ok := other.Result()
-	if !ok || len(otherResult.Run.Notifications) != 0 {
-		t.Fatalf("other partial result = %#v, ok=%v", otherResult.Run, ok)
-	}
-	if _, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
-		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
-	}); !errors.Is(err, ErrClientClosed) {
-		t.Fatalf("new operation error = %v, want ErrClientClosed", err)
-	}
-	if closeErr := root.Close(); !errors.Is(closeErr, ErrNotificationBackpressure) {
-		t.Fatalf("Close error = %v, want ErrNotificationBackpressure", closeErr)
 	}
 }
 
