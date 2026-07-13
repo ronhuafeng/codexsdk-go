@@ -7,6 +7,9 @@
 // facades, exact thread/turn composition, and typed callback delivery. Exact
 // run notifications retain ingestion order across stream attachment: pending
 // notifications are accepted before later live notifications for the same run.
+// A decoded thread/start response without a thread ID is returned as exact
+// partial evidence with ErrMissingThreadID before any turn starts or run is
+// registered; this fail-closed response does not close the Client.
 // Exact run results retain complete immutable notification history independent
 // of observation. Wait observes completion without consuming notifications;
 // Next advances a cursor over the same ordered history. The configurable

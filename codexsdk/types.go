@@ -14,6 +14,7 @@ var (
 	ErrNotificationBackpressure = errors.New("codexsdk: notification backpressure")
 	ErrHandlerFailed            = errors.New("codexsdk: handler failed")
 	ErrExactServerRequest       = errors.New("codexsdk: exact server request failed closed")
+	ErrMissingThreadID          = errors.New("codexsdk: thread response missing thread id")
 )
 
 type ExactServerRequestError struct {

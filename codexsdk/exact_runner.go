@@ -102,10 +102,12 @@ func (r *exactRunner) StartStream(ctx context.Context, request StartThreadRunReq
 	if err := r.client.callProtocol(ctx, protocolv2.MethodThreadStart, threadParams, &started); err != nil {
 		return nil, err
 	}
-	if started.Thread.ID == "" {
-		return nil, errors.New("codexsdk: thread/start response missing thread id")
-	}
 	initial := StartedThreadRun{Start: started, Run: ThreadRunResult{InputStats: exactInputStats(turnParams.Input)}}
+	if started.Thread.ID == "" {
+		state := newExactRunState(r.client, "", initial)
+		state.finish(fmt.Errorf("codexsdk: thread/start response missing thread id: %w", ErrMissingThreadID))
+		return &Stream[StartedThreadRun]{state: state}, nil
+	}
 	state := r.client.newExactRunState(started.Thread.ID, initial)
 	r.client.registerAttachingExactStream(state)
 	stream := &Stream[StartedThreadRun]{state: state}
