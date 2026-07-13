@@ -16,7 +16,7 @@ launched Codex app-server over stdio.
   `codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json`.
 - API stability: pre-1.0. Public APIs are intended to be useful and reviewed,
   but breaking changes can happen before v1.0.
-- Current stable release: `v0.4.0`.
+- Current stable release: `v0.5.0`.
 - Runtime requirement: the SDK launches an external `codex app-server` command.
   Unit tests and CI do not require a local Codex binary.
 
@@ -26,6 +26,8 @@ versus experimental generated compatibility.
 See [Pre-v1 Public API Boundary](docs/public-api-boundary.md).
 For the concrete generated-facade migration, see the
 [v0.4 migration guide](docs/v0.4-migration.md).
+For the unified malformed lifecycle partial-evidence contract, see the
+[v0.5 migration guide](docs/v0.5-migration.md).
 
 ## Packages
 
@@ -41,7 +43,7 @@ For the concrete generated-facade migration, see the
 ## Installation
 
 ```sh
-go get github.com/ronhuafeng/codexsdk-go@v0.4.0
+go get github.com/ronhuafeng/codexsdk-go@v0.5.0
 ```
 
 The module targets Go 1.23 or newer.
