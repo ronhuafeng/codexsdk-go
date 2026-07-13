@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import codexsdk_generate_sdk_surface as sdk_surface
+
 
 def load_manifest(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
@@ -18,7 +20,8 @@ def load_manifest(path: Path) -> dict[str, Any]:
 
 def surface_index(manifest: dict[str, Any]) -> dict[tuple[str, str], dict[str, str]]:
     result: dict[tuple[str, str], dict[str, str]] = {}
-    for raw in manifest.get("surface", []):
+    generated_surface = list(manifest.get("surface", [])) + sdk_surface.facade_compatibility_surface(manifest)
+    for raw in generated_surface:
         if not isinstance(raw, dict):
             raise ValueError("manifest surface entry is not an object")
         kind = raw.get("kind")
@@ -67,13 +70,15 @@ def compatibility_report(base: dict[str, Any], target: dict[str, Any]) -> dict[s
                     "to_signature": after[(kind, name)]["signature"],
                 }
             )
+    implementation_obligations = [item for item in added if item["kind"] == "interface_method"]
     return {
-        "policy": "classification_is_metadata_not_a_semver_exemption",
-        "compatibility_impact": "incompatible" if removed or changed else "additive_or_metadata_only",
+        "policy": "go_source_compatibility_with_classification_metadata",
+        "compatibility_impact": "incompatible" if removed or changed or implementation_obligations else "additive_or_metadata_only",
         "added": added,
         "removed": removed,
         "reclassified": reclassified,
         "changed": changed,
+        "external_implementation_obligations": implementation_obligations,
         "counts_by_classification": {
             stability: {
                 "added": sum(item["classification"] == stability for item in added),

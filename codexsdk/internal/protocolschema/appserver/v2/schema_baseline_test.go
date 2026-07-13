@@ -34,6 +34,7 @@ type manifestFile struct {
 
 type manifestEntry struct {
 	FacadeTarget          string            `json:"facade_target"`
+	FacadeStatus          string            `json:"facade_status"`
 	Family                string            `json:"family"`
 	Direction             string            `json:"direction"`
 	Kind                  string            `json:"kind"`
@@ -169,6 +170,19 @@ func TestManifestClassifiedMatchesAggregateSchemas(t *testing.T) {
 		}
 		if entry.FacadeTarget == "" {
 			t.Fatalf("manifest entry %q missing facade target", entry.Method)
+		}
+		if entry.Direction == "client_to_server" && entry.Kind == "request" {
+			if strings.HasPrefix(entry.FacadeTarget, "internal.") {
+				// Explicit internal operations do not belong to a generated facade.
+			} else if !regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*\(\)\.[A-Za-z][A-Za-z0-9]*$`).MatchString(entry.FacadeTarget) {
+				t.Fatalf("manifest entry %q has invalid facade_target %q", entry.Method, entry.FacadeTarget)
+			} else {
+				switch entry.FacadeStatus {
+				case "generated", "deferred_missing_generated_types":
+				default:
+					t.Fatalf("manifest entry %q has invalid facade_status %q", entry.Method, entry.FacadeStatus)
+				}
+			}
 		}
 		if !validStability(entry.Stability) || entry.StabilitySource == "" {
 			t.Fatalf("manifest entry %q has invalid stability classification: %#v", entry.Method, entry)

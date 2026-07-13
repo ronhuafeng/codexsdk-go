@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -157,6 +158,17 @@ def validate_manifest(root: Path) -> list[Finding]:
         if method in manifest_methods:
             findings.append(finding("manifest_duplicate_method", str(manifest_path), f"duplicate manifest method {method!r}"))
         manifest_methods[method] = entry
+
+        facade_target = entry.get("facade_target", "")
+        if entry.get("direction") == "client_to_server" and entry.get("kind") == "request":
+            if facade_target.startswith("internal."):
+                pass
+            elif not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*\(\)\.[A-Za-z][A-Za-z0-9]*", facade_target):
+                findings.append(finding("manifest_invalid_facade_target", str(manifest_path), f"{method}: invalid facade_target {facade_target!r}"))
+            else:
+                facade_status = entry.get("facade_status", "")
+                if facade_status not in {"generated", "deferred_missing_generated_types"}:
+                    findings.append(finding("manifest_invalid_facade_status", str(manifest_path), f"{method}: invalid facade_status {facade_status!r}"))
 
         source_schema = entry.get("source_schema", "")
         if not schema_exists(root, source_schema):

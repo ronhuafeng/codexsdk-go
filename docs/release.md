@@ -16,20 +16,25 @@ Use this checklist before tagging or publishing a release.
 - Removing or changing public generated types, method constants, facade
   methods, request structs, response structs, or thread helper behavior is a
   major change after v1.0 unless preserving compatibility would be unsafe.
+- Adding a method to a concrete generated facade is additive. Adding a method
+  to any exported interface is an external implementation obligation and is
+  incompatible; the compatibility report distinguishes these cases.
 
 The classified `manifest.json` is the accepted single source for generated
-stability metadata. Its `surface` classifies every exported generated Go
-declaration and compatibility-relevant member by comparing package generation
-without and with experimental schema visibility. A type is `mixed` when its
-members span stable and experimental classifications; each member retains its
-own classification. Canonical signatures let release comparison detect changed
-types and members as well as added or removed identities. Do not maintain a
-second handwritten stability inventory.
+stability metadata. Its `surface` classifies exported `protocolv2` declarations
+and compatibility-relevant members. Concrete facade types and methods are
+derived by the release report from request entries explicitly marked
+`facade_status: generated`; deferred entries do not claim public facade API. A
+type is `mixed` when its members span stable and experimental classifications;
+each member retains its own classification. Canonical signatures let release
+comparison detect changed types and members as well as added or removed
+identities. Do not maintain a second handwritten stability inventory.
 
 The handwritten public API is mechanically recorded in
 `codexsdk/testdata/handwritten-api.txt`. Generated `protocolv2` declarations and
 generated facades are intentionally excluded because their inventory is a
-protocol fact guarded by generator reproducibility tests.
+manifest-derived protocol fact guarded by compatibility reporting, generator
+reproducibility, and semantic public-boundary tests.
 
 ## Baseline Update Flow
 
@@ -101,6 +106,10 @@ GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -stdout method-registry 
   diff -u codexsdk/protocolv2/method_registry.gen.go -
 GOWORK=off go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
   diff -u codexsdk/protocolv2/protocol_types.gen.go -
+tmp="$(mktemp -d)/sdk_surface.gen.go"
+python3 scripts/codexsdk_generate_sdk_surface.py --out "$tmp"
+gofmt -w "$tmp"
+diff -u codexsdk/sdk_surface.gen.go "$tmp"
 
 python3 scripts/codexsdk_release_report.py \
   --base-manifest /path/to/previous/manifest.json \

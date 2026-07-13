@@ -11,7 +11,9 @@ the current SDK-owned `Client` interface embedding the growing generated
 ## Status
 
 Accepted; the concrete-root portion is implemented by issue #62 after v0.2.1.
-Generated stability manifest extension remains separate bounded work.
+Generated stability manifest extension is implemented. Issue #89 completes the
+same ownership rule for generated facades in the planned v0.4.0 release: facade
+accessors return exported concrete opaque values, not SDK-owned interfaces.
 
 ## Decision
 
@@ -29,6 +31,10 @@ Generated stability manifest extension remains separate bounded work.
 - Handwritten lifecycle APIs may compose exact generated operations and retain
   evidence, but must not copy generated facts into handwritten models.
   Generated facades remain the exact, complete protocol escape hatch.
+- Each generated facade is an exported concrete value with private
+  representation. Adding a generated method expands capability without
+  enlarging an interface implemented by applications. Applications define
+  narrow interfaces at their consuming seams.
 - Consumers mock only the narrow operation or lifecycle interface they use.
   They are never expected to implement `SDKSurface` or another SDK-owned root
   interface.

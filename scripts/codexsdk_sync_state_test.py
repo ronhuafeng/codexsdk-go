@@ -140,6 +140,41 @@ class SyncStateTest(unittest.TestCase):
             write_valid_baseline(root)
             self.assertEqual(sync_state.validate_baseline(root), [])
 
+    def test_generated_facade_target_requires_explicit_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_valid_baseline(root)
+            manifest_path = root / "manifest.json"
+            manifest = schema_utils.load_json(manifest_path)
+            manifest["entries"][0].update(
+                {
+                    "direction": "client_to_server",
+                    "kind": "request",
+                    "facade_target": "Threads().Start",
+                }
+            )
+            write_json(manifest_path, manifest)
+
+            self.assertIn("manifest_invalid_facade_status", codes(sync_state.validate_baseline(root)))
+
+    def test_client_request_rejects_facade_target_typo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_valid_baseline(root)
+            manifest_path = root / "manifest.json"
+            manifest = schema_utils.load_json(manifest_path)
+            manifest["entries"][0].update(
+                {
+                    "direction": "client_to_server",
+                    "kind": "request",
+                    "facade_target": "Threads.Start",
+                    "facade_status": "generated",
+                }
+            )
+            write_json(manifest_path, manifest)
+
+            self.assertIn("manifest_invalid_facade_target", codes(sync_state.validate_baseline(root)))
+
     def test_bad_metadata_count_and_checksum_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -31,8 +31,11 @@ func compileModelConsumer(ctx context.Context, models modelLister) error {
 var (
 	_ *codexsdk.Client = (*codexsdk.Client)(nil)
 	_ runStarter       = (codexsdk.ThreadRunner)(nil)
-	_ modelLister      = (codexsdk.Models)(nil)
 )
+
+func compileConcreteFacadeType(models codexsdk.Models) {
+	var _ modelLister = models
+}
 
 func compileConcreteRootLifecycle(root *codexsdk.Client) error {
 	return root.Close()
