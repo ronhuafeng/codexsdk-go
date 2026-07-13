@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1300,6 +1301,94 @@ func TestExactRunnerPreservesPartialStartOnTurnStartFailure(t *testing.T) {
 	}
 	if stream.Err() == nil {
 		t.Fatal("stream did not report post-start failure")
+	}
+}
+
+func TestExactRunnerStartPreservesDecodedResponseMissingThreadID(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("thread-start-missing-id-once")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	result, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if !errors.Is(err, ErrMissingThreadID) || !strings.Contains(err.Error(), "thread/start response missing thread id") {
+		t.Fatalf("Start error = %v, want missing thread id", err)
+	}
+	if result.Start.Model != "decoded-model" || result.Start.Thread.SessionID == "" || result.Start.Thread.ID != "" {
+		t.Fatalf("Start partial evidence = %#v", result.Start)
+	}
+	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodTurnStart) != nil {
+		t.Fatal("turn/start was sent after missing thread id")
+	}
+
+	second, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil || second.Start.Thread.ID == "" || second.Run.Turn.Status != protocolv2.TurnStatusCompleted {
+		t.Fatalf("second run = %#v, error = %v; want usable Client", second, err)
+	}
+	assertNoGhostNotification(t, second)
+}
+
+func TestExactRunnerStartStreamPreservesDecodedResponseMissingThreadID(t *testing.T) {
+	record := tempRecord(t)
+	t.Setenv("CODEXSDK_FAKE_RECORD", record)
+	root, err := New(ClientOptions{CWD: t.TempDir(), Command: fakeCommand("thread-start-missing-id-once")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil {
+		t.Fatalf("StartStream error = %v, want observable terminal stream", err)
+	}
+	if stream == nil {
+		t.Fatal("StartStream returned nil stream")
+	}
+	result, err := stream.Wait(context.Background())
+	if !errors.Is(err, ErrMissingThreadID) || !strings.Contains(err.Error(), "thread/start response missing thread id") {
+		t.Fatalf("Wait error = %v, want missing thread id", err)
+	}
+	if stream.Err() != err {
+		t.Fatalf("stream Err = %p, Wait error = %p; want stable terminal cause", stream.Err(), err)
+	}
+	if result.Start.Model != "decoded-model" || result.Start.Thread.SessionID == "" || result.Start.Thread.ID != "" {
+		t.Fatalf("Wait partial evidence = %#v", result.Start)
+	}
+	result.Start.Model = "mutated"
+	result.Start.Thread.SessionID = "mutated"
+	snapshot, ok := stream.Result()
+	if !ok || snapshot.Start.Model != "decoded-model" || snapshot.Start.Thread.SessionID == "mutated" {
+		t.Fatalf("Result snapshot aliases Wait result: %#v, ok=%v", snapshot.Start, ok)
+	}
+	if firstRecord(readRecords(t, record), "recv", protocolv2.MethodTurnStart) != nil {
+		t.Fatal("turn/start was sent after missing thread id")
+	}
+
+	second, err := root.ThreadRunner().Start(context.Background(), StartThreadRunRequest{
+		Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}},
+	})
+	if err != nil || second.Start.Thread.ID == "" || second.Run.Turn.Status != protocolv2.TurnStatusCompleted {
+		t.Fatalf("second run = %#v, error = %v; want usable Client", second, err)
+	}
+	assertNoGhostNotification(t, second)
+}
+
+func assertNoGhostNotification(t *testing.T, run StartedThreadRun) {
+	t.Helper()
+	for _, notification := range run.Run.Notifications {
+		rerouted, ok := notification.AsModelRerouted()
+		if ok && rerouted.Params.ToModel == "must-not-attach" {
+			t.Fatalf("unattributed notification leaked into subsequent run: %#v", notification)
+		}
 	}
 }
 

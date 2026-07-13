@@ -151,6 +151,12 @@ func main() {
 contains the latest immutable partial snapshot. More compile-checked examples
 live in `codexsdk/examples_test.go`.
 
+A `thread/start` response that decodes but lacks a thread ID fails closed with
+`ErrMissingThreadID` before `turn/start`. `Start` returns the decoded
+`StartedThreadRun.Start` together with that error; `StartStream` returns a
+terminal stream whose `Wait` and `Result` expose the same isolated partial
+evidence. The malformed run is never registered, and the Client remains open.
+
 Call `Stream.Wait` when multiple consumers need to observe the same run without
 coordinating ownership of `Next`. Any number of waiters can block independently
 and each receives an immutable result snapshot plus the run's stable terminal

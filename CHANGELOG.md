@@ -10,6 +10,10 @@ All notable changes to this project are documented here.
   delivery. `Next` now advances over the immutable ordered result history, so
   runs retain all notifications and complete even when callers only use
   `Wait`; global notification-handler backpressure remains bounded.
+- Preserved decoded `thread/start` evidence when its thread ID is missing.
+  `Start` and `StartStream` now return the partial start with stable
+  `ErrMissingThreadID`, without starting a turn, registering an unattributed
+  run, or closing the Client.
 
 ## [0.3.0] - 2026-07-13
 

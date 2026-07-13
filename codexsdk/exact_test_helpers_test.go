@@ -798,6 +798,12 @@ func runFakeAppServer(mode string, extra []string) {
 				return
 			}
 			threadCounter++
+			if mode == "thread-start-missing-id-once" && threadCounter == 1 {
+				response := facadeThreadStartResponse("", "decoded-model")
+				sendProtocolResult(id, response)
+				sendExactReroute("", "turn-ghost", "unattributed", "must-not-attach")
+				continue
+			}
 			if mode == "thread-start-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{"thread": map[string]any{"id": "thread-" + itoa(threadCounter)}}})
 				continue
@@ -1055,6 +1061,9 @@ func runFakeAppServer(mode string, extra []string) {
 		case "turn/start":
 			turnCounter++
 			turnID := "turn-" + itoa(turnCounter)
+			if mode == "thread-start-missing-id-once" {
+				turnID = "turn-ghost"
+			}
 			params, _ := message["params"].(map[string]any)
 			threadID, _ := params["threadId"].(string)
 			if mode == "turn-start-malformed-response" {
