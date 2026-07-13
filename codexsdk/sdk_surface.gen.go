@@ -8,430 +8,259 @@ import (
 	"github.com/ronhuafeng/codexsdk-go/codexsdk/protocolv2"
 )
 
-type accountsFacade struct {
+// Accounts is an opaque generated facade for exact Codex operations.
+type Accounts struct {
 	client *Client
-}
-
-type Accounts interface {
-	LoginCancel(ctx context.Context, params protocolv2.CancelLoginAccountParams) (protocolv2.CancelLoginAccountResponse, error)
-	LoginStart(ctx context.Context, params protocolv2.LoginAccountParams) (protocolv2.LoginAccountResponse, error)
-	Logout(ctx context.Context) (protocolv2.LogoutAccountResponse, error)
-	RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error)
-	RateLimitsRead(ctx context.Context) (protocolv2.GetAccountRateLimitsResponse, error)
-	Read(ctx context.Context, params protocolv2.GetAccountParams) (protocolv2.GetAccountResponse, error)
-	SendAddCreditsNudgeEmail(ctx context.Context, params protocolv2.SendAddCreditsNudgeEmailParams) (protocolv2.SendAddCreditsNudgeEmailResponse, error)
-	WorkspaceMessagesRead(ctx context.Context) (protocolv2.GetWorkspaceMessagesResponse, error)
 }
 
 func (c *Client) Accounts() Accounts {
-	return accountsFacade{client: c}
+	return Accounts{client: c}
 }
 
-type appsFacade struct {
+// Apps is an opaque generated facade for exact Codex operations.
+type Apps struct {
 	client *Client
-}
-
-type Apps interface {
-	List(ctx context.Context, params protocolv2.AppsListParams) (protocolv2.AppsListResponse, error)
 }
 
 func (c *Client) Apps() Apps {
-	return appsFacade{client: c}
+	return Apps{client: c}
 }
 
-type collaborationModesFacade struct {
+// CollaborationModes is an opaque generated facade for exact Codex operations.
+type CollaborationModes struct {
 	client *Client
-}
-
-type CollaborationModes interface {
-	List(ctx context.Context, params protocolv2.CollaborationModeListParams) (protocolv2.CollaborationModeListResponse, error)
 }
 
 func (c *Client) CollaborationModes() CollaborationModes {
-	return collaborationModesFacade{client: c}
+	return CollaborationModes{client: c}
 }
 
-type commandsFacade struct {
+// Commands is an opaque generated facade for exact Codex operations.
+type Commands struct {
 	client *Client
-}
-
-type Commands interface {
-	Exec(ctx context.Context, params protocolv2.CommandExecParams) (protocolv2.CommandExecResponse, error)
-	ExecResize(ctx context.Context, params protocolv2.CommandExecResizeParams) (protocolv2.CommandExecResizeResponse, error)
-	ExecTerminate(ctx context.Context, params protocolv2.CommandExecTerminateParams) (protocolv2.CommandExecTerminateResponse, error)
-	ExecWrite(ctx context.Context, params protocolv2.CommandExecWriteParams) (protocolv2.CommandExecWriteResponse, error)
 }
 
 func (c *Client) Commands() Commands {
-	return commandsFacade{client: c}
+	return Commands{client: c}
 }
 
-type configFacade struct {
+// Config is an opaque generated facade for exact Codex operations.
+type Config struct {
 	client *Client
-}
-
-type Config interface {
-	BatchWrite(ctx context.Context, params protocolv2.ConfigBatchWriteParams) (protocolv2.ConfigWriteResponse, error)
-	MCPServerReload(ctx context.Context) (protocolv2.McpServerRefreshResponse, error)
-	Read(ctx context.Context, params protocolv2.ConfigReadParams) (protocolv2.ConfigReadResponse, error)
-	ValueWrite(ctx context.Context, params protocolv2.ConfigValueWriteParams) (protocolv2.ConfigWriteResponse, error)
 }
 
 func (c *Client) Config() Config {
-	return configFacade{client: c}
+	return Config{client: c}
 }
 
-type configRequirementsFacade struct {
+// ConfigRequirements is an opaque generated facade for exact Codex operations.
+type ConfigRequirements struct {
 	client *Client
-}
-
-type ConfigRequirements interface {
-	Read(ctx context.Context) (protocolv2.ConfigRequirementsReadResponse, error)
 }
 
 func (c *Client) ConfigRequirements() ConfigRequirements {
-	return configRequirementsFacade{client: c}
+	return ConfigRequirements{client: c}
 }
 
-type environmentsFacade struct {
+// Environments is an opaque generated facade for exact Codex operations.
+type Environments struct {
 	client *Client
-}
-
-type Environments interface {
-	Add(ctx context.Context, params protocolv2.EnvironmentAddParams) (protocolv2.EnvironmentAddResponse, error)
 }
 
 func (c *Client) Environments() Environments {
-	return environmentsFacade{client: c}
+	return Environments{client: c}
 }
 
-type experimentalFeaturesFacade struct {
+// ExperimentalFeatures is an opaque generated facade for exact Codex operations.
+type ExperimentalFeatures struct {
 	client *Client
-}
-
-type ExperimentalFeatures interface {
-	EnablementSet(ctx context.Context, params protocolv2.ExperimentalFeatureEnablementSetParams) (protocolv2.ExperimentalFeatureEnablementSetResponse, error)
-	List(ctx context.Context, params protocolv2.ExperimentalFeatureListParams) (protocolv2.ExperimentalFeatureListResponse, error)
 }
 
 func (c *Client) ExperimentalFeatures() ExperimentalFeatures {
-	return experimentalFeaturesFacade{client: c}
+	return ExperimentalFeatures{client: c}
 }
 
-type externalAgentConfigsFacade struct {
+// ExternalAgentConfigs is an opaque generated facade for exact Codex operations.
+type ExternalAgentConfigs struct {
 	client *Client
-}
-
-type ExternalAgentConfigs interface {
-	Detect(ctx context.Context, params protocolv2.ExternalAgentConfigDetectParams) (protocolv2.ExternalAgentConfigDetectResponse, error)
-	Import(ctx context.Context, params protocolv2.ExternalAgentConfigImportParams) (protocolv2.ExternalAgentConfigImportResponse, error)
-	ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error)
 }
 
 func (c *Client) ExternalAgentConfigs() ExternalAgentConfigs {
-	return externalAgentConfigsFacade{client: c}
+	return ExternalAgentConfigs{client: c}
 }
 
-type fsFacade struct {
+// FS is an opaque generated facade for exact Codex operations.
+type FS struct {
 	client *Client
-}
-
-type FS interface {
-	Copy(ctx context.Context, params protocolv2.FsCopyParams) (protocolv2.FsCopyResponse, error)
-	CreateDirectory(ctx context.Context, params protocolv2.FsCreateDirectoryParams) (protocolv2.FsCreateDirectoryResponse, error)
-	GetMetadata(ctx context.Context, params protocolv2.FsGetMetadataParams) (protocolv2.FsGetMetadataResponse, error)
-	ReadDirectory(ctx context.Context, params protocolv2.FsReadDirectoryParams) (protocolv2.FsReadDirectoryResponse, error)
-	ReadFile(ctx context.Context, params protocolv2.FsReadFileParams) (protocolv2.FsReadFileResponse, error)
-	Remove(ctx context.Context, params protocolv2.FsRemoveParams) (protocolv2.FsRemoveResponse, error)
-	Unwatch(ctx context.Context, params protocolv2.FsUnwatchParams) (protocolv2.FsUnwatchResponse, error)
-	Watch(ctx context.Context, params protocolv2.FsWatchParams) (protocolv2.FsWatchResponse, error)
-	WriteFile(ctx context.Context, params protocolv2.FsWriteFileParams) (protocolv2.FsWriteFileResponse, error)
 }
 
 func (c *Client) FS() FS {
-	return fsFacade{client: c}
+	return FS{client: c}
 }
 
-type feedbackFacade struct {
+// Feedback is an opaque generated facade for exact Codex operations.
+type Feedback struct {
 	client *Client
-}
-
-type Feedback interface {
-	Upload(ctx context.Context, params protocolv2.FeedbackUploadParams) (protocolv2.FeedbackUploadResponse, error)
 }
 
 func (c *Client) Feedback() Feedback {
-	return feedbackFacade{client: c}
+	return Feedback{client: c}
 }
 
-type fuzzyFileSearchFacade struct {
+// FuzzyFileSearch is an opaque generated facade for exact Codex operations.
+type FuzzyFileSearch struct {
 	client *Client
-}
-
-type FuzzyFileSearch interface {
-	Search(ctx context.Context, params protocolv2.FuzzyFileSearchParams) (protocolv2.FuzzyFileSearchResponse, error)
-	SessionStart(ctx context.Context, params protocolv2.FuzzyFileSearchSessionStartParams) (protocolv2.FuzzyFileSearchSessionStartResponse, error)
-	SessionStop(ctx context.Context, params protocolv2.FuzzyFileSearchSessionStopParams) (protocolv2.FuzzyFileSearchSessionStopResponse, error)
-	SessionUpdate(ctx context.Context, params protocolv2.FuzzyFileSearchSessionUpdateParams) (protocolv2.FuzzyFileSearchSessionUpdateResponse, error)
 }
 
 func (c *Client) FuzzyFileSearch() FuzzyFileSearch {
-	return fuzzyFileSearchFacade{client: c}
+	return FuzzyFileSearch{client: c}
 }
 
-type hooksFacade struct {
+// Hooks is an opaque generated facade for exact Codex operations.
+type Hooks struct {
 	client *Client
-}
-
-type Hooks interface {
-	List(ctx context.Context, params protocolv2.HooksListParams) (protocolv2.HooksListResponse, error)
 }
 
 func (c *Client) Hooks() Hooks {
-	return hooksFacade{client: c}
+	return Hooks{client: c}
 }
 
-type mcpServerStatusFacade struct {
+// MCPServerStatus is an opaque generated facade for exact Codex operations.
+type MCPServerStatus struct {
 	client *Client
-}
-
-type MCPServerStatus interface {
-	List(ctx context.Context, params protocolv2.ListMcpServerStatusParams) (protocolv2.ListMcpServerStatusResponse, error)
 }
 
 func (c *Client) MCPServerStatus() MCPServerStatus {
-	return mcpServerStatusFacade{client: c}
+	return MCPServerStatus{client: c}
 }
 
-type mcpServersFacade struct {
+// MCPServers is an opaque generated facade for exact Codex operations.
+type MCPServers struct {
 	client *Client
-}
-
-type MCPServers interface {
-	OAuthLogin(ctx context.Context, params protocolv2.McpServerOauthLoginParams) (protocolv2.McpServerOauthLoginResponse, error)
-	ResourceRead(ctx context.Context, params protocolv2.McpResourceReadParams) (protocolv2.McpResourceReadResponse, error)
-	ToolCall(ctx context.Context, params protocolv2.McpServerToolCallParams) (protocolv2.McpServerToolCallResponse, error)
 }
 
 func (c *Client) MCPServers() MCPServers {
-	return mcpServersFacade{client: c}
+	return MCPServers{client: c}
 }
 
-type marketplaceFacade struct {
+// Marketplace is an opaque generated facade for exact Codex operations.
+type Marketplace struct {
 	client *Client
-}
-
-type Marketplace interface {
-	Add(ctx context.Context, params protocolv2.MarketplaceAddParams) (protocolv2.MarketplaceAddResponse, error)
-	Remove(ctx context.Context, params protocolv2.MarketplaceRemoveParams) (protocolv2.MarketplaceRemoveResponse, error)
-	Upgrade(ctx context.Context, params protocolv2.MarketplaceUpgradeParams) (protocolv2.MarketplaceUpgradeResponse, error)
 }
 
 func (c *Client) Marketplace() Marketplace {
-	return marketplaceFacade{client: c}
+	return Marketplace{client: c}
 }
 
-type memoryFacade struct {
+// Memory is an opaque generated facade for exact Codex operations.
+type Memory struct {
 	client *Client
-}
-
-type Memory interface {
-	Reset(ctx context.Context) (protocolv2.MemoryResetResponse, error)
 }
 
 func (c *Client) Memory() Memory {
-	return memoryFacade{client: c}
+	return Memory{client: c}
 }
 
-type mockFacade struct {
+// Mock is an opaque generated facade for exact Codex operations.
+type Mock struct {
 	client *Client
-}
-
-type Mock interface {
-	ExperimentalMethod(ctx context.Context, params protocolv2.MockExperimentalMethodParams) (protocolv2.MockExperimentalMethodResponse, error)
 }
 
 func (c *Client) Mock() Mock {
-	return mockFacade{client: c}
+	return Mock{client: c}
 }
 
-type modelProvidersFacade struct {
+// ModelProviders is an opaque generated facade for exact Codex operations.
+type ModelProviders struct {
 	client *Client
-}
-
-type ModelProviders interface {
-	CapabilitiesRead(ctx context.Context, params protocolv2.ModelProviderCapabilitiesReadParams) (protocolv2.ModelProviderCapabilitiesReadResponse, error)
 }
 
 func (c *Client) ModelProviders() ModelProviders {
-	return modelProvidersFacade{client: c}
+	return ModelProviders{client: c}
 }
 
-type modelsFacade struct {
+// Models is an opaque generated facade for exact Codex operations.
+type Models struct {
 	client *Client
-}
-
-type Models interface {
-	List(ctx context.Context, params protocolv2.ModelListParams) (protocolv2.ModelListResponse, error)
 }
 
 func (c *Client) Models() Models {
-	return modelsFacade{client: c}
+	return Models{client: c}
 }
 
-type pluginsFacade struct {
+// Plugins is an opaque generated facade for exact Codex operations.
+type Plugins struct {
 	client *Client
-}
-
-type Plugins interface {
-	Install(ctx context.Context, params protocolv2.PluginInstallParams) (protocolv2.PluginInstallResponse, error)
-	Installed(ctx context.Context, params protocolv2.PluginInstalledParams) (protocolv2.PluginInstalledResponse, error)
-	List(ctx context.Context, params protocolv2.PluginListParams) (protocolv2.PluginListResponse, error)
-	Read(ctx context.Context, params protocolv2.PluginReadParams) (protocolv2.PluginReadResponse, error)
-	ShareCheckout(ctx context.Context, params protocolv2.PluginShareCheckoutParams) (protocolv2.PluginShareCheckoutResponse, error)
-	ShareDelete(ctx context.Context, params protocolv2.PluginShareDeleteParams) (protocolv2.PluginShareDeleteResponse, error)
-	ShareList(ctx context.Context, params protocolv2.PluginShareListParams) (protocolv2.PluginShareListResponse, error)
-	ShareSave(ctx context.Context, params protocolv2.PluginShareSaveParams) (protocolv2.PluginShareSaveResponse, error)
-	ShareUpdateTargets(ctx context.Context, params protocolv2.PluginShareUpdateTargetsParams) (protocolv2.PluginShareUpdateTargetsResponse, error)
-	SkillRead(ctx context.Context, params protocolv2.PluginSkillReadParams) (protocolv2.PluginSkillReadResponse, error)
-	Uninstall(ctx context.Context, params protocolv2.PluginUninstallParams) (protocolv2.PluginUninstallResponse, error)
 }
 
 func (c *Client) Plugins() Plugins {
-	return pluginsFacade{client: c}
+	return Plugins{client: c}
 }
 
-type processesFacade struct {
+// Processes is an opaque generated facade for exact Codex operations.
+type Processes struct {
 	client *Client
-}
-
-type Processes interface {
-	Kill(ctx context.Context, params protocolv2.ProcessKillParams) (protocolv2.ProcessKillResponse, error)
-	ResizePTY(ctx context.Context, params protocolv2.ProcessResizePtyParams) (protocolv2.ProcessResizePtyResponse, error)
-	Spawn(ctx context.Context, params protocolv2.ProcessSpawnParams) (protocolv2.ProcessSpawnResponse, error)
-	WriteStdin(ctx context.Context, params protocolv2.ProcessWriteStdinParams) (protocolv2.ProcessWriteStdinResponse, error)
 }
 
 func (c *Client) Processes() Processes {
-	return processesFacade{client: c}
+	return Processes{client: c}
 }
 
-type remoteControlFacade struct {
+// RemoteControl is an opaque generated facade for exact Codex operations.
+type RemoteControl struct {
 	client *Client
-}
-
-type RemoteControl interface {
-	ClientRevoke(ctx context.Context, params protocolv2.RemoteControlClientsRevokeParams) (protocolv2.RemoteControlClientsRevokeResponse, error)
-	Disable(ctx context.Context) (protocolv2.RemoteControlDisableResponse, error)
-	Enable(ctx context.Context) (protocolv2.RemoteControlEnableResponse, error)
-	PairingStart(ctx context.Context, params protocolv2.RemoteControlPairingStartParams) (protocolv2.RemoteControlPairingStartResponse, error)
-	PairingStatus(ctx context.Context, params protocolv2.RemoteControlPairingStatusParams) (protocolv2.RemoteControlPairingStatusResponse, error)
-	StatusRead(ctx context.Context) (protocolv2.RemoteControlStatusReadResponse, error)
 }
 
 func (c *Client) RemoteControl() RemoteControl {
-	return remoteControlFacade{client: c}
+	return RemoteControl{client: c}
 }
 
-type reviewsFacade struct {
+// Reviews is an opaque generated facade for exact Codex operations.
+type Reviews struct {
 	client *Client
-}
-
-type Reviews interface {
-	Start(ctx context.Context, params protocolv2.ReviewStartParams) (protocolv2.ReviewStartResponse, error)
 }
 
 func (c *Client) Reviews() Reviews {
-	return reviewsFacade{client: c}
+	return Reviews{client: c}
 }
 
-type skillsFacade struct {
+// Skills is an opaque generated facade for exact Codex operations.
+type Skills struct {
 	client *Client
-}
-
-type Skills interface {
-	ConfigWrite(ctx context.Context, params protocolv2.SkillsConfigWriteParams) (protocolv2.SkillsConfigWriteResponse, error)
-	ExtraRootsSet(ctx context.Context, params protocolv2.SkillsExtraRootsSetParams) (protocolv2.SkillsExtraRootsSetResponse, error)
-	List(ctx context.Context, params protocolv2.SkillsListParams) (protocolv2.SkillsListResponse, error)
 }
 
 func (c *Client) Skills() Skills {
-	return skillsFacade{client: c}
+	return Skills{client: c}
 }
 
-type threadsFacade struct {
+// Threads is an opaque generated facade for exact Codex operations.
+type Threads struct {
 	client *Client
-}
-
-type Threads interface {
-	ApproveGuardianDeniedAction(ctx context.Context, params protocolv2.ThreadApproveGuardianDeniedActionParams) (protocolv2.ThreadApproveGuardianDeniedActionResponse, error)
-	Archive(ctx context.Context, params protocolv2.ThreadArchiveParams) (protocolv2.ThreadArchiveResponse, error)
-	BackgroundTerminalsClean(ctx context.Context, params protocolv2.ThreadBackgroundTerminalsCleanParams) (protocolv2.ThreadBackgroundTerminalsCleanResponse, error)
-	BackgroundTerminalsTerminate(ctx context.Context, params protocolv2.ThreadBackgroundTerminalsTerminateParams) (protocolv2.ThreadBackgroundTerminalsTerminateResponse, error)
-	CompactStart(ctx context.Context, params protocolv2.ThreadCompactStartParams) (protocolv2.ThreadCompactStartResponse, error)
-	DecrementElicitation(ctx context.Context, params protocolv2.ThreadDecrementElicitationParams) (protocolv2.ThreadDecrementElicitationResponse, error)
-	Delete(ctx context.Context, params protocolv2.ThreadDeleteParams) (protocolv2.ThreadDeleteResponse, error)
-	Fork(ctx context.Context, params protocolv2.ThreadForkParams) (protocolv2.ThreadForkResponse, error)
-	GoalClear(ctx context.Context, params protocolv2.ThreadGoalClearParams) (protocolv2.ThreadGoalClearResponse, error)
-	GoalGet(ctx context.Context, params protocolv2.ThreadGoalGetParams) (protocolv2.ThreadGoalGetResponse, error)
-	GoalSet(ctx context.Context, params protocolv2.ThreadGoalSetParams) (protocolv2.ThreadGoalSetResponse, error)
-	IncrementElicitation(ctx context.Context, params protocolv2.ThreadIncrementElicitationParams) (protocolv2.ThreadIncrementElicitationResponse, error)
-	InjectItems(ctx context.Context, params protocolv2.ThreadInjectItemsParams) (protocolv2.ThreadInjectItemsResponse, error)
-	ItemsList(ctx context.Context, params protocolv2.ThreadItemsListParams) (protocolv2.ThreadItemsListResponse, error)
-	List(ctx context.Context, params protocolv2.ThreadListParams) (protocolv2.ThreadListResponse, error)
-	LoadedList(ctx context.Context, params protocolv2.ThreadLoadedListParams) (protocolv2.ThreadLoadedListResponse, error)
-	MemoryModeSet(ctx context.Context, params protocolv2.ThreadMemoryModeSetParams) (protocolv2.ThreadMemoryModeSetResponse, error)
-	MetadataUpdate(ctx context.Context, params protocolv2.ThreadMetadataUpdateParams) (protocolv2.ThreadMetadataUpdateResponse, error)
-	NameSet(ctx context.Context, params protocolv2.ThreadSetNameParams) (protocolv2.ThreadSetNameResponse, error)
-	Read(ctx context.Context, params protocolv2.ThreadReadParams) (protocolv2.ThreadReadResponse, error)
-	RealtimeAppendAudio(ctx context.Context, params protocolv2.ThreadRealtimeAppendAudioParams) (protocolv2.ThreadRealtimeAppendAudioResponse, error)
-	RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error)
-	RealtimeAppendText(ctx context.Context, params protocolv2.ThreadRealtimeAppendTextParams) (protocolv2.ThreadRealtimeAppendTextResponse, error)
-	RealtimeListVoices(ctx context.Context, params protocolv2.ThreadRealtimeListVoicesParams) (protocolv2.ThreadRealtimeListVoicesResponse, error)
-	RealtimeStart(ctx context.Context, params protocolv2.ThreadRealtimeStartParams) (protocolv2.ThreadRealtimeStartResponse, error)
-	RealtimeStop(ctx context.Context, params protocolv2.ThreadRealtimeStopParams) (protocolv2.ThreadRealtimeStopResponse, error)
-	Resume(ctx context.Context, params protocolv2.ThreadResumeParams) (protocolv2.ThreadResumeResponse, error)
-	Rollback(ctx context.Context, params protocolv2.ThreadRollbackParams) (protocolv2.ThreadRollbackResponse, error)
-	SettingsUpdate(ctx context.Context, params protocolv2.ThreadSettingsUpdateParams) (protocolv2.ThreadSettingsUpdateResponse, error)
-	ShellCommand(ctx context.Context, params protocolv2.ThreadShellCommandParams) (protocolv2.ThreadShellCommandResponse, error)
-	Start(ctx context.Context, params protocolv2.ThreadStartParams) (protocolv2.ThreadStartResponse, error)
-	TurnsList(ctx context.Context, params protocolv2.ThreadTurnsListParams) (protocolv2.ThreadTurnsListResponse, error)
-	Unarchive(ctx context.Context, params protocolv2.ThreadUnarchiveParams) (protocolv2.ThreadUnarchiveResponse, error)
-	Unsubscribe(ctx context.Context, params protocolv2.ThreadUnsubscribeParams) (protocolv2.ThreadUnsubscribeResponse, error)
 }
 
 func (c *Client) Threads() Threads {
-	return threadsFacade{client: c}
+	return Threads{client: c}
 }
 
-type turnsFacade struct {
+// Turns is an opaque generated facade for exact Codex operations.
+type Turns struct {
 	client *Client
-}
-
-type Turns interface {
-	Interrupt(ctx context.Context, params protocolv2.TurnInterruptParams) (protocolv2.TurnInterruptResponse, error)
-	Start(ctx context.Context, params protocolv2.TurnStartParams) (protocolv2.TurnStartResponse, error)
-	Steer(ctx context.Context, params protocolv2.TurnSteerParams) (protocolv2.TurnSteerResponse, error)
 }
 
 func (c *Client) Turns() Turns {
-	return turnsFacade{client: c}
+	return Turns{client: c}
 }
 
-type windowsSandboxFacade struct {
+// WindowsSandbox is an opaque generated facade for exact Codex operations.
+type WindowsSandbox struct {
 	client *Client
 }
 
-type WindowsSandbox interface {
-	Readiness(ctx context.Context) (protocolv2.WindowsSandboxReadinessResponse, error)
-	SetupStart(ctx context.Context, params protocolv2.WindowsSandboxSetupStartParams) (protocolv2.WindowsSandboxSetupStartResponse, error)
-}
-
 func (c *Client) WindowsSandbox() WindowsSandbox {
-	return windowsSandboxFacade{client: c}
+	return WindowsSandbox{client: c}
 }
 
-func (f accountsFacade) LoginCancel(ctx context.Context, params protocolv2.CancelLoginAccountParams) (protocolv2.CancelLoginAccountResponse, error) {
+func (f Accounts) LoginCancel(ctx context.Context, params protocolv2.CancelLoginAccountParams) (protocolv2.CancelLoginAccountResponse, error) {
 	var response protocolv2.CancelLoginAccountResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountLoginCancel, params, &response); err != nil {
 		return protocolv2.CancelLoginAccountResponse{}, err
@@ -439,7 +268,7 @@ func (f accountsFacade) LoginCancel(ctx context.Context, params protocolv2.Cance
 	return response, nil
 }
 
-func (f accountsFacade) LoginStart(ctx context.Context, params protocolv2.LoginAccountParams) (protocolv2.LoginAccountResponse, error) {
+func (f Accounts) LoginStart(ctx context.Context, params protocolv2.LoginAccountParams) (protocolv2.LoginAccountResponse, error) {
 	var response protocolv2.LoginAccountResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountLoginStart, params, &response); err != nil {
 		return protocolv2.LoginAccountResponse{}, err
@@ -447,7 +276,7 @@ func (f accountsFacade) LoginStart(ctx context.Context, params protocolv2.LoginA
 	return response, nil
 }
 
-func (f accountsFacade) Logout(ctx context.Context) (protocolv2.LogoutAccountResponse, error) {
+func (f Accounts) Logout(ctx context.Context) (protocolv2.LogoutAccountResponse, error) {
 	var response protocolv2.LogoutAccountResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodAccountLogout, &response); err != nil {
 		return protocolv2.LogoutAccountResponse{}, err
@@ -455,7 +284,7 @@ func (f accountsFacade) Logout(ctx context.Context) (protocolv2.LogoutAccountRes
 	return response, nil
 }
 
-func (f accountsFacade) RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error) {
+func (f Accounts) RateLimitResetCreditConsume(ctx context.Context, params protocolv2.ConsumeAccountRateLimitResetCreditParams) (protocolv2.ConsumeAccountRateLimitResetCreditResponse, error) {
 	var response protocolv2.ConsumeAccountRateLimitResetCreditResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountRateLimitResetCreditConsume, params, &response); err != nil {
 		return protocolv2.ConsumeAccountRateLimitResetCreditResponse{}, err
@@ -463,7 +292,7 @@ func (f accountsFacade) RateLimitResetCreditConsume(ctx context.Context, params 
 	return response, nil
 }
 
-func (f accountsFacade) RateLimitsRead(ctx context.Context) (protocolv2.GetAccountRateLimitsResponse, error) {
+func (f Accounts) RateLimitsRead(ctx context.Context) (protocolv2.GetAccountRateLimitsResponse, error) {
 	var response protocolv2.GetAccountRateLimitsResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodAccountRateLimitsRead, &response); err != nil {
 		return protocolv2.GetAccountRateLimitsResponse{}, err
@@ -471,7 +300,7 @@ func (f accountsFacade) RateLimitsRead(ctx context.Context) (protocolv2.GetAccou
 	return response, nil
 }
 
-func (f accountsFacade) Read(ctx context.Context, params protocolv2.GetAccountParams) (protocolv2.GetAccountResponse, error) {
+func (f Accounts) Read(ctx context.Context, params protocolv2.GetAccountParams) (protocolv2.GetAccountResponse, error) {
 	var response protocolv2.GetAccountResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountRead, params, &response); err != nil {
 		return protocolv2.GetAccountResponse{}, err
@@ -479,7 +308,7 @@ func (f accountsFacade) Read(ctx context.Context, params protocolv2.GetAccountPa
 	return response, nil
 }
 
-func (f accountsFacade) SendAddCreditsNudgeEmail(ctx context.Context, params protocolv2.SendAddCreditsNudgeEmailParams) (protocolv2.SendAddCreditsNudgeEmailResponse, error) {
+func (f Accounts) SendAddCreditsNudgeEmail(ctx context.Context, params protocolv2.SendAddCreditsNudgeEmailParams) (protocolv2.SendAddCreditsNudgeEmailResponse, error) {
 	var response protocolv2.SendAddCreditsNudgeEmailResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAccountSendAddCreditsNudgeEmail, params, &response); err != nil {
 		return protocolv2.SendAddCreditsNudgeEmailResponse{}, err
@@ -487,7 +316,7 @@ func (f accountsFacade) SendAddCreditsNudgeEmail(ctx context.Context, params pro
 	return response, nil
 }
 
-func (f accountsFacade) WorkspaceMessagesRead(ctx context.Context) (protocolv2.GetWorkspaceMessagesResponse, error) {
+func (f Accounts) WorkspaceMessagesRead(ctx context.Context) (protocolv2.GetWorkspaceMessagesResponse, error) {
 	var response protocolv2.GetWorkspaceMessagesResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodAccountWorkspaceMessagesRead, &response); err != nil {
 		return protocolv2.GetWorkspaceMessagesResponse{}, err
@@ -495,7 +324,7 @@ func (f accountsFacade) WorkspaceMessagesRead(ctx context.Context) (protocolv2.G
 	return response, nil
 }
 
-func (f appsFacade) List(ctx context.Context, params protocolv2.AppsListParams) (protocolv2.AppsListResponse, error) {
+func (f Apps) List(ctx context.Context, params protocolv2.AppsListParams) (protocolv2.AppsListResponse, error) {
 	var response protocolv2.AppsListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodAppList, params, &response); err != nil {
 		return protocolv2.AppsListResponse{}, err
@@ -503,7 +332,7 @@ func (f appsFacade) List(ctx context.Context, params protocolv2.AppsListParams) 
 	return response, nil
 }
 
-func (f collaborationModesFacade) List(ctx context.Context, params protocolv2.CollaborationModeListParams) (protocolv2.CollaborationModeListResponse, error) {
+func (f CollaborationModes) List(ctx context.Context, params protocolv2.CollaborationModeListParams) (protocolv2.CollaborationModeListResponse, error) {
 	var response protocolv2.CollaborationModeListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodCollaborationModeList, params, &response); err != nil {
 		return protocolv2.CollaborationModeListResponse{}, err
@@ -511,7 +340,7 @@ func (f collaborationModesFacade) List(ctx context.Context, params protocolv2.Co
 	return response, nil
 }
 
-func (f commandsFacade) Exec(ctx context.Context, params protocolv2.CommandExecParams) (protocolv2.CommandExecResponse, error) {
+func (f Commands) Exec(ctx context.Context, params protocolv2.CommandExecParams) (protocolv2.CommandExecResponse, error) {
 	var response protocolv2.CommandExecResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodCommandExec, params, &response); err != nil {
 		return protocolv2.CommandExecResponse{}, err
@@ -519,7 +348,7 @@ func (f commandsFacade) Exec(ctx context.Context, params protocolv2.CommandExecP
 	return response, nil
 }
 
-func (f commandsFacade) ExecResize(ctx context.Context, params protocolv2.CommandExecResizeParams) (protocolv2.CommandExecResizeResponse, error) {
+func (f Commands) ExecResize(ctx context.Context, params protocolv2.CommandExecResizeParams) (protocolv2.CommandExecResizeResponse, error) {
 	var response protocolv2.CommandExecResizeResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodCommandExecResize, params, &response); err != nil {
 		return protocolv2.CommandExecResizeResponse{}, err
@@ -527,7 +356,7 @@ func (f commandsFacade) ExecResize(ctx context.Context, params protocolv2.Comman
 	return response, nil
 }
 
-func (f commandsFacade) ExecTerminate(ctx context.Context, params protocolv2.CommandExecTerminateParams) (protocolv2.CommandExecTerminateResponse, error) {
+func (f Commands) ExecTerminate(ctx context.Context, params protocolv2.CommandExecTerminateParams) (protocolv2.CommandExecTerminateResponse, error) {
 	var response protocolv2.CommandExecTerminateResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodCommandExecTerminate, params, &response); err != nil {
 		return protocolv2.CommandExecTerminateResponse{}, err
@@ -535,7 +364,7 @@ func (f commandsFacade) ExecTerminate(ctx context.Context, params protocolv2.Com
 	return response, nil
 }
 
-func (f commandsFacade) ExecWrite(ctx context.Context, params protocolv2.CommandExecWriteParams) (protocolv2.CommandExecWriteResponse, error) {
+func (f Commands) ExecWrite(ctx context.Context, params protocolv2.CommandExecWriteParams) (protocolv2.CommandExecWriteResponse, error) {
 	var response protocolv2.CommandExecWriteResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodCommandExecWrite, params, &response); err != nil {
 		return protocolv2.CommandExecWriteResponse{}, err
@@ -543,7 +372,7 @@ func (f commandsFacade) ExecWrite(ctx context.Context, params protocolv2.Command
 	return response, nil
 }
 
-func (f configFacade) BatchWrite(ctx context.Context, params protocolv2.ConfigBatchWriteParams) (protocolv2.ConfigWriteResponse, error) {
+func (f Config) BatchWrite(ctx context.Context, params protocolv2.ConfigBatchWriteParams) (protocolv2.ConfigWriteResponse, error) {
 	var response protocolv2.ConfigWriteResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodConfigBatchWrite, params, &response); err != nil {
 		return protocolv2.ConfigWriteResponse{}, err
@@ -551,7 +380,7 @@ func (f configFacade) BatchWrite(ctx context.Context, params protocolv2.ConfigBa
 	return response, nil
 }
 
-func (f configFacade) MCPServerReload(ctx context.Context) (protocolv2.McpServerRefreshResponse, error) {
+func (f Config) MCPServerReload(ctx context.Context) (protocolv2.McpServerRefreshResponse, error) {
 	var response protocolv2.McpServerRefreshResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodConfigMCPServerReload, &response); err != nil {
 		return protocolv2.McpServerRefreshResponse{}, err
@@ -559,7 +388,7 @@ func (f configFacade) MCPServerReload(ctx context.Context) (protocolv2.McpServer
 	return response, nil
 }
 
-func (f configFacade) Read(ctx context.Context, params protocolv2.ConfigReadParams) (protocolv2.ConfigReadResponse, error) {
+func (f Config) Read(ctx context.Context, params protocolv2.ConfigReadParams) (protocolv2.ConfigReadResponse, error) {
 	var response protocolv2.ConfigReadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodConfigRead, params, &response); err != nil {
 		return protocolv2.ConfigReadResponse{}, err
@@ -567,7 +396,7 @@ func (f configFacade) Read(ctx context.Context, params protocolv2.ConfigReadPara
 	return response, nil
 }
 
-func (f configFacade) ValueWrite(ctx context.Context, params protocolv2.ConfigValueWriteParams) (protocolv2.ConfigWriteResponse, error) {
+func (f Config) ValueWrite(ctx context.Context, params protocolv2.ConfigValueWriteParams) (protocolv2.ConfigWriteResponse, error) {
 	var response protocolv2.ConfigWriteResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodConfigValueWrite, params, &response); err != nil {
 		return protocolv2.ConfigWriteResponse{}, err
@@ -575,7 +404,7 @@ func (f configFacade) ValueWrite(ctx context.Context, params protocolv2.ConfigVa
 	return response, nil
 }
 
-func (f configRequirementsFacade) Read(ctx context.Context) (protocolv2.ConfigRequirementsReadResponse, error) {
+func (f ConfigRequirements) Read(ctx context.Context) (protocolv2.ConfigRequirementsReadResponse, error) {
 	var response protocolv2.ConfigRequirementsReadResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodConfigRequirementsRead, &response); err != nil {
 		return protocolv2.ConfigRequirementsReadResponse{}, err
@@ -583,7 +412,7 @@ func (f configRequirementsFacade) Read(ctx context.Context) (protocolv2.ConfigRe
 	return response, nil
 }
 
-func (f environmentsFacade) Add(ctx context.Context, params protocolv2.EnvironmentAddParams) (protocolv2.EnvironmentAddResponse, error) {
+func (f Environments) Add(ctx context.Context, params protocolv2.EnvironmentAddParams) (protocolv2.EnvironmentAddResponse, error) {
 	var response protocolv2.EnvironmentAddResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodEnvironmentAdd, params, &response); err != nil {
 		return protocolv2.EnvironmentAddResponse{}, err
@@ -591,7 +420,7 @@ func (f environmentsFacade) Add(ctx context.Context, params protocolv2.Environme
 	return response, nil
 }
 
-func (f experimentalFeaturesFacade) EnablementSet(ctx context.Context, params protocolv2.ExperimentalFeatureEnablementSetParams) (protocolv2.ExperimentalFeatureEnablementSetResponse, error) {
+func (f ExperimentalFeatures) EnablementSet(ctx context.Context, params protocolv2.ExperimentalFeatureEnablementSetParams) (protocolv2.ExperimentalFeatureEnablementSetResponse, error) {
 	var response protocolv2.ExperimentalFeatureEnablementSetResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodExperimentalFeatureEnablementSet, params, &response); err != nil {
 		return protocolv2.ExperimentalFeatureEnablementSetResponse{}, err
@@ -599,7 +428,7 @@ func (f experimentalFeaturesFacade) EnablementSet(ctx context.Context, params pr
 	return response, nil
 }
 
-func (f experimentalFeaturesFacade) List(ctx context.Context, params protocolv2.ExperimentalFeatureListParams) (protocolv2.ExperimentalFeatureListResponse, error) {
+func (f ExperimentalFeatures) List(ctx context.Context, params protocolv2.ExperimentalFeatureListParams) (protocolv2.ExperimentalFeatureListResponse, error) {
 	var response protocolv2.ExperimentalFeatureListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodExperimentalFeatureList, params, &response); err != nil {
 		return protocolv2.ExperimentalFeatureListResponse{}, err
@@ -607,7 +436,7 @@ func (f experimentalFeaturesFacade) List(ctx context.Context, params protocolv2.
 	return response, nil
 }
 
-func (f externalAgentConfigsFacade) Detect(ctx context.Context, params protocolv2.ExternalAgentConfigDetectParams) (protocolv2.ExternalAgentConfigDetectResponse, error) {
+func (f ExternalAgentConfigs) Detect(ctx context.Context, params protocolv2.ExternalAgentConfigDetectParams) (protocolv2.ExternalAgentConfigDetectResponse, error) {
 	var response protocolv2.ExternalAgentConfigDetectResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodExternalAgentConfigDetect, params, &response); err != nil {
 		return protocolv2.ExternalAgentConfigDetectResponse{}, err
@@ -615,7 +444,7 @@ func (f externalAgentConfigsFacade) Detect(ctx context.Context, params protocolv
 	return response, nil
 }
 
-func (f externalAgentConfigsFacade) Import(ctx context.Context, params protocolv2.ExternalAgentConfigImportParams) (protocolv2.ExternalAgentConfigImportResponse, error) {
+func (f ExternalAgentConfigs) Import(ctx context.Context, params protocolv2.ExternalAgentConfigImportParams) (protocolv2.ExternalAgentConfigImportResponse, error) {
 	var response protocolv2.ExternalAgentConfigImportResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodExternalAgentConfigImport, params, &response); err != nil {
 		return protocolv2.ExternalAgentConfigImportResponse{}, err
@@ -623,7 +452,7 @@ func (f externalAgentConfigsFacade) Import(ctx context.Context, params protocolv
 	return response, nil
 }
 
-func (f externalAgentConfigsFacade) ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error) {
+func (f ExternalAgentConfigs) ImportReadHistories(ctx context.Context) (protocolv2.ExternalAgentConfigImportHistoriesReadResponse, error) {
 	var response protocolv2.ExternalAgentConfigImportHistoriesReadResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodExternalAgentConfigImportReadHistories, &response); err != nil {
 		return protocolv2.ExternalAgentConfigImportHistoriesReadResponse{}, err
@@ -631,7 +460,7 @@ func (f externalAgentConfigsFacade) ImportReadHistories(ctx context.Context) (pr
 	return response, nil
 }
 
-func (f fsFacade) Copy(ctx context.Context, params protocolv2.FsCopyParams) (protocolv2.FsCopyResponse, error) {
+func (f FS) Copy(ctx context.Context, params protocolv2.FsCopyParams) (protocolv2.FsCopyResponse, error) {
 	var response protocolv2.FsCopyResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSCopy, params, &response); err != nil {
 		return protocolv2.FsCopyResponse{}, err
@@ -639,7 +468,7 @@ func (f fsFacade) Copy(ctx context.Context, params protocolv2.FsCopyParams) (pro
 	return response, nil
 }
 
-func (f fsFacade) CreateDirectory(ctx context.Context, params protocolv2.FsCreateDirectoryParams) (protocolv2.FsCreateDirectoryResponse, error) {
+func (f FS) CreateDirectory(ctx context.Context, params protocolv2.FsCreateDirectoryParams) (protocolv2.FsCreateDirectoryResponse, error) {
 	var response protocolv2.FsCreateDirectoryResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSCreateDirectory, params, &response); err != nil {
 		return protocolv2.FsCreateDirectoryResponse{}, err
@@ -647,7 +476,7 @@ func (f fsFacade) CreateDirectory(ctx context.Context, params protocolv2.FsCreat
 	return response, nil
 }
 
-func (f fsFacade) GetMetadata(ctx context.Context, params protocolv2.FsGetMetadataParams) (protocolv2.FsGetMetadataResponse, error) {
+func (f FS) GetMetadata(ctx context.Context, params protocolv2.FsGetMetadataParams) (protocolv2.FsGetMetadataResponse, error) {
 	var response protocolv2.FsGetMetadataResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSGetMetadata, params, &response); err != nil {
 		return protocolv2.FsGetMetadataResponse{}, err
@@ -655,7 +484,7 @@ func (f fsFacade) GetMetadata(ctx context.Context, params protocolv2.FsGetMetada
 	return response, nil
 }
 
-func (f fsFacade) ReadDirectory(ctx context.Context, params protocolv2.FsReadDirectoryParams) (protocolv2.FsReadDirectoryResponse, error) {
+func (f FS) ReadDirectory(ctx context.Context, params protocolv2.FsReadDirectoryParams) (protocolv2.FsReadDirectoryResponse, error) {
 	var response protocolv2.FsReadDirectoryResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSReadDirectory, params, &response); err != nil {
 		return protocolv2.FsReadDirectoryResponse{}, err
@@ -663,7 +492,7 @@ func (f fsFacade) ReadDirectory(ctx context.Context, params protocolv2.FsReadDir
 	return response, nil
 }
 
-func (f fsFacade) ReadFile(ctx context.Context, params protocolv2.FsReadFileParams) (protocolv2.FsReadFileResponse, error) {
+func (f FS) ReadFile(ctx context.Context, params protocolv2.FsReadFileParams) (protocolv2.FsReadFileResponse, error) {
 	var response protocolv2.FsReadFileResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSReadFile, params, &response); err != nil {
 		return protocolv2.FsReadFileResponse{}, err
@@ -671,7 +500,7 @@ func (f fsFacade) ReadFile(ctx context.Context, params protocolv2.FsReadFilePara
 	return response, nil
 }
 
-func (f fsFacade) Remove(ctx context.Context, params protocolv2.FsRemoveParams) (protocolv2.FsRemoveResponse, error) {
+func (f FS) Remove(ctx context.Context, params protocolv2.FsRemoveParams) (protocolv2.FsRemoveResponse, error) {
 	var response protocolv2.FsRemoveResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSRemove, params, &response); err != nil {
 		return protocolv2.FsRemoveResponse{}, err
@@ -679,7 +508,7 @@ func (f fsFacade) Remove(ctx context.Context, params protocolv2.FsRemoveParams) 
 	return response, nil
 }
 
-func (f fsFacade) Unwatch(ctx context.Context, params protocolv2.FsUnwatchParams) (protocolv2.FsUnwatchResponse, error) {
+func (f FS) Unwatch(ctx context.Context, params protocolv2.FsUnwatchParams) (protocolv2.FsUnwatchResponse, error) {
 	var response protocolv2.FsUnwatchResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSUnwatch, params, &response); err != nil {
 		return protocolv2.FsUnwatchResponse{}, err
@@ -687,7 +516,7 @@ func (f fsFacade) Unwatch(ctx context.Context, params protocolv2.FsUnwatchParams
 	return response, nil
 }
 
-func (f fsFacade) Watch(ctx context.Context, params protocolv2.FsWatchParams) (protocolv2.FsWatchResponse, error) {
+func (f FS) Watch(ctx context.Context, params protocolv2.FsWatchParams) (protocolv2.FsWatchResponse, error) {
 	var response protocolv2.FsWatchResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSWatch, params, &response); err != nil {
 		return protocolv2.FsWatchResponse{}, err
@@ -695,7 +524,7 @@ func (f fsFacade) Watch(ctx context.Context, params protocolv2.FsWatchParams) (p
 	return response, nil
 }
 
-func (f fsFacade) WriteFile(ctx context.Context, params protocolv2.FsWriteFileParams) (protocolv2.FsWriteFileResponse, error) {
+func (f FS) WriteFile(ctx context.Context, params protocolv2.FsWriteFileParams) (protocolv2.FsWriteFileResponse, error) {
 	var response protocolv2.FsWriteFileResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFSWriteFile, params, &response); err != nil {
 		return protocolv2.FsWriteFileResponse{}, err
@@ -703,7 +532,7 @@ func (f fsFacade) WriteFile(ctx context.Context, params protocolv2.FsWriteFilePa
 	return response, nil
 }
 
-func (f feedbackFacade) Upload(ctx context.Context, params protocolv2.FeedbackUploadParams) (protocolv2.FeedbackUploadResponse, error) {
+func (f Feedback) Upload(ctx context.Context, params protocolv2.FeedbackUploadParams) (protocolv2.FeedbackUploadResponse, error) {
 	var response protocolv2.FeedbackUploadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFeedbackUpload, params, &response); err != nil {
 		return protocolv2.FeedbackUploadResponse{}, err
@@ -711,7 +540,7 @@ func (f feedbackFacade) Upload(ctx context.Context, params protocolv2.FeedbackUp
 	return response, nil
 }
 
-func (f fuzzyFileSearchFacade) Search(ctx context.Context, params protocolv2.FuzzyFileSearchParams) (protocolv2.FuzzyFileSearchResponse, error) {
+func (f FuzzyFileSearch) Search(ctx context.Context, params protocolv2.FuzzyFileSearchParams) (protocolv2.FuzzyFileSearchResponse, error) {
 	var response protocolv2.FuzzyFileSearchResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFuzzyFileSearch, params, &response); err != nil {
 		return protocolv2.FuzzyFileSearchResponse{}, err
@@ -719,7 +548,7 @@ func (f fuzzyFileSearchFacade) Search(ctx context.Context, params protocolv2.Fuz
 	return response, nil
 }
 
-func (f fuzzyFileSearchFacade) SessionStart(ctx context.Context, params protocolv2.FuzzyFileSearchSessionStartParams) (protocolv2.FuzzyFileSearchSessionStartResponse, error) {
+func (f FuzzyFileSearch) SessionStart(ctx context.Context, params protocolv2.FuzzyFileSearchSessionStartParams) (protocolv2.FuzzyFileSearchSessionStartResponse, error) {
 	var response protocolv2.FuzzyFileSearchSessionStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFuzzyFileSearchSessionStart, params, &response); err != nil {
 		return protocolv2.FuzzyFileSearchSessionStartResponse{}, err
@@ -727,7 +556,7 @@ func (f fuzzyFileSearchFacade) SessionStart(ctx context.Context, params protocol
 	return response, nil
 }
 
-func (f fuzzyFileSearchFacade) SessionStop(ctx context.Context, params protocolv2.FuzzyFileSearchSessionStopParams) (protocolv2.FuzzyFileSearchSessionStopResponse, error) {
+func (f FuzzyFileSearch) SessionStop(ctx context.Context, params protocolv2.FuzzyFileSearchSessionStopParams) (protocolv2.FuzzyFileSearchSessionStopResponse, error) {
 	var response protocolv2.FuzzyFileSearchSessionStopResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFuzzyFileSearchSessionStop, params, &response); err != nil {
 		return protocolv2.FuzzyFileSearchSessionStopResponse{}, err
@@ -735,7 +564,7 @@ func (f fuzzyFileSearchFacade) SessionStop(ctx context.Context, params protocolv
 	return response, nil
 }
 
-func (f fuzzyFileSearchFacade) SessionUpdate(ctx context.Context, params protocolv2.FuzzyFileSearchSessionUpdateParams) (protocolv2.FuzzyFileSearchSessionUpdateResponse, error) {
+func (f FuzzyFileSearch) SessionUpdate(ctx context.Context, params protocolv2.FuzzyFileSearchSessionUpdateParams) (protocolv2.FuzzyFileSearchSessionUpdateResponse, error) {
 	var response protocolv2.FuzzyFileSearchSessionUpdateResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodFuzzyFileSearchSessionUpdate, params, &response); err != nil {
 		return protocolv2.FuzzyFileSearchSessionUpdateResponse{}, err
@@ -743,7 +572,7 @@ func (f fuzzyFileSearchFacade) SessionUpdate(ctx context.Context, params protoco
 	return response, nil
 }
 
-func (f hooksFacade) List(ctx context.Context, params protocolv2.HooksListParams) (protocolv2.HooksListResponse, error) {
+func (f Hooks) List(ctx context.Context, params protocolv2.HooksListParams) (protocolv2.HooksListResponse, error) {
 	var response protocolv2.HooksListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodHooksList, params, &response); err != nil {
 		return protocolv2.HooksListResponse{}, err
@@ -751,7 +580,7 @@ func (f hooksFacade) List(ctx context.Context, params protocolv2.HooksListParams
 	return response, nil
 }
 
-func (f mcpServerStatusFacade) List(ctx context.Context, params protocolv2.ListMcpServerStatusParams) (protocolv2.ListMcpServerStatusResponse, error) {
+func (f MCPServerStatus) List(ctx context.Context, params protocolv2.ListMcpServerStatusParams) (protocolv2.ListMcpServerStatusResponse, error) {
 	var response protocolv2.ListMcpServerStatusResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMCPServerStatusList, params, &response); err != nil {
 		return protocolv2.ListMcpServerStatusResponse{}, err
@@ -759,7 +588,7 @@ func (f mcpServerStatusFacade) List(ctx context.Context, params protocolv2.ListM
 	return response, nil
 }
 
-func (f mcpServersFacade) OAuthLogin(ctx context.Context, params protocolv2.McpServerOauthLoginParams) (protocolv2.McpServerOauthLoginResponse, error) {
+func (f MCPServers) OAuthLogin(ctx context.Context, params protocolv2.McpServerOauthLoginParams) (protocolv2.McpServerOauthLoginResponse, error) {
 	var response protocolv2.McpServerOauthLoginResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMCPServerOAuthLogin, params, &response); err != nil {
 		return protocolv2.McpServerOauthLoginResponse{}, err
@@ -767,7 +596,7 @@ func (f mcpServersFacade) OAuthLogin(ctx context.Context, params protocolv2.McpS
 	return response, nil
 }
 
-func (f mcpServersFacade) ResourceRead(ctx context.Context, params protocolv2.McpResourceReadParams) (protocolv2.McpResourceReadResponse, error) {
+func (f MCPServers) ResourceRead(ctx context.Context, params protocolv2.McpResourceReadParams) (protocolv2.McpResourceReadResponse, error) {
 	var response protocolv2.McpResourceReadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMCPServerResourceRead, params, &response); err != nil {
 		return protocolv2.McpResourceReadResponse{}, err
@@ -775,7 +604,7 @@ func (f mcpServersFacade) ResourceRead(ctx context.Context, params protocolv2.Mc
 	return response, nil
 }
 
-func (f mcpServersFacade) ToolCall(ctx context.Context, params protocolv2.McpServerToolCallParams) (protocolv2.McpServerToolCallResponse, error) {
+func (f MCPServers) ToolCall(ctx context.Context, params protocolv2.McpServerToolCallParams) (protocolv2.McpServerToolCallResponse, error) {
 	var response protocolv2.McpServerToolCallResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMCPServerToolCall, params, &response); err != nil {
 		return protocolv2.McpServerToolCallResponse{}, err
@@ -783,7 +612,7 @@ func (f mcpServersFacade) ToolCall(ctx context.Context, params protocolv2.McpSer
 	return response, nil
 }
 
-func (f marketplaceFacade) Add(ctx context.Context, params protocolv2.MarketplaceAddParams) (protocolv2.MarketplaceAddResponse, error) {
+func (f Marketplace) Add(ctx context.Context, params protocolv2.MarketplaceAddParams) (protocolv2.MarketplaceAddResponse, error) {
 	var response protocolv2.MarketplaceAddResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMarketplaceAdd, params, &response); err != nil {
 		return protocolv2.MarketplaceAddResponse{}, err
@@ -791,7 +620,7 @@ func (f marketplaceFacade) Add(ctx context.Context, params protocolv2.Marketplac
 	return response, nil
 }
 
-func (f marketplaceFacade) Remove(ctx context.Context, params protocolv2.MarketplaceRemoveParams) (protocolv2.MarketplaceRemoveResponse, error) {
+func (f Marketplace) Remove(ctx context.Context, params protocolv2.MarketplaceRemoveParams) (protocolv2.MarketplaceRemoveResponse, error) {
 	var response protocolv2.MarketplaceRemoveResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMarketplaceRemove, params, &response); err != nil {
 		return protocolv2.MarketplaceRemoveResponse{}, err
@@ -799,7 +628,7 @@ func (f marketplaceFacade) Remove(ctx context.Context, params protocolv2.Marketp
 	return response, nil
 }
 
-func (f marketplaceFacade) Upgrade(ctx context.Context, params protocolv2.MarketplaceUpgradeParams) (protocolv2.MarketplaceUpgradeResponse, error) {
+func (f Marketplace) Upgrade(ctx context.Context, params protocolv2.MarketplaceUpgradeParams) (protocolv2.MarketplaceUpgradeResponse, error) {
 	var response protocolv2.MarketplaceUpgradeResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMarketplaceUpgrade, params, &response); err != nil {
 		return protocolv2.MarketplaceUpgradeResponse{}, err
@@ -807,7 +636,7 @@ func (f marketplaceFacade) Upgrade(ctx context.Context, params protocolv2.Market
 	return response, nil
 }
 
-func (f memoryFacade) Reset(ctx context.Context) (protocolv2.MemoryResetResponse, error) {
+func (f Memory) Reset(ctx context.Context) (protocolv2.MemoryResetResponse, error) {
 	var response protocolv2.MemoryResetResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodMemoryReset, &response); err != nil {
 		return protocolv2.MemoryResetResponse{}, err
@@ -815,7 +644,7 @@ func (f memoryFacade) Reset(ctx context.Context) (protocolv2.MemoryResetResponse
 	return response, nil
 }
 
-func (f mockFacade) ExperimentalMethod(ctx context.Context, params protocolv2.MockExperimentalMethodParams) (protocolv2.MockExperimentalMethodResponse, error) {
+func (f Mock) ExperimentalMethod(ctx context.Context, params protocolv2.MockExperimentalMethodParams) (protocolv2.MockExperimentalMethodResponse, error) {
 	var response protocolv2.MockExperimentalMethodResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodMockExperimentalMethod, params, &response); err != nil {
 		return protocolv2.MockExperimentalMethodResponse{}, err
@@ -823,7 +652,7 @@ func (f mockFacade) ExperimentalMethod(ctx context.Context, params protocolv2.Mo
 	return response, nil
 }
 
-func (f modelProvidersFacade) CapabilitiesRead(ctx context.Context, params protocolv2.ModelProviderCapabilitiesReadParams) (protocolv2.ModelProviderCapabilitiesReadResponse, error) {
+func (f ModelProviders) CapabilitiesRead(ctx context.Context, params protocolv2.ModelProviderCapabilitiesReadParams) (protocolv2.ModelProviderCapabilitiesReadResponse, error) {
 	var response protocolv2.ModelProviderCapabilitiesReadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodModelProviderCapabilitiesRead, params, &response); err != nil {
 		return protocolv2.ModelProviderCapabilitiesReadResponse{}, err
@@ -831,7 +660,7 @@ func (f modelProvidersFacade) CapabilitiesRead(ctx context.Context, params proto
 	return response, nil
 }
 
-func (f modelsFacade) List(ctx context.Context, params protocolv2.ModelListParams) (protocolv2.ModelListResponse, error) {
+func (f Models) List(ctx context.Context, params protocolv2.ModelListParams) (protocolv2.ModelListResponse, error) {
 	var response protocolv2.ModelListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodModelList, params, &response); err != nil {
 		return protocolv2.ModelListResponse{}, err
@@ -839,7 +668,7 @@ func (f modelsFacade) List(ctx context.Context, params protocolv2.ModelListParam
 	return response, nil
 }
 
-func (f pluginsFacade) Install(ctx context.Context, params protocolv2.PluginInstallParams) (protocolv2.PluginInstallResponse, error) {
+func (f Plugins) Install(ctx context.Context, params protocolv2.PluginInstallParams) (protocolv2.PluginInstallResponse, error) {
 	var response protocolv2.PluginInstallResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginInstall, params, &response); err != nil {
 		return protocolv2.PluginInstallResponse{}, err
@@ -847,7 +676,7 @@ func (f pluginsFacade) Install(ctx context.Context, params protocolv2.PluginInst
 	return response, nil
 }
 
-func (f pluginsFacade) Installed(ctx context.Context, params protocolv2.PluginInstalledParams) (protocolv2.PluginInstalledResponse, error) {
+func (f Plugins) Installed(ctx context.Context, params protocolv2.PluginInstalledParams) (protocolv2.PluginInstalledResponse, error) {
 	var response protocolv2.PluginInstalledResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginInstalled, params, &response); err != nil {
 		return protocolv2.PluginInstalledResponse{}, err
@@ -855,7 +684,7 @@ func (f pluginsFacade) Installed(ctx context.Context, params protocolv2.PluginIn
 	return response, nil
 }
 
-func (f pluginsFacade) List(ctx context.Context, params protocolv2.PluginListParams) (protocolv2.PluginListResponse, error) {
+func (f Plugins) List(ctx context.Context, params protocolv2.PluginListParams) (protocolv2.PluginListResponse, error) {
 	var response protocolv2.PluginListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginList, params, &response); err != nil {
 		return protocolv2.PluginListResponse{}, err
@@ -863,7 +692,7 @@ func (f pluginsFacade) List(ctx context.Context, params protocolv2.PluginListPar
 	return response, nil
 }
 
-func (f pluginsFacade) Read(ctx context.Context, params protocolv2.PluginReadParams) (protocolv2.PluginReadResponse, error) {
+func (f Plugins) Read(ctx context.Context, params protocolv2.PluginReadParams) (protocolv2.PluginReadResponse, error) {
 	var response protocolv2.PluginReadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginRead, params, &response); err != nil {
 		return protocolv2.PluginReadResponse{}, err
@@ -871,7 +700,7 @@ func (f pluginsFacade) Read(ctx context.Context, params protocolv2.PluginReadPar
 	return response, nil
 }
 
-func (f pluginsFacade) ShareCheckout(ctx context.Context, params protocolv2.PluginShareCheckoutParams) (protocolv2.PluginShareCheckoutResponse, error) {
+func (f Plugins) ShareCheckout(ctx context.Context, params protocolv2.PluginShareCheckoutParams) (protocolv2.PluginShareCheckoutResponse, error) {
 	var response protocolv2.PluginShareCheckoutResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginShareCheckout, params, &response); err != nil {
 		return protocolv2.PluginShareCheckoutResponse{}, err
@@ -879,7 +708,7 @@ func (f pluginsFacade) ShareCheckout(ctx context.Context, params protocolv2.Plug
 	return response, nil
 }
 
-func (f pluginsFacade) ShareDelete(ctx context.Context, params protocolv2.PluginShareDeleteParams) (protocolv2.PluginShareDeleteResponse, error) {
+func (f Plugins) ShareDelete(ctx context.Context, params protocolv2.PluginShareDeleteParams) (protocolv2.PluginShareDeleteResponse, error) {
 	var response protocolv2.PluginShareDeleteResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginShareDelete, params, &response); err != nil {
 		return protocolv2.PluginShareDeleteResponse{}, err
@@ -887,7 +716,7 @@ func (f pluginsFacade) ShareDelete(ctx context.Context, params protocolv2.Plugin
 	return response, nil
 }
 
-func (f pluginsFacade) ShareList(ctx context.Context, params protocolv2.PluginShareListParams) (protocolv2.PluginShareListResponse, error) {
+func (f Plugins) ShareList(ctx context.Context, params protocolv2.PluginShareListParams) (protocolv2.PluginShareListResponse, error) {
 	var response protocolv2.PluginShareListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginShareList, params, &response); err != nil {
 		return protocolv2.PluginShareListResponse{}, err
@@ -895,7 +724,7 @@ func (f pluginsFacade) ShareList(ctx context.Context, params protocolv2.PluginSh
 	return response, nil
 }
 
-func (f pluginsFacade) ShareSave(ctx context.Context, params protocolv2.PluginShareSaveParams) (protocolv2.PluginShareSaveResponse, error) {
+func (f Plugins) ShareSave(ctx context.Context, params protocolv2.PluginShareSaveParams) (protocolv2.PluginShareSaveResponse, error) {
 	var response protocolv2.PluginShareSaveResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginShareSave, params, &response); err != nil {
 		return protocolv2.PluginShareSaveResponse{}, err
@@ -903,7 +732,7 @@ func (f pluginsFacade) ShareSave(ctx context.Context, params protocolv2.PluginSh
 	return response, nil
 }
 
-func (f pluginsFacade) ShareUpdateTargets(ctx context.Context, params protocolv2.PluginShareUpdateTargetsParams) (protocolv2.PluginShareUpdateTargetsResponse, error) {
+func (f Plugins) ShareUpdateTargets(ctx context.Context, params protocolv2.PluginShareUpdateTargetsParams) (protocolv2.PluginShareUpdateTargetsResponse, error) {
 	var response protocolv2.PluginShareUpdateTargetsResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginShareUpdateTargets, params, &response); err != nil {
 		return protocolv2.PluginShareUpdateTargetsResponse{}, err
@@ -911,7 +740,7 @@ func (f pluginsFacade) ShareUpdateTargets(ctx context.Context, params protocolv2
 	return response, nil
 }
 
-func (f pluginsFacade) SkillRead(ctx context.Context, params protocolv2.PluginSkillReadParams) (protocolv2.PluginSkillReadResponse, error) {
+func (f Plugins) SkillRead(ctx context.Context, params protocolv2.PluginSkillReadParams) (protocolv2.PluginSkillReadResponse, error) {
 	var response protocolv2.PluginSkillReadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginSkillRead, params, &response); err != nil {
 		return protocolv2.PluginSkillReadResponse{}, err
@@ -919,7 +748,7 @@ func (f pluginsFacade) SkillRead(ctx context.Context, params protocolv2.PluginSk
 	return response, nil
 }
 
-func (f pluginsFacade) Uninstall(ctx context.Context, params protocolv2.PluginUninstallParams) (protocolv2.PluginUninstallResponse, error) {
+func (f Plugins) Uninstall(ctx context.Context, params protocolv2.PluginUninstallParams) (protocolv2.PluginUninstallResponse, error) {
 	var response protocolv2.PluginUninstallResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodPluginUninstall, params, &response); err != nil {
 		return protocolv2.PluginUninstallResponse{}, err
@@ -927,7 +756,7 @@ func (f pluginsFacade) Uninstall(ctx context.Context, params protocolv2.PluginUn
 	return response, nil
 }
 
-func (f processesFacade) Kill(ctx context.Context, params protocolv2.ProcessKillParams) (protocolv2.ProcessKillResponse, error) {
+func (f Processes) Kill(ctx context.Context, params protocolv2.ProcessKillParams) (protocolv2.ProcessKillResponse, error) {
 	var response protocolv2.ProcessKillResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodProcessKill, params, &response); err != nil {
 		return protocolv2.ProcessKillResponse{}, err
@@ -935,7 +764,7 @@ func (f processesFacade) Kill(ctx context.Context, params protocolv2.ProcessKill
 	return response, nil
 }
 
-func (f processesFacade) ResizePTY(ctx context.Context, params protocolv2.ProcessResizePtyParams) (protocolv2.ProcessResizePtyResponse, error) {
+func (f Processes) ResizePTY(ctx context.Context, params protocolv2.ProcessResizePtyParams) (protocolv2.ProcessResizePtyResponse, error) {
 	var response protocolv2.ProcessResizePtyResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodProcessResizePTY, params, &response); err != nil {
 		return protocolv2.ProcessResizePtyResponse{}, err
@@ -943,7 +772,7 @@ func (f processesFacade) ResizePTY(ctx context.Context, params protocolv2.Proces
 	return response, nil
 }
 
-func (f processesFacade) Spawn(ctx context.Context, params protocolv2.ProcessSpawnParams) (protocolv2.ProcessSpawnResponse, error) {
+func (f Processes) Spawn(ctx context.Context, params protocolv2.ProcessSpawnParams) (protocolv2.ProcessSpawnResponse, error) {
 	var response protocolv2.ProcessSpawnResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodProcessSpawn, params, &response); err != nil {
 		return protocolv2.ProcessSpawnResponse{}, err
@@ -951,7 +780,7 @@ func (f processesFacade) Spawn(ctx context.Context, params protocolv2.ProcessSpa
 	return response, nil
 }
 
-func (f processesFacade) WriteStdin(ctx context.Context, params protocolv2.ProcessWriteStdinParams) (protocolv2.ProcessWriteStdinResponse, error) {
+func (f Processes) WriteStdin(ctx context.Context, params protocolv2.ProcessWriteStdinParams) (protocolv2.ProcessWriteStdinResponse, error) {
 	var response protocolv2.ProcessWriteStdinResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodProcessWriteStdin, params, &response); err != nil {
 		return protocolv2.ProcessWriteStdinResponse{}, err
@@ -959,7 +788,7 @@ func (f processesFacade) WriteStdin(ctx context.Context, params protocolv2.Proce
 	return response, nil
 }
 
-func (f remoteControlFacade) ClientRevoke(ctx context.Context, params protocolv2.RemoteControlClientsRevokeParams) (protocolv2.RemoteControlClientsRevokeResponse, error) {
+func (f RemoteControl) ClientRevoke(ctx context.Context, params protocolv2.RemoteControlClientsRevokeParams) (protocolv2.RemoteControlClientsRevokeResponse, error) {
 	var response protocolv2.RemoteControlClientsRevokeResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodRemoteControlClientRevoke, params, &response); err != nil {
 		return protocolv2.RemoteControlClientsRevokeResponse{}, err
@@ -967,7 +796,7 @@ func (f remoteControlFacade) ClientRevoke(ctx context.Context, params protocolv2
 	return response, nil
 }
 
-func (f remoteControlFacade) Disable(ctx context.Context) (protocolv2.RemoteControlDisableResponse, error) {
+func (f RemoteControl) Disable(ctx context.Context) (protocolv2.RemoteControlDisableResponse, error) {
 	var response protocolv2.RemoteControlDisableResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodRemoteControlDisable, &response); err != nil {
 		return protocolv2.RemoteControlDisableResponse{}, err
@@ -975,7 +804,7 @@ func (f remoteControlFacade) Disable(ctx context.Context) (protocolv2.RemoteCont
 	return response, nil
 }
 
-func (f remoteControlFacade) Enable(ctx context.Context) (protocolv2.RemoteControlEnableResponse, error) {
+func (f RemoteControl) Enable(ctx context.Context) (protocolv2.RemoteControlEnableResponse, error) {
 	var response protocolv2.RemoteControlEnableResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodRemoteControlEnable, &response); err != nil {
 		return protocolv2.RemoteControlEnableResponse{}, err
@@ -983,7 +812,7 @@ func (f remoteControlFacade) Enable(ctx context.Context) (protocolv2.RemoteContr
 	return response, nil
 }
 
-func (f remoteControlFacade) PairingStart(ctx context.Context, params protocolv2.RemoteControlPairingStartParams) (protocolv2.RemoteControlPairingStartResponse, error) {
+func (f RemoteControl) PairingStart(ctx context.Context, params protocolv2.RemoteControlPairingStartParams) (protocolv2.RemoteControlPairingStartResponse, error) {
 	var response protocolv2.RemoteControlPairingStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodRemoteControlPairingStart, params, &response); err != nil {
 		return protocolv2.RemoteControlPairingStartResponse{}, err
@@ -991,7 +820,7 @@ func (f remoteControlFacade) PairingStart(ctx context.Context, params protocolv2
 	return response, nil
 }
 
-func (f remoteControlFacade) PairingStatus(ctx context.Context, params protocolv2.RemoteControlPairingStatusParams) (protocolv2.RemoteControlPairingStatusResponse, error) {
+func (f RemoteControl) PairingStatus(ctx context.Context, params protocolv2.RemoteControlPairingStatusParams) (protocolv2.RemoteControlPairingStatusResponse, error) {
 	var response protocolv2.RemoteControlPairingStatusResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodRemoteControlPairingStatus, params, &response); err != nil {
 		return protocolv2.RemoteControlPairingStatusResponse{}, err
@@ -999,7 +828,7 @@ func (f remoteControlFacade) PairingStatus(ctx context.Context, params protocolv
 	return response, nil
 }
 
-func (f remoteControlFacade) StatusRead(ctx context.Context) (protocolv2.RemoteControlStatusReadResponse, error) {
+func (f RemoteControl) StatusRead(ctx context.Context) (protocolv2.RemoteControlStatusReadResponse, error) {
 	var response protocolv2.RemoteControlStatusReadResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodRemoteControlStatusRead, &response); err != nil {
 		return protocolv2.RemoteControlStatusReadResponse{}, err
@@ -1007,7 +836,7 @@ func (f remoteControlFacade) StatusRead(ctx context.Context) (protocolv2.RemoteC
 	return response, nil
 }
 
-func (f reviewsFacade) Start(ctx context.Context, params protocolv2.ReviewStartParams) (protocolv2.ReviewStartResponse, error) {
+func (f Reviews) Start(ctx context.Context, params protocolv2.ReviewStartParams) (protocolv2.ReviewStartResponse, error) {
 	var response protocolv2.ReviewStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodReviewStart, params, &response); err != nil {
 		return protocolv2.ReviewStartResponse{}, err
@@ -1015,7 +844,7 @@ func (f reviewsFacade) Start(ctx context.Context, params protocolv2.ReviewStartP
 	return response, nil
 }
 
-func (f skillsFacade) ConfigWrite(ctx context.Context, params protocolv2.SkillsConfigWriteParams) (protocolv2.SkillsConfigWriteResponse, error) {
+func (f Skills) ConfigWrite(ctx context.Context, params protocolv2.SkillsConfigWriteParams) (protocolv2.SkillsConfigWriteResponse, error) {
 	var response protocolv2.SkillsConfigWriteResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodSkillsConfigWrite, params, &response); err != nil {
 		return protocolv2.SkillsConfigWriteResponse{}, err
@@ -1023,7 +852,7 @@ func (f skillsFacade) ConfigWrite(ctx context.Context, params protocolv2.SkillsC
 	return response, nil
 }
 
-func (f skillsFacade) ExtraRootsSet(ctx context.Context, params protocolv2.SkillsExtraRootsSetParams) (protocolv2.SkillsExtraRootsSetResponse, error) {
+func (f Skills) ExtraRootsSet(ctx context.Context, params protocolv2.SkillsExtraRootsSetParams) (protocolv2.SkillsExtraRootsSetResponse, error) {
 	var response protocolv2.SkillsExtraRootsSetResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodSkillsExtraRootsSet, params, &response); err != nil {
 		return protocolv2.SkillsExtraRootsSetResponse{}, err
@@ -1031,7 +860,7 @@ func (f skillsFacade) ExtraRootsSet(ctx context.Context, params protocolv2.Skill
 	return response, nil
 }
 
-func (f skillsFacade) List(ctx context.Context, params protocolv2.SkillsListParams) (protocolv2.SkillsListResponse, error) {
+func (f Skills) List(ctx context.Context, params protocolv2.SkillsListParams) (protocolv2.SkillsListResponse, error) {
 	var response protocolv2.SkillsListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodSkillsList, params, &response); err != nil {
 		return protocolv2.SkillsListResponse{}, err
@@ -1039,7 +868,7 @@ func (f skillsFacade) List(ctx context.Context, params protocolv2.SkillsListPara
 	return response, nil
 }
 
-func (f threadsFacade) ApproveGuardianDeniedAction(ctx context.Context, params protocolv2.ThreadApproveGuardianDeniedActionParams) (protocolv2.ThreadApproveGuardianDeniedActionResponse, error) {
+func (f Threads) ApproveGuardianDeniedAction(ctx context.Context, params protocolv2.ThreadApproveGuardianDeniedActionParams) (protocolv2.ThreadApproveGuardianDeniedActionResponse, error) {
 	var response protocolv2.ThreadApproveGuardianDeniedActionResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadApproveGuardianDeniedAction, params, &response); err != nil {
 		return protocolv2.ThreadApproveGuardianDeniedActionResponse{}, err
@@ -1047,7 +876,7 @@ func (f threadsFacade) ApproveGuardianDeniedAction(ctx context.Context, params p
 	return response, nil
 }
 
-func (f threadsFacade) Archive(ctx context.Context, params protocolv2.ThreadArchiveParams) (protocolv2.ThreadArchiveResponse, error) {
+func (f Threads) Archive(ctx context.Context, params protocolv2.ThreadArchiveParams) (protocolv2.ThreadArchiveResponse, error) {
 	var response protocolv2.ThreadArchiveResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadArchive, params, &response); err != nil {
 		return protocolv2.ThreadArchiveResponse{}, err
@@ -1055,7 +884,7 @@ func (f threadsFacade) Archive(ctx context.Context, params protocolv2.ThreadArch
 	return response, nil
 }
 
-func (f threadsFacade) BackgroundTerminalsClean(ctx context.Context, params protocolv2.ThreadBackgroundTerminalsCleanParams) (protocolv2.ThreadBackgroundTerminalsCleanResponse, error) {
+func (f Threads) BackgroundTerminalsClean(ctx context.Context, params protocolv2.ThreadBackgroundTerminalsCleanParams) (protocolv2.ThreadBackgroundTerminalsCleanResponse, error) {
 	var response protocolv2.ThreadBackgroundTerminalsCleanResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadBackgroundTerminalsClean, params, &response); err != nil {
 		return protocolv2.ThreadBackgroundTerminalsCleanResponse{}, err
@@ -1063,7 +892,7 @@ func (f threadsFacade) BackgroundTerminalsClean(ctx context.Context, params prot
 	return response, nil
 }
 
-func (f threadsFacade) BackgroundTerminalsTerminate(ctx context.Context, params protocolv2.ThreadBackgroundTerminalsTerminateParams) (protocolv2.ThreadBackgroundTerminalsTerminateResponse, error) {
+func (f Threads) BackgroundTerminalsTerminate(ctx context.Context, params protocolv2.ThreadBackgroundTerminalsTerminateParams) (protocolv2.ThreadBackgroundTerminalsTerminateResponse, error) {
 	var response protocolv2.ThreadBackgroundTerminalsTerminateResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadBackgroundTerminalsTerminate, params, &response); err != nil {
 		return protocolv2.ThreadBackgroundTerminalsTerminateResponse{}, err
@@ -1071,7 +900,7 @@ func (f threadsFacade) BackgroundTerminalsTerminate(ctx context.Context, params 
 	return response, nil
 }
 
-func (f threadsFacade) CompactStart(ctx context.Context, params protocolv2.ThreadCompactStartParams) (protocolv2.ThreadCompactStartResponse, error) {
+func (f Threads) CompactStart(ctx context.Context, params protocolv2.ThreadCompactStartParams) (protocolv2.ThreadCompactStartResponse, error) {
 	var response protocolv2.ThreadCompactStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadCompactStart, params, &response); err != nil {
 		return protocolv2.ThreadCompactStartResponse{}, err
@@ -1079,7 +908,7 @@ func (f threadsFacade) CompactStart(ctx context.Context, params protocolv2.Threa
 	return response, nil
 }
 
-func (f threadsFacade) DecrementElicitation(ctx context.Context, params protocolv2.ThreadDecrementElicitationParams) (protocolv2.ThreadDecrementElicitationResponse, error) {
+func (f Threads) DecrementElicitation(ctx context.Context, params protocolv2.ThreadDecrementElicitationParams) (protocolv2.ThreadDecrementElicitationResponse, error) {
 	var response protocolv2.ThreadDecrementElicitationResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadDecrementElicitation, params, &response); err != nil {
 		return protocolv2.ThreadDecrementElicitationResponse{}, err
@@ -1087,7 +916,7 @@ func (f threadsFacade) DecrementElicitation(ctx context.Context, params protocol
 	return response, nil
 }
 
-func (f threadsFacade) Delete(ctx context.Context, params protocolv2.ThreadDeleteParams) (protocolv2.ThreadDeleteResponse, error) {
+func (f Threads) Delete(ctx context.Context, params protocolv2.ThreadDeleteParams) (protocolv2.ThreadDeleteResponse, error) {
 	var response protocolv2.ThreadDeleteResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadDelete, params, &response); err != nil {
 		return protocolv2.ThreadDeleteResponse{}, err
@@ -1095,7 +924,7 @@ func (f threadsFacade) Delete(ctx context.Context, params protocolv2.ThreadDelet
 	return response, nil
 }
 
-func (f threadsFacade) Fork(ctx context.Context, params protocolv2.ThreadForkParams) (protocolv2.ThreadForkResponse, error) {
+func (f Threads) Fork(ctx context.Context, params protocolv2.ThreadForkParams) (protocolv2.ThreadForkResponse, error) {
 	var response protocolv2.ThreadForkResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadFork, params, &response); err != nil {
 		return protocolv2.ThreadForkResponse{}, err
@@ -1103,7 +932,7 @@ func (f threadsFacade) Fork(ctx context.Context, params protocolv2.ThreadForkPar
 	return response, nil
 }
 
-func (f threadsFacade) GoalClear(ctx context.Context, params protocolv2.ThreadGoalClearParams) (protocolv2.ThreadGoalClearResponse, error) {
+func (f Threads) GoalClear(ctx context.Context, params protocolv2.ThreadGoalClearParams) (protocolv2.ThreadGoalClearResponse, error) {
 	var response protocolv2.ThreadGoalClearResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadGoalClear, params, &response); err != nil {
 		return protocolv2.ThreadGoalClearResponse{}, err
@@ -1111,7 +940,7 @@ func (f threadsFacade) GoalClear(ctx context.Context, params protocolv2.ThreadGo
 	return response, nil
 }
 
-func (f threadsFacade) GoalGet(ctx context.Context, params protocolv2.ThreadGoalGetParams) (protocolv2.ThreadGoalGetResponse, error) {
+func (f Threads) GoalGet(ctx context.Context, params protocolv2.ThreadGoalGetParams) (protocolv2.ThreadGoalGetResponse, error) {
 	var response protocolv2.ThreadGoalGetResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadGoalGet, params, &response); err != nil {
 		return protocolv2.ThreadGoalGetResponse{}, err
@@ -1119,7 +948,7 @@ func (f threadsFacade) GoalGet(ctx context.Context, params protocolv2.ThreadGoal
 	return response, nil
 }
 
-func (f threadsFacade) GoalSet(ctx context.Context, params protocolv2.ThreadGoalSetParams) (protocolv2.ThreadGoalSetResponse, error) {
+func (f Threads) GoalSet(ctx context.Context, params protocolv2.ThreadGoalSetParams) (protocolv2.ThreadGoalSetResponse, error) {
 	var response protocolv2.ThreadGoalSetResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadGoalSet, params, &response); err != nil {
 		return protocolv2.ThreadGoalSetResponse{}, err
@@ -1127,7 +956,7 @@ func (f threadsFacade) GoalSet(ctx context.Context, params protocolv2.ThreadGoal
 	return response, nil
 }
 
-func (f threadsFacade) IncrementElicitation(ctx context.Context, params protocolv2.ThreadIncrementElicitationParams) (protocolv2.ThreadIncrementElicitationResponse, error) {
+func (f Threads) IncrementElicitation(ctx context.Context, params protocolv2.ThreadIncrementElicitationParams) (protocolv2.ThreadIncrementElicitationResponse, error) {
 	var response protocolv2.ThreadIncrementElicitationResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadIncrementElicitation, params, &response); err != nil {
 		return protocolv2.ThreadIncrementElicitationResponse{}, err
@@ -1135,7 +964,7 @@ func (f threadsFacade) IncrementElicitation(ctx context.Context, params protocol
 	return response, nil
 }
 
-func (f threadsFacade) InjectItems(ctx context.Context, params protocolv2.ThreadInjectItemsParams) (protocolv2.ThreadInjectItemsResponse, error) {
+func (f Threads) InjectItems(ctx context.Context, params protocolv2.ThreadInjectItemsParams) (protocolv2.ThreadInjectItemsResponse, error) {
 	var response protocolv2.ThreadInjectItemsResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadInjectItems, params, &response); err != nil {
 		return protocolv2.ThreadInjectItemsResponse{}, err
@@ -1143,7 +972,7 @@ func (f threadsFacade) InjectItems(ctx context.Context, params protocolv2.Thread
 	return response, nil
 }
 
-func (f threadsFacade) ItemsList(ctx context.Context, params protocolv2.ThreadItemsListParams) (protocolv2.ThreadItemsListResponse, error) {
+func (f Threads) ItemsList(ctx context.Context, params protocolv2.ThreadItemsListParams) (protocolv2.ThreadItemsListResponse, error) {
 	var response protocolv2.ThreadItemsListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadItemsList, params, &response); err != nil {
 		return protocolv2.ThreadItemsListResponse{}, err
@@ -1151,7 +980,7 @@ func (f threadsFacade) ItemsList(ctx context.Context, params protocolv2.ThreadIt
 	return response, nil
 }
 
-func (f threadsFacade) List(ctx context.Context, params protocolv2.ThreadListParams) (protocolv2.ThreadListResponse, error) {
+func (f Threads) List(ctx context.Context, params protocolv2.ThreadListParams) (protocolv2.ThreadListResponse, error) {
 	var response protocolv2.ThreadListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadList, params, &response); err != nil {
 		return protocolv2.ThreadListResponse{}, err
@@ -1159,7 +988,7 @@ func (f threadsFacade) List(ctx context.Context, params protocolv2.ThreadListPar
 	return response, nil
 }
 
-func (f threadsFacade) LoadedList(ctx context.Context, params protocolv2.ThreadLoadedListParams) (protocolv2.ThreadLoadedListResponse, error) {
+func (f Threads) LoadedList(ctx context.Context, params protocolv2.ThreadLoadedListParams) (protocolv2.ThreadLoadedListResponse, error) {
 	var response protocolv2.ThreadLoadedListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadLoadedList, params, &response); err != nil {
 		return protocolv2.ThreadLoadedListResponse{}, err
@@ -1167,7 +996,7 @@ func (f threadsFacade) LoadedList(ctx context.Context, params protocolv2.ThreadL
 	return response, nil
 }
 
-func (f threadsFacade) MemoryModeSet(ctx context.Context, params protocolv2.ThreadMemoryModeSetParams) (protocolv2.ThreadMemoryModeSetResponse, error) {
+func (f Threads) MemoryModeSet(ctx context.Context, params protocolv2.ThreadMemoryModeSetParams) (protocolv2.ThreadMemoryModeSetResponse, error) {
 	var response protocolv2.ThreadMemoryModeSetResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadMemoryModeSet, params, &response); err != nil {
 		return protocolv2.ThreadMemoryModeSetResponse{}, err
@@ -1175,7 +1004,7 @@ func (f threadsFacade) MemoryModeSet(ctx context.Context, params protocolv2.Thre
 	return response, nil
 }
 
-func (f threadsFacade) MetadataUpdate(ctx context.Context, params protocolv2.ThreadMetadataUpdateParams) (protocolv2.ThreadMetadataUpdateResponse, error) {
+func (f Threads) MetadataUpdate(ctx context.Context, params protocolv2.ThreadMetadataUpdateParams) (protocolv2.ThreadMetadataUpdateResponse, error) {
 	var response protocolv2.ThreadMetadataUpdateResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadMetadataUpdate, params, &response); err != nil {
 		return protocolv2.ThreadMetadataUpdateResponse{}, err
@@ -1183,7 +1012,7 @@ func (f threadsFacade) MetadataUpdate(ctx context.Context, params protocolv2.Thr
 	return response, nil
 }
 
-func (f threadsFacade) NameSet(ctx context.Context, params protocolv2.ThreadSetNameParams) (protocolv2.ThreadSetNameResponse, error) {
+func (f Threads) NameSet(ctx context.Context, params protocolv2.ThreadSetNameParams) (protocolv2.ThreadSetNameResponse, error) {
 	var response protocolv2.ThreadSetNameResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadNameSet, params, &response); err != nil {
 		return protocolv2.ThreadSetNameResponse{}, err
@@ -1191,7 +1020,7 @@ func (f threadsFacade) NameSet(ctx context.Context, params protocolv2.ThreadSetN
 	return response, nil
 }
 
-func (f threadsFacade) Read(ctx context.Context, params protocolv2.ThreadReadParams) (protocolv2.ThreadReadResponse, error) {
+func (f Threads) Read(ctx context.Context, params protocolv2.ThreadReadParams) (protocolv2.ThreadReadResponse, error) {
 	var response protocolv2.ThreadReadResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRead, params, &response); err != nil {
 		return protocolv2.ThreadReadResponse{}, err
@@ -1199,7 +1028,7 @@ func (f threadsFacade) Read(ctx context.Context, params protocolv2.ThreadReadPar
 	return response, nil
 }
 
-func (f threadsFacade) RealtimeAppendAudio(ctx context.Context, params protocolv2.ThreadRealtimeAppendAudioParams) (protocolv2.ThreadRealtimeAppendAudioResponse, error) {
+func (f Threads) RealtimeAppendAudio(ctx context.Context, params protocolv2.ThreadRealtimeAppendAudioParams) (protocolv2.ThreadRealtimeAppendAudioResponse, error) {
 	var response protocolv2.ThreadRealtimeAppendAudioResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeAppendAudio, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeAppendAudioResponse{}, err
@@ -1207,7 +1036,7 @@ func (f threadsFacade) RealtimeAppendAudio(ctx context.Context, params protocolv
 	return response, nil
 }
 
-func (f threadsFacade) RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error) {
+func (f Threads) RealtimeAppendSpeech(ctx context.Context, params protocolv2.ThreadRealtimeAppendSpeechParams) (protocolv2.ThreadRealtimeAppendSpeechResponse, error) {
 	var response protocolv2.ThreadRealtimeAppendSpeechResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeAppendSpeech, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeAppendSpeechResponse{}, err
@@ -1215,7 +1044,7 @@ func (f threadsFacade) RealtimeAppendSpeech(ctx context.Context, params protocol
 	return response, nil
 }
 
-func (f threadsFacade) RealtimeAppendText(ctx context.Context, params protocolv2.ThreadRealtimeAppendTextParams) (protocolv2.ThreadRealtimeAppendTextResponse, error) {
+func (f Threads) RealtimeAppendText(ctx context.Context, params protocolv2.ThreadRealtimeAppendTextParams) (protocolv2.ThreadRealtimeAppendTextResponse, error) {
 	var response protocolv2.ThreadRealtimeAppendTextResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeAppendText, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeAppendTextResponse{}, err
@@ -1223,7 +1052,7 @@ func (f threadsFacade) RealtimeAppendText(ctx context.Context, params protocolv2
 	return response, nil
 }
 
-func (f threadsFacade) RealtimeListVoices(ctx context.Context, params protocolv2.ThreadRealtimeListVoicesParams) (protocolv2.ThreadRealtimeListVoicesResponse, error) {
+func (f Threads) RealtimeListVoices(ctx context.Context, params protocolv2.ThreadRealtimeListVoicesParams) (protocolv2.ThreadRealtimeListVoicesResponse, error) {
 	var response protocolv2.ThreadRealtimeListVoicesResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeListVoices, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeListVoicesResponse{}, err
@@ -1231,7 +1060,7 @@ func (f threadsFacade) RealtimeListVoices(ctx context.Context, params protocolv2
 	return response, nil
 }
 
-func (f threadsFacade) RealtimeStart(ctx context.Context, params protocolv2.ThreadRealtimeStartParams) (protocolv2.ThreadRealtimeStartResponse, error) {
+func (f Threads) RealtimeStart(ctx context.Context, params protocolv2.ThreadRealtimeStartParams) (protocolv2.ThreadRealtimeStartResponse, error) {
 	var response protocolv2.ThreadRealtimeStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeStart, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeStartResponse{}, err
@@ -1239,7 +1068,7 @@ func (f threadsFacade) RealtimeStart(ctx context.Context, params protocolv2.Thre
 	return response, nil
 }
 
-func (f threadsFacade) RealtimeStop(ctx context.Context, params protocolv2.ThreadRealtimeStopParams) (protocolv2.ThreadRealtimeStopResponse, error) {
+func (f Threads) RealtimeStop(ctx context.Context, params protocolv2.ThreadRealtimeStopParams) (protocolv2.ThreadRealtimeStopResponse, error) {
 	var response protocolv2.ThreadRealtimeStopResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRealtimeStop, params, &response); err != nil {
 		return protocolv2.ThreadRealtimeStopResponse{}, err
@@ -1247,7 +1076,7 @@ func (f threadsFacade) RealtimeStop(ctx context.Context, params protocolv2.Threa
 	return response, nil
 }
 
-func (f threadsFacade) Resume(ctx context.Context, params protocolv2.ThreadResumeParams) (protocolv2.ThreadResumeResponse, error) {
+func (f Threads) Resume(ctx context.Context, params protocolv2.ThreadResumeParams) (protocolv2.ThreadResumeResponse, error) {
 	var response protocolv2.ThreadResumeResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadResume, params, &response); err != nil {
 		return protocolv2.ThreadResumeResponse{}, err
@@ -1255,7 +1084,7 @@ func (f threadsFacade) Resume(ctx context.Context, params protocolv2.ThreadResum
 	return response, nil
 }
 
-func (f threadsFacade) Rollback(ctx context.Context, params protocolv2.ThreadRollbackParams) (protocolv2.ThreadRollbackResponse, error) {
+func (f Threads) Rollback(ctx context.Context, params protocolv2.ThreadRollbackParams) (protocolv2.ThreadRollbackResponse, error) {
 	var response protocolv2.ThreadRollbackResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadRollback, params, &response); err != nil {
 		return protocolv2.ThreadRollbackResponse{}, err
@@ -1263,7 +1092,7 @@ func (f threadsFacade) Rollback(ctx context.Context, params protocolv2.ThreadRol
 	return response, nil
 }
 
-func (f threadsFacade) SettingsUpdate(ctx context.Context, params protocolv2.ThreadSettingsUpdateParams) (protocolv2.ThreadSettingsUpdateResponse, error) {
+func (f Threads) SettingsUpdate(ctx context.Context, params protocolv2.ThreadSettingsUpdateParams) (protocolv2.ThreadSettingsUpdateResponse, error) {
 	var response protocolv2.ThreadSettingsUpdateResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadSettingsUpdate, params, &response); err != nil {
 		return protocolv2.ThreadSettingsUpdateResponse{}, err
@@ -1271,7 +1100,7 @@ func (f threadsFacade) SettingsUpdate(ctx context.Context, params protocolv2.Thr
 	return response, nil
 }
 
-func (f threadsFacade) ShellCommand(ctx context.Context, params protocolv2.ThreadShellCommandParams) (protocolv2.ThreadShellCommandResponse, error) {
+func (f Threads) ShellCommand(ctx context.Context, params protocolv2.ThreadShellCommandParams) (protocolv2.ThreadShellCommandResponse, error) {
 	var response protocolv2.ThreadShellCommandResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadShellCommand, params, &response); err != nil {
 		return protocolv2.ThreadShellCommandResponse{}, err
@@ -1279,7 +1108,7 @@ func (f threadsFacade) ShellCommand(ctx context.Context, params protocolv2.Threa
 	return response, nil
 }
 
-func (f threadsFacade) Start(ctx context.Context, params protocolv2.ThreadStartParams) (protocolv2.ThreadStartResponse, error) {
+func (f Threads) Start(ctx context.Context, params protocolv2.ThreadStartParams) (protocolv2.ThreadStartResponse, error) {
 	var response protocolv2.ThreadStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadStart, params, &response); err != nil {
 		return protocolv2.ThreadStartResponse{}, err
@@ -1287,7 +1116,7 @@ func (f threadsFacade) Start(ctx context.Context, params protocolv2.ThreadStartP
 	return response, nil
 }
 
-func (f threadsFacade) TurnsList(ctx context.Context, params protocolv2.ThreadTurnsListParams) (protocolv2.ThreadTurnsListResponse, error) {
+func (f Threads) TurnsList(ctx context.Context, params protocolv2.ThreadTurnsListParams) (protocolv2.ThreadTurnsListResponse, error) {
 	var response protocolv2.ThreadTurnsListResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadTurnsList, params, &response); err != nil {
 		return protocolv2.ThreadTurnsListResponse{}, err
@@ -1295,7 +1124,7 @@ func (f threadsFacade) TurnsList(ctx context.Context, params protocolv2.ThreadTu
 	return response, nil
 }
 
-func (f threadsFacade) Unarchive(ctx context.Context, params protocolv2.ThreadUnarchiveParams) (protocolv2.ThreadUnarchiveResponse, error) {
+func (f Threads) Unarchive(ctx context.Context, params protocolv2.ThreadUnarchiveParams) (protocolv2.ThreadUnarchiveResponse, error) {
 	var response protocolv2.ThreadUnarchiveResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadUnarchive, params, &response); err != nil {
 		return protocolv2.ThreadUnarchiveResponse{}, err
@@ -1303,7 +1132,7 @@ func (f threadsFacade) Unarchive(ctx context.Context, params protocolv2.ThreadUn
 	return response, nil
 }
 
-func (f threadsFacade) Unsubscribe(ctx context.Context, params protocolv2.ThreadUnsubscribeParams) (protocolv2.ThreadUnsubscribeResponse, error) {
+func (f Threads) Unsubscribe(ctx context.Context, params protocolv2.ThreadUnsubscribeParams) (protocolv2.ThreadUnsubscribeResponse, error) {
 	var response protocolv2.ThreadUnsubscribeResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodThreadUnsubscribe, params, &response); err != nil {
 		return protocolv2.ThreadUnsubscribeResponse{}, err
@@ -1311,7 +1140,7 @@ func (f threadsFacade) Unsubscribe(ctx context.Context, params protocolv2.Thread
 	return response, nil
 }
 
-func (f turnsFacade) Interrupt(ctx context.Context, params protocolv2.TurnInterruptParams) (protocolv2.TurnInterruptResponse, error) {
+func (f Turns) Interrupt(ctx context.Context, params protocolv2.TurnInterruptParams) (protocolv2.TurnInterruptResponse, error) {
 	var response protocolv2.TurnInterruptResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodTurnInterrupt, params, &response); err != nil {
 		return protocolv2.TurnInterruptResponse{}, err
@@ -1319,7 +1148,7 @@ func (f turnsFacade) Interrupt(ctx context.Context, params protocolv2.TurnInterr
 	return response, nil
 }
 
-func (f turnsFacade) Start(ctx context.Context, params protocolv2.TurnStartParams) (protocolv2.TurnStartResponse, error) {
+func (f Turns) Start(ctx context.Context, params protocolv2.TurnStartParams) (protocolv2.TurnStartResponse, error) {
 	var response protocolv2.TurnStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodTurnStart, params, &response); err != nil {
 		return protocolv2.TurnStartResponse{}, err
@@ -1327,7 +1156,7 @@ func (f turnsFacade) Start(ctx context.Context, params protocolv2.TurnStartParam
 	return response, nil
 }
 
-func (f turnsFacade) Steer(ctx context.Context, params protocolv2.TurnSteerParams) (protocolv2.TurnSteerResponse, error) {
+func (f Turns) Steer(ctx context.Context, params protocolv2.TurnSteerParams) (protocolv2.TurnSteerResponse, error) {
 	var response protocolv2.TurnSteerResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodTurnSteer, params, &response); err != nil {
 		return protocolv2.TurnSteerResponse{}, err
@@ -1335,7 +1164,7 @@ func (f turnsFacade) Steer(ctx context.Context, params protocolv2.TurnSteerParam
 	return response, nil
 }
 
-func (f windowsSandboxFacade) Readiness(ctx context.Context) (protocolv2.WindowsSandboxReadinessResponse, error) {
+func (f WindowsSandbox) Readiness(ctx context.Context) (protocolv2.WindowsSandboxReadinessResponse, error) {
 	var response protocolv2.WindowsSandboxReadinessResponse
 	if err := f.client.callProtocolNoParams(ctx, protocolv2.MethodWindowsSandboxReadiness, &response); err != nil {
 		return protocolv2.WindowsSandboxReadinessResponse{}, err
@@ -1343,7 +1172,7 @@ func (f windowsSandboxFacade) Readiness(ctx context.Context) (protocolv2.Windows
 	return response, nil
 }
 
-func (f windowsSandboxFacade) SetupStart(ctx context.Context, params protocolv2.WindowsSandboxSetupStartParams) (protocolv2.WindowsSandboxSetupStartResponse, error) {
+func (f WindowsSandbox) SetupStart(ctx context.Context, params protocolv2.WindowsSandboxSetupStartParams) (protocolv2.WindowsSandboxSetupStartResponse, error) {
 	var response protocolv2.WindowsSandboxSetupStartResponse
 	if err := f.client.callProtocol(ctx, protocolv2.MethodWindowsSandboxSetupStart, params, &response); err != nil {
 		return protocolv2.WindowsSandboxSetupStartResponse{}, err

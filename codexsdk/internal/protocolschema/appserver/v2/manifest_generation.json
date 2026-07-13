@@ -66,6 +66,10 @@
     "server_notification": "ServerNotifications().<Rust variant name>",
     "server_request": "ServerRequests().<Rust variant name>"
   },
+  "facade_status_rule": {
+    "deferred_missing_generated_types": "The facade target is intentionally omitted only while one or more method constant, params type, or response type prerequisites are absent; generation fails once all prerequisites exist.",
+    "generated": "The facade target must have a method constant and every referenced protocol type; missing prerequisites fail generation."
+  },
   "inputs": {
     "experimental_baseline": "codexsdk/internal/protocolschema/appserver/v2",
     "experimental_schema_command": "codex app-server generate-json-schema --experimental --out <tmpdir>",

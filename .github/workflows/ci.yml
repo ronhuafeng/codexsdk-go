@@ -70,6 +70,10 @@ jobs:
             diff -u codexsdk/protocolv2/method_registry.gen.go -
           go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
             diff -u codexsdk/protocolv2/protocol_types.gen.go -
+          tmp="$(mktemp -d)/sdk_surface.gen.go"
+          python3 scripts/codexsdk_generate_sdk_surface.py --out "$tmp"
+          gofmt -w "$tmp"
+          diff -u codexsdk/sdk_surface.gen.go "$tmp"
 
   race:
     name: Go race
@@ -120,7 +124,7 @@ jobs:
           cache: true
 
       - name: Check handwritten API and generated facades
-        run: go test ./codexsdk -run 'Test(HandwrittenPublicAPI|ConcreteRootClientDoesNotExposeThreadLifecycleOrRawCall)$'
+        run: go test ./codexsdk -run 'Test(HandwrittenPublicAPI|GeneratedFacadeAccessorsReturnConcreteOpaqueValues)$'
 
   clean-consumer:
     name: Clean consumer

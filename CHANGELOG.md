@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (planned for v0.4.0):** generated facade accessors now return
+  exported concrete opaque values instead of SDK-owned interfaces. Existing
+  calls retain their exact typed methods and facts; consumers should declare
+  narrow interfaces at their own seams. Future generated method additions add
+  SDK capability without adding methods that external implementations owe.
+
 ### Fixed
 
 - Decoupled exact-run history and `Wait` completion observation from bounded

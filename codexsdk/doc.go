@@ -1,7 +1,8 @@
 // Package codexsdk provides a concrete Client for interacting with a Codex
 // app-server. New returns the only connected form, *Client. The safe, inert
 // zero value closes successfully and returns ErrClientClosed from operations.
-// Consumers should define narrow interfaces around the operations they use.
+// Generated facade accessors return exported concrete opaque values. Consumers
+// should define narrow interfaces around only the operations they use.
 //
 // Client owns process transport, client lifecycle, generated protocol
 // facades, exact thread/turn composition, and typed callback delivery. Exact

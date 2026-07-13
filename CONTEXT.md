@@ -16,8 +16,9 @@ while preserving exact generated protocol facts.
 _Avoid_: workflow API, convenience DSL
 
 **Generated Facade**:
-A protocol-derived group of exact Codex app-server operations exposed by the
-Root Client.
+A protocol-derived exported concrete opaque value exposed by the Root Client.
+It carries a group of exact Codex app-server operations; generated method growth
+adds capability without enlarging an interface that applications implement.
 _Avoid_: service abstraction, provider API
 
 **Stable Generated Surface**:

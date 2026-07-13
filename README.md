@@ -19,9 +19,9 @@ launched Codex app-server over stdio.
 - Runtime requirement: the SDK launches an external `codex app-server` command.
   Unit tests and CI do not require a local Codex binary.
 
-The pre-v1 API uses a concrete root client, consumer-owned
-narrow interfaces, and manifest-classified stable versus experimental
-generated compatibility.
+The pre-v1 API uses a concrete root client, exported concrete opaque generated
+facades, consumer-owned narrow interfaces, and manifest-classified stable
+versus experimental generated compatibility.
 See [Pre-v1 Public API Boundary](docs/public-api-boundary.md).
 
 ## Packages
@@ -221,8 +221,10 @@ tracked with:
   Codex version, generation command, source license, file count, and schema
   bundle checksum.
 - `manifest.json`: classified method and exported generated Go surface,
-  request/notification direction, response schema mapping, facade target, and
-  mechanically derived stable, experimental, or mixed marking.
+  request/notification direction, response schema mapping, facade target,
+  explicit generated/deferred facade status, and mechanically derived stable,
+  experimental, or mixed marking. A deferred facade is valid only while a
+  generated method constant or protocol type prerequisite is absent.
 - `coverage_matrix.json`: reviewed support status for methods, types, and key
   fields.
 - `drift_report.json` and `matrix_update_skeleton.json`: last clean comparison
@@ -241,6 +243,10 @@ go run ./codexsdk/internal/cmd/protocolv2gen -stdout method-registry |
   diff -u codexsdk/protocolv2/method_registry.gen.go -
 go run ./codexsdk/internal/cmd/protocolv2gen -stdout protocol-types |
   diff -u codexsdk/protocolv2/protocol_types.gen.go -
+tmp="$(mktemp -d)/sdk_surface.gen.go"
+python3 scripts/codexsdk_generate_sdk_surface.py --out "$tmp"
+gofmt -w "$tmp"
+diff -u codexsdk/sdk_surface.gen.go "$tmp"
 ```
 
 ## Maintenance

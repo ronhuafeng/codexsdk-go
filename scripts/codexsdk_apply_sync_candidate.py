@@ -338,34 +338,36 @@ def build_manifest(root: Path, old_manifest: dict[str, Any], mappings: dict[str,
                 if not response_mapping or response_mapping.startswith("not_applicable"):
                     raise SystemExit(f"missing response mapping for request method {aggregate_entry.method!r}")
 
-            entries.append(
-                {
-                    "direction": direction,
-                    "facade_target": facade_target(aggregate_entry, direction, kind, existing, mapping),
-                    "family": aggregate_entry.method.split("/", 1)[0],
-                    "kind": kind,
-                    "method": aggregate_entry.method,
-                    "params_or_payload_schema": params_name,
+            target = facade_target(aggregate_entry, direction, kind, existing, mapping)
+            manifest_entry = {
+                "direction": direction,
+                "facade_target": target,
+                "family": aggregate_entry.method.split("/", 1)[0],
+                "kind": kind,
+                "method": aggregate_entry.method,
+                "params_or_payload_schema": params_name,
+                "response_schema": response_schema,
+                "response_schema_status": response_status,
+                "response_type": response_type,
+                "schema_title": aggregate_entry.schema_title,
+                "source_ref": {
+                    "aggregate_pointer": f"{aggregate}#/oneOf/{aggregate_entry.index}",
+                    "aggregate_schema": aggregate,
+                    "baseline_source_commit": source_commit,
+                    "facade_rule": "manifest_generation.json#facade_target_rule",
+                    "params_or_payload_schema": params_schema,
+                    "response_mapping": response_mapping,
                     "response_schema": response_schema,
-                    "response_schema_status": response_status,
-                    "response_type": response_type,
-                    "schema_title": aggregate_entry.schema_title,
-                    "source_ref": {
-                        "aggregate_pointer": f"{aggregate}#/oneOf/{aggregate_entry.index}",
-                        "aggregate_schema": aggregate,
-                        "baseline_source_commit": source_commit,
-                        "facade_rule": "manifest_generation.json#facade_target_rule",
-                        "params_or_payload_schema": params_schema,
-                        "response_mapping": response_mapping,
-                        "response_schema": response_schema,
-                        "stability": stability_text,
-                    },
-                    "source_schema": aggregate,
-                    "source_variant": mapping.variant if mapping else title_variant(aggregate_entry.schema_title),
-                    "stability": stability,
-                    "stability_source": stability_source,
-                }
-            )
+                    "stability": stability_text,
+                },
+                "source_schema": aggregate,
+                "source_variant": mapping.variant if mapping else title_variant(aggregate_entry.schema_title),
+                "stability": stability,
+                "stability_source": stability_source,
+            }
+            if direction == "client_to_server" and kind == "request" and re.fullmatch(r"[A-Za-z][A-Za-z0-9]*\(\)\.[A-Za-z][A-Za-z0-9]*", target):
+                manifest_entry["facade_status"] = existing.get("facade_status", "generated") if existing else "generated"
+            entries.append(manifest_entry)
     return {
         "aggregate_schemas": aggregates,
         "classification_sources": old_manifest.get("classification_sources", []),

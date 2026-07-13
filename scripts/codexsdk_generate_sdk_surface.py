@@ -28,6 +28,11 @@ class SurfaceMethod:
     method_const: str
     params_type: str
     response_type: str
+    stability: str
+
+
+FACADE_STATUS_GENERATED = "generated"
+FACADE_STATUS_DEFERRED = "deferred_missing_generated_types"
 
 
 def load_json(path: Path) -> object:
@@ -44,11 +49,7 @@ def protocol_type_names(path: Path) -> set[str]:
 
 
 def facade_struct_name(accessor: str) -> str:
-    if accessor == "FS":
-        return "fsFacade"
-    if accessor.startswith("MCP"):
-        return "mcp" + accessor[3:] + "Facade"
-    return accessor[:1].lower() + accessor[1:] + "Facade"
+    return accessor
 
 
 def surface_methods(manifest: dict[str, object], method_consts: dict[str, str], type_names: set[str]) -> list[SurfaceMethod]:
@@ -61,18 +62,30 @@ def surface_methods(manifest: dict[str, object], method_consts: dict[str, str], 
         target = str(entry.get("facade_target", ""))
         match = FACADE_TARGET_RE.match(target)
         if not match:
-            continue
+            if target.startswith("internal."):
+                continue
+            raise SystemExit(f"invalid generated facade target {target!r} for method {entry.get('method', '')!r}")
         accessor, operation = match.groups()
         method = str(entry.get("method", ""))
+        facade_status = str(entry.get("facade_status", ""))
         method_const = method_consts.get(method, "")
-        if not method_const:
-            continue
         params_type = str(entry.get("params_or_payload_schema", ""))
         response_type = str(entry.get("response_type", ""))
+        missing = []
+        if not method_const:
+            missing.append("method constant")
         if params_type and params_type not in type_names:
-            continue
+            missing.append(f"params type {params_type}")
         if not response_type or response_type not in type_names:
+            missing.append(f"response type {response_type or '<empty>'}")
+        if facade_status == FACADE_STATUS_DEFERRED:
+            if not missing:
+                raise SystemExit(f"deferred facade method {method!r} has all generated prerequisites; mark it generated")
             continue
+        if facade_status != FACADE_STATUS_GENERATED:
+            raise SystemExit(f"facade method {method!r} has invalid or missing facade_status {facade_status!r}")
+        if missing:
+            raise SystemExit(f"generated facade method {method!r} is missing {', '.join(missing)}")
         key = (accessor, operation)
         if key in seen:
             raise SystemExit(f"duplicate facade operation {accessor}().{operation}")
@@ -85,10 +98,55 @@ def surface_methods(manifest: dict[str, object], method_consts: dict[str, str], 
                 method_const=method_const,
                 params_type=params_type,
                 response_type=response_type,
+                stability=str(entry.get("stability", "")),
             )
         )
     methods.sort(key=lambda item: (item.accessor, item.operation, item.method))
     return methods
+
+
+def facade_compatibility_surface(manifest: dict[str, object]) -> list[dict[str, str]]:
+    by_accessor: dict[str, list[dict[str, str]]] = {}
+    for raw_entry in manifest.get("entries", []):
+        entry = raw_entry if isinstance(raw_entry, dict) else {}
+        if entry.get("direction") != "client_to_server" or entry.get("kind") != "request":
+            continue
+        match = FACADE_TARGET_RE.match(str(entry.get("facade_target", "")))
+        if not match or entry.get("facade_status") != FACADE_STATUS_GENERATED:
+            continue
+        accessor, operation = match.groups()
+        params_type = str(entry.get("params_or_payload_schema", ""))
+        response_type = str(entry.get("response_type", ""))
+        stability = str(entry.get("stability", ""))
+        signature = "func(context.Context"
+        if params_type:
+            signature += f", protocolv2.{params_type}"
+        signature += f") (protocolv2.{response_type}, error)"
+        by_accessor.setdefault(accessor, []).append(
+            {
+                "kind": "method",
+                "name": f"codexsdk.{accessor}.{operation}",
+                "owner": f"codexsdk.{accessor}",
+                "signature": signature,
+                "stability": stability,
+            }
+        )
+
+    surface: list[dict[str, str]] = []
+    for accessor, methods in by_accessor.items():
+        stabilities = {method["stability"] for method in methods}
+        type_stability = "mixed" if len(stabilities) > 1 else next(iter(stabilities))
+        surface.append(
+            {
+                "kind": "type",
+                "name": f"codexsdk.{accessor}",
+                "owner": "",
+                "signature": "struct{/* opaque */}",
+                "stability": type_stability,
+            }
+        )
+        surface.extend(methods)
+    return sorted(surface, key=lambda entry: (entry["kind"], entry["name"]))
 
 
 def render(methods: list[SurfaceMethod]) -> str:
@@ -115,25 +173,16 @@ def render(methods: list[SurfaceMethod]) -> str:
         struct_name = facade_struct_name(accessor)
         lines.extend(
             [
+                f"// {struct_name} is an opaque generated facade for exact Codex operations.",
                 f"type {struct_name} struct {{",
                 "\tclient *Client",
                 "}",
                 "",
-                f"type {accessor} interface {{",
             ]
         )
-        for method in by_accessor[accessor]:
-            if method.params_type:
-                lines.append(
-                    f"\t{method.operation}(ctx context.Context, params protocolv2.{method.params_type}) (protocolv2.{method.response_type}, error)"
-                )
-            else:
-                lines.append(f"\t{method.operation}(ctx context.Context) (protocolv2.{method.response_type}, error)")
         lines.extend(
             [
-                "}",
-                "",
-                f"func (c *Client) {accessor}() {accessor} {{",
+                f"func (c *Client) {accessor}() {struct_name} {{",
                 f"\treturn {struct_name}{{client: c}}",
                 "}",
                 "",

@@ -30,6 +30,14 @@ type modelLister interface {
 	List(context.Context, protocolv2.ModelListParams) (protocolv2.ModelListResponse, error)
 }
 
+type fakeModelLister struct{}
+
+func (fakeModelLister) List(context.Context, protocolv2.ModelListParams) (protocolv2.ModelListResponse, error) {
+	return protocolv2.ModelListResponse{}, nil
+}
+
+var _ modelLister = fakeModelLister{}
+
 func useRoot(root *codexsdk.Client) error {
 	var _ runStarter = root.ThreadRunner()
 	var _ modelLister = root.Models()
