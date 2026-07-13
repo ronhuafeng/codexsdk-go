@@ -390,8 +390,15 @@ func TestNotificationHandlerPanicBecomesTypedClientFailure(t *testing.T) {
 }
 
 func TestNormalCloseWaitsForAcceptedNotificationHandler(t *testing.T) {
+	type startResult struct {
+		stream *Stream[StartedThreadRun]
+		err    error
+	}
+
 	started := make(chan struct{})
 	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseHandler := func() { releaseOnce.Do(func() { close(release) }) }
 	t.Setenv("CODEXSDK_FAKE_RECORD", tempRecord(t))
 	root, err := New(ClientOptions{
 		CWD:     t.TempDir(),
@@ -409,11 +416,25 @@ func TestNormalCloseWaitsForAcceptedNotificationHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := root.ThreadRunner().StartStream(context.Background(), StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
-	if err != nil {
-		t.Fatal(err)
+	startCtx, cancelStart := context.WithCancel(context.Background())
+	t.Cleanup(func() {
+		cancelStart()
+		releaseHandler()
+		_ = root.Close()
+	})
+	// StartStream may fence terminal replay on the admitted handler. Start it
+	// concurrently so the test does not assume which side of that fence returns
+	// first.
+	startedStream := make(chan startResult, 1)
+	go func() {
+		stream, err := root.ThreadRunner().StartStream(startCtx, StartThreadRunRequest{Turn: protocolv2.TurnStartParams{Input: []protocolv2.UserInput{}}})
+		startedStream <- startResult{stream: stream, err: err}
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("notification handler did not start")
 	}
-	<-started
 	closed := make(chan error, 1)
 	go func() { closed <- root.Close() }()
 	select {
@@ -421,11 +442,39 @@ func TestNormalCloseWaitsForAcceptedNotificationHandler(t *testing.T) {
 		t.Fatalf("Close returned before handler: %v", err)
 	case <-time.After(25 * time.Millisecond):
 	}
-	close(release)
-	if err := <-closed; err != nil {
-		t.Fatal(err)
+	releaseHandler()
+	select {
+	case err := <-closed:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close did not return after handler completed")
 	}
-	for stream.Next(context.Background()) {
+	var startedRun startResult
+	select {
+	case startedRun = <-startedStream:
+	case <-time.After(5 * time.Second):
+		t.Fatal("StartStream did not return after handler completed")
+	}
+	if startedRun.err == nil {
+		if startedRun.stream == nil {
+			t.Fatal("StartStream returned a nil stream without an error")
+		}
+	} else if errors.Is(startedRun.err, ErrClientClosed) {
+		if startedRun.stream != nil {
+			t.Fatal("StartStream returned a stream with ErrClientClosed")
+		}
+		return
+	} else {
+		t.Fatal(startedRun.err)
+	}
+	nextCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for startedRun.stream.Next(nextCtx) {
+	}
+	if nextCtx.Err() != nil {
+		t.Fatalf("stream did not terminate: %v", nextCtx.Err())
 	}
 }
 

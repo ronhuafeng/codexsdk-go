@@ -12,7 +12,7 @@ the current SDK-owned `Client` interface embedding the growing generated
 
 Accepted; the concrete-root portion is implemented by issue #62 after v0.2.1.
 Generated stability manifest extension is implemented. Issue #89 completes the
-same ownership rule for generated facades in the planned v0.4.0 release: facade
+same ownership rule for generated facades in v0.4.0: facade
 accessors return exported concrete opaque values, not SDK-owned interfaces.
 
 ## Decision

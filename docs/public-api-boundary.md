@@ -4,7 +4,7 @@ The accepted target for issue #44 is recorded in
 [ADR 0001](adr/0001-pre-v1-public-api-boundary.md). This page translates the
 decision into consumer guidance and migration consequences. The concrete-root
 root boundary is implemented after v0.2.1. Concrete generated facade ownership
-is implemented for the planned v0.4.0 release.
+is implemented in v0.4.0.
 
 ## Target shape
 
@@ -93,8 +93,8 @@ remains closed because its design was folded into #44.
 ## Migration window
 
 The concrete-root change is implemented after v0.2.1. Concrete facade values
-replace the remaining generated facade interfaces in the planned v0.4.0 minor
-release as a documented pre-v1 breaking change. Code, migration guidance,
+replace the remaining generated facade interfaces in v0.4.0 as a documented
+pre-v1 breaking change. Code, migration guidance,
 compatibility reporting, changelog, package documentation, and clean-consumer
 evidence move together.
 

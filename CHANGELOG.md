@@ -4,13 +4,16 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-13
+
 ### Changed
 
-- **Breaking (planned for v0.4.0):** generated facade accessors now return
+- **Breaking (pre-v1):** generated facade accessors now return
   exported concrete opaque values instead of SDK-owned interfaces. Existing
   calls retain their exact typed methods and facts; consumers should declare
   narrow interfaces at their own seams. Future generated method additions add
   SDK capability without adding methods that external implementations owe.
+  See the [v0.4 migration guide](docs/v0.4-migration.md).
 
 ### Fixed
 
