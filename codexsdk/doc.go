@@ -7,12 +7,11 @@
 // facades, exact thread/turn composition, and typed callback delivery. Exact
 // run notifications retain ingestion order across stream attachment: pending
 // notifications are accepted before later live notifications for the same run.
-// Each exact run stream has a bounded delivery queue. If that queue overflows,
-// the generated notification remains in the run's partial history, the first
-// backpressure failure closes the client and all active streams, and Close
-// returns that same cause. This per-run capacity is independent of the
-// configurable global notification-handler queue capacity. Per-run overflow
-// errors include turn_id context; global-handler overflow has no run context.
+// Exact run results retain complete immutable notification history independent
+// of observation. Wait observes completion without consuming notifications;
+// Next advances a cursor over the same ordered history. The configurable
+// global notification-handler queue remains bounded, and its overflow closes
+// the client with ErrNotificationBackpressure.
 // Exact run history follows generated-schema identity: turn-scoped facts attach
 // only to the matching turn; thread-scoped facts attach to every run currently
 // active or attaching for that thread and are not retained for a later run;

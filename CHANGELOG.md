@@ -4,7 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- Decoupled exact-run history and `Wait` completion observation from bounded
+  delivery. `Next` now advances over the immutable ordered result history, so
+  runs retain all notifications and complete even when callers only use
+  `Wait`; global notification-handler backpressure remains bounded.
 
 ## [0.3.0] - 2026-07-13
 

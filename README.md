@@ -157,7 +157,11 @@ and each receives an immutable result snapshot plus the run's stable terminal
 error. A waiter's context bounds only that call: cancellation returns the latest
 partial snapshot with `ctx.Err()` without canceling the run or changing
 `Stream.Err`. Use `Stream.Close` for explicit shared run cancellation. `Next`
-retains its existing bounded live-delivery and cancellation semantics.
+uses a cursor over the same immutable ordered history retained by `Result`, so
+`Wait` does not need to consume notifications and cannot cause per-run
+backpressure. `Next` context cancellation retains its shared-run cancellation
+semantics. The separately configurable global notification-handler queue
+remains bounded.
 
 Configure `ServerRequestHandler` when the application can provide generated
 response data. With no handler, the
