@@ -15,6 +15,7 @@ var (
 	ErrHandlerFailed            = errors.New("codexsdk: handler failed")
 	ErrExactServerRequest       = errors.New("codexsdk: exact server request failed closed")
 	ErrMissingThreadID          = errors.New("codexsdk: thread response missing thread id")
+	ErrMissingTurnID            = errors.New("codexsdk: turn response missing turn id")
 )
 
 type ExactServerRequestError struct {

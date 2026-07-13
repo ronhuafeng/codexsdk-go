@@ -179,6 +179,7 @@ func runFakeAppServer(mode string, extra []string) {
 	appendRecord(record, map[string]any{"kind": "process", "argv": os.Args[1:], "cwd": mustGetwd(), "extra": extra})
 	scanner := bufio.NewScanner(os.Stdin)
 	threadCounter := 0
+	resumeCounter := 0
 	turnCounter := 0
 	pendingConcurrent := []string{}
 	for scanner.Scan() {
@@ -818,7 +819,17 @@ func runFakeAppServer(mode string, extra []string) {
 			model, _ := params["model"].(string)
 			sendProtocolResult(id, facadeThreadStartResponse("thread-"+itoa(threadCounter), model))
 		case "thread/resume":
+			resumeCounter++
 			params, _ := message["params"].(map[string]any)
+			if mode == "thread-resume-malformed-response" {
+				send(map[string]any{"id": id, "result": map[string]any{"thread": map[string]any{"id": "thread-existing"}}})
+				continue
+			}
+			if mode == "thread-resume-missing-id-once" && resumeCounter == 1 {
+				sendProtocolResult(id, facadeThreadResumeResponse("", "decoded-resume-model"))
+				sendExactReroute("", "turn-ghost", "unattributed", "must-not-attach")
+				continue
+			}
 			if mode == "facade" {
 				threadID, _ := params["threadId"].(string)
 				model, _ := params["model"].(string)
@@ -1066,6 +1077,18 @@ func runFakeAppServer(mode string, extra []string) {
 			}
 			params, _ := message["params"].(map[string]any)
 			threadID, _ := params["threadId"].(string)
+			if mode == "turn-start-missing-id-once" && turnCounter == 1 {
+				sendProtocolResult(id, protocolv2.TurnStartResponse{
+					Turn: protocolv2.Turn{
+						ID:        "",
+						Items:     []protocolv2.ThreadItem{facadeThreadAgentMessageItem("decoded-item", "decoded partial turn")},
+						StartedAt: protocolv2.Value(int64(1234)),
+						Status:    protocolv2.TurnStatusInProgress,
+					},
+				})
+				sendExactReroute("", "", "unattributed", "must-not-attach")
+				continue
+			}
 			if mode == "turn-start-malformed-response" {
 				send(map[string]any{"id": id, "result": map[string]any{"turn": map[string]any{"id": turnID, "status": "inProgress"}}})
 				continue

@@ -45,6 +45,7 @@ var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrClientClosed error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrExactServerRequest error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrHandlerFailed error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrMissingThreadID error
+var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrMissingTurnID error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrNotificationBackpressure error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrStreamClosed error
 var github.com/ronhuafeng/codexsdk-go/codexsdk.ErrTurnFailed error

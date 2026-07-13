@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added `ErrMissingTurnID` as the stable `errors.Is` target for a successfully
+  decoded `turn/start` response whose required turn identity is empty.
+
+### Fixed
+
+- Unified malformed exact-lifecycle evidence across Start and Resume. Decoded
+  `thread/start`, `thread/resume`, and `turn/start` responses now remain
+  observable as immutable terminal partial results when a required identity is
+  missing, without starting the next stage, registering an empty-ID run, or
+  closing the Client. See the [v0.5 migration guide](docs/v0.5-migration.md).
+
 ## [0.4.0] - 2026-07-13
 
 ### Changed
