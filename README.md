@@ -3,6 +3,14 @@
 Go client and generated protocol types for the Codex app-server JSON-RPC
 protocol.
 
+> [!IMPORTANT]
+> This module path is frozen at `v0.5.1` and receives no further feature or
+> security updates. Development moves to
+> `github.com/ronhuafeng/llm-go/codexsdk`, beginning with `v0.6.0`. See the
+> [migration guide](docs/llm-go-migration.md) for exact import mappings. Treat
+> the replacement as available only after that tag resolves through the public
+> Go proxy.
+
 This project is unofficial and experimental. It is not an OpenAI product, is
 not supported by OpenAI, and may lag or diverge from the Codex CLI/app-server
 implementation. Use it when you want a small Go SDK that talks to a locally
@@ -16,7 +24,8 @@ launched Codex app-server over stdio.
   `codexsdk/internal/protocolschema/appserver/v2/baseline_metadata.json`.
 - API stability: pre-1.0. Public APIs are intended to be useful and reviewed,
   but breaking changes can happen before v1.0.
-- Current stable release: `v0.5.0`.
+- Final legacy release: `v0.5.1`; this repository is frozen pending archival
+  after the replacement module is verified.
 - Runtime requirement: the SDK launches an external `codex app-server` command.
   Unit tests and CI do not require a local Codex binary.
 
@@ -43,7 +52,7 @@ For the unified malformed lifecycle partial-evidence contract, see the
 ## Installation
 
 ```sh
-go get github.com/ronhuafeng/codexsdk-go@v0.5.0
+go get github.com/ronhuafeng/codexsdk-go@v0.5.1
 ```
 
 The module targets Go 1.23 or newer.

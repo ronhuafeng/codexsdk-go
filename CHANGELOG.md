@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+This legacy module path is frozen. Future releases use
+`github.com/ronhuafeng/llm-go/codexsdk`.
+
+## [0.5.1] - 2026-07-14
+
+### Deprecated
+
+- Froze `github.com/ronhuafeng/codexsdk-go` at its final legacy release. The
+  replacement module is `github.com/ronhuafeng/llm-go/codexsdk`, beginning
+  with `v0.6.0`; see the [repository migration guide](docs/llm-go-migration.md)
+  for exact public import mappings.
+- Ended feature and security maintenance for the legacy module path. Existing
+  immutable versions remain available through the public Go proxy until the
+  repository is archived after replacement verification.
+
 ## [0.5.0] - 2026-07-13
 
 ### Added
